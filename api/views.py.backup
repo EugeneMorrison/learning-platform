@@ -1,0 +1,399 @@
+"""
+API Views for the Learning Platform
+
+ViewSets provide automatic CRUD operations:
+- list()   → GET /api/courses/          (all courses)
+- create() → POST /api/courses/         (create new)
+- retrieve() → GET /api/courses/123/    (specific course)
+- update() → PUT /api/courses/123/      (update)
+- destroy() → DELETE /api/courses/123/  (delete)
+
+Django REST Framework generates all of these automatically!
+"""
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import User, Course, Lesson, Block, Enrollment, Progress
+from .serializers import (
+    UserSerializer,
+    CourseSerializer,
+    CourseDetailSerializer,
+    LessonSerializer,
+    LessonDetailSerializer,
+    BlockSerializer,
+    EnrollmentSerializer,
+    ProgressSerializer
+)
+
+
+# =============================================================================
+# USER VIEWSET
+# =============================================================================
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for users.
+
+    Provides:
+    - GET /api/users/          → List all users
+    - POST /api/users/         → Create user
+    - GET /api/users/123/      → Get specific user
+    - PUT /api/users/123/      → Update user
+    - DELETE /api/users/123/   → Delete user
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+
+# =============================================================================
+# COURSE VIEWSET
+# =============================================================================
+
+class CourseViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for courses.
+
+    Uses different serializers for list vs detail:
+    - List view: Basic course info
+    - Detail view: Course info + all lessons
+    """
+    queryset = Course.objects.all()
+
+    def get_serializer_class(self):
+        """
+        Use detailed serializer for single course view.
+        Use basic serializer for list view.
+        """
+        if self.action == 'retrieve':
+            return CourseDetailSerializer
+        return CourseSerializer
+
+    def get_queryset(self):
+        """
+        Filter courses based on query parameters.
+
+        Examples:
+        - /api/courses/?is_published=true  → Only published courses
+        - /api/courses/?author=123         → Courses by specific author
+        """
+        queryset = Course.objects.all()
+
+        # Filter by published status
+        is_published = self.request.query_params.get('is_published')
+        if is_published is not None:
+            queryset = queryset.filter(is_published=is_published.lower() == 'true')
+
+        # Filter by author
+        author_id = self.request.query_params.get('author')
+        if author_id is not None:
+            queryset = queryset.filter(author_id=author_id)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def my_courses(self, request):
+        """
+        Custom endpoint: GET /api/courses/my_courses/
+
+        Returns courses authored by the current user.
+        (Will work after we add authentication in Step 4)
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'Authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        courses = Course.objects.filter(author=request.user)
+        serializer = self.get_serializer(courses, many=True)
+        return Response(serializer.data)
+
+
+# =============================================================================
+# LESSON VIEWSET
+# =============================================================================
+
+class LessonViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for lessons.
+
+    Automatically filters by course when using:
+    - /api/lessons/?course=123  → Get all lessons in course 123
+    """
+    queryset = Lesson.objects.all()
+
+    def get_serializer_class(self):
+        """Use detailed serializer for single lesson view"""
+        if self.action == 'retrieve':
+            return LessonDetailSerializer
+        return LessonSerializer
+
+    def get_queryset(self):
+        """
+        Filter lessons by course.
+
+        Example:
+        - /api/lessons/?course=123  → Lessons in course 123
+        """
+        queryset = Lesson.objects.all()
+
+        # Filter by course
+        course_id = self.request.query_params.get('course')
+        if course_id is not None:
+            queryset = queryset.filter(course_id=course_id)
+
+        return queryset
+
+
+# =============================================================================
+# BLOCK VIEWSET
+# =============================================================================
+
+class BlockViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for blocks.
+
+    Filters:
+    - /api/blocks/?lesson=123   → Blocks in lesson 123
+    - /api/blocks/?type=QUIZ    → Only quiz blocks
+    """
+    queryset = Block.objects.all()
+    serializer_class = BlockSerializer
+
+    def get_queryset(self):
+        """
+        Filter blocks by lesson or type.
+
+        Examples:
+        - /api/blocks/?lesson=123   → Blocks in specific lesson
+        - /api/blocks/?type=QUIZ    → Only QUIZ blocks
+        """
+        queryset = Block.objects.all()
+
+        # Filter by lesson
+        lesson_id = self.request.query_params.get('lesson')
+        if lesson_id is not None:
+            queryset = queryset.filter(lesson_id=lesson_id)
+
+        # Filter by type
+        block_type = self.request.query_params.get('type')
+        if block_type is not None:
+            queryset = queryset.filter(type=block_type.upper())
+
+        return queryset
+
+
+# =============================================================================
+# ENROLLMENT VIEWSET
+# =============================================================================
+
+class EnrollmentViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for enrollments.
+
+    Tracks which students are enrolled in which courses.
+    """
+    queryset = Enrollment.objects.all()
+    serializer_class = EnrollmentSerializer
+
+    def get_queryset(self):
+        """
+        Filter enrollments.
+
+        Examples:
+        - /api/enrollments/?student=123  → Courses this student enrolled in
+        - /api/enrollments/?course=456   → Students in this course
+        """
+        queryset = Enrollment.objects.all()
+
+        # Filter by student
+        student_id = self.request.query_params.get('student')
+        if student_id is not None:
+            queryset = queryset.filter(student_id=student_id)
+
+        # Filter by course
+        course_id = self.request.query_params.get('course')
+        if course_id is not None:
+            queryset = queryset.filter(course_id=course_id)
+
+        return queryset
+
+    @action(detail=False, methods=['get'])
+    def my_enrollments(self, request):
+        """
+        Custom endpoint: GET /api/enrollments/my_enrollments/
+
+        Returns courses the current user is enrolled in.
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'Authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        enrollments = Enrollment.objects.filter(student=request.user)
+        serializer = self.get_serializer(enrollments, many=True)
+        return Response(serializer.data)
+
+
+# =============================================================================
+# PROGRESS VIEWSET
+# =============================================================================
+
+class ProgressViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for progress tracking.
+
+    Tracks student completion of blocks.
+    """
+    queryset = Progress.objects.all()
+    serializer_class = ProgressSerializer
+
+    def get_queryset(self):
+        """
+        Filter progress.
+
+        Examples:
+        - /api/progress/?student=123     → This student's progress
+        - /api/progress/?lesson=456      → Progress in this lesson
+        - /api/progress/?completed=true  → Only completed blocks
+        """
+        queryset = Progress.objects.all()
+
+        # Filter by student
+        student_id = self.request.query_params.get('student')
+        if student_id is not None:
+            queryset = queryset.filter(student_id=student_id)
+
+        # Filter by lesson
+        lesson_id = self.request.query_params.get('lesson')
+        if lesson_id is not None:
+            queryset = queryset.filter(lesson_id=lesson_id)
+
+        # Filter by completed
+        completed = self.request.query_params.get('completed')
+        if completed is not None:
+            queryset = queryset.filter(completed=completed.lower() == 'true')
+
+        return queryset
+
+    @action(detail=False, methods=['post'])
+    def submit(self, request):
+        """
+        Custom endpoint: POST /api/progress/submit/
+
+        Submit a block completion/answer.
+
+        Expected data:
+        {
+            "block_id": "uuid",
+            "answer": {"selected": 1},  # For quiz
+            "completed": true
+        }
+        """
+        if not request.user.is_authenticated:
+            return Response(
+                {'error': 'Authentication required'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+
+        block_id = request.data.get('block_id')
+        answer = request.data.get('answer')
+        completed = request.data.get('completed', True)
+
+        if not block_id:
+            return Response(
+                {'error': 'block_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            block = Block.objects.get(id=block_id)
+        except Block.DoesNotExist:
+            return Response(
+                {'error': 'Block not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Get or create progress record
+        progress, created = Progress.objects.get_or_create(
+            student=request.user,
+            block=block,
+            lesson=block.lesson,
+            defaults={
+                'completed': completed,
+                'answer': answer
+            }
+        )
+
+        # Update if already exists
+        if not created:
+            progress.completed = completed
+            progress.answer = answer
+
+            # Check if answer is correct (for QUIZ blocks)
+            if block.type == 'QUIZ' and answer:
+                selected = answer.get('selected')
+                correct_answer = block.content.get('correct_answer')
+                progress.is_correct = (selected == correct_answer)
+
+            progress.save()
+
+        serializer = self.get_serializer(progress)
+        return Response(serializer.data)
+
+
+# =============================================================================
+# KEEP YOUR OLD VIEWS (For Step 1 compatibility)
+# =============================================================================
+
+from rest_framework.decorators import api_view
+from datetime import datetime
+
+
+@api_view(['GET'])
+def hello_view(request):
+    """Simple hello endpoint"""
+    return Response({'message': 'Hello World!'})
+
+
+@api_view(['GET'])
+def status_view(request):
+    """API status with timestamp"""
+    return Response({
+        'status': 'ok',
+        'message': 'Learning Platform API is running',
+        'timestamp': datetime.now().isoformat(),
+        'version': '1.0.0'
+    })
+
+
+@api_view(['GET', 'POST'])
+def course_list_view(request):
+    """
+    OLD VIEW - Now using real database!
+
+    GET: Return list of courses
+    POST: Create new course
+    """
+
+    if request.method == 'GET':
+        # NEW: Get real courses from database!
+        courses = Course.objects.all()
+        serializer = CourseSerializer(courses, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        # NEW: Create real course in database!
+        serializer = CourseSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                serializer.data,
+                status=status.HTTP_201_CREATED
+            )
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )

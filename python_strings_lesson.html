@@ -1,0 +1,671 @@
+
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Методы проверки строк в Python</title>
+<style>
+body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111; line-height:1.6; margin:0; padding:24px; }
+h1 { font-size: 28px; margin-bottom: 16px; }
+h2 { font-size: 22px; margin-top: 24px; }
+h3 { font-size: 18px; margin-top: 16px; }
+.step { border-left:4px solid #e0e0e0; padding:8px 12px; margin:10px 0; background:#fafafa; }
+.step b { color:#555; }
+.choice-options { margin-top:8px; padding:6px 10px; background:#fff7e6; border:1px dashed #e5c07b; border-radius:6px; }
+.choice-options ul { margin:4px 0 0 20px; padding:0; }
+.answer { margin-top:6px; padding:4px 8px; background:#e9ffe9; border:1px solid #93d493; border-radius:6px; display:inline-block; }
+.dataset-block { margin-top:8px; padding:6px 10px; background:#f4f4f4; border-radius:6px; font-size: 13px; }
+.dataset-block pre { white-space: pre-wrap; word-wrap: break-word; }
+</style>
+</head>
+<body>
+
+<h2>⭐ Метод <code>.startswith()</code> ⭐</h2>
+
+<p>Проверяет, <strong>начинается ли строка с указанной подстроки</strong> (или одной из подстрок в кортеже).</p>
+
+<p>Возвращает <code>True</code> или <code>False</code>.</p>
+
+<blockquote>
+<p>Не пугайтесь, кортеж — это&nbsp;просто несколько значений, записанных через запятую в круглых скобках.<br>
+Пока что мы не будем глубоко в них вникать, достаточно понимать общий принцип.</p>
+</blockquote>
+
+<h3>Пример 1: Базовое использование</h3>
+
+<pre><code class="language-python">print("Понедельник день тяжёлый".startswith("Пон"))</code></pre>
+
+<p><strong>Вывод:</strong></p>
+
+<pre><code class="language-no-highlight">True</code></pre>
+
+<p><strong>Как это работает?</strong><br>
+Метод проверяет, начинается ли строка с подстроки&nbsp;<code>"Пон"</code>.&nbsp;<strong>Регистр имеет значение!</strong></p>
+
+<h3>Пример 2: Проверка нескольких вариантов</h3>
+
+<pre><code class="language-python">print("image.jpg".startswith(("image", "photo")))
+print("video.mp4".startswith(("image", "photo")))
+print("photo.png".startswith(("image", "photo")))</code></pre>
+
+<p><strong>Вывод:</strong></p>
+
+<pre><code class="language-no-highlight">True
+False
+True</code></pre>
+
+<p><strong>Как это работает?</strong><br>
+Можно передать&nbsp;<strong>кортеж подстрок&nbsp;</strong>для проверки. Метод вернет&nbsp;<code>True</code>, если строка начинается с&nbsp;<strong>любой из них</strong>.</p>
+
+<h3>Пример 3: Учет регистра</h3>
+
+<pre><code class="language-python">print("Апельсин".startswith("апе"))
+print("апельсин".startswith("апе"))</code></pre>
+
+<p><strong>Вывод:</strong></p>
+
+<pre><code class="language-no-highlight">False
+True</code></pre>
+
+<p><strong>Как это работает?</strong><br>
+Метод <strong>чувствителен к регистру</strong>: заглавная <code>A</code> не равна строчной <code>а</code>.</p>
+
+<p>✅&nbsp;<strong>Решение:</strong>&nbsp;<br>
+Для регистронезависимой проверки используйте метод&nbsp;<code>.lower()</code>:</p>
+
+<pre><code class="language-python">"Апельсин".lower().startswith("апе")  # True</code></pre>
+
+<h3>Пример 4: Проверка с указанием диапазона (только <code>start</code>)</h3>
+
+<p>Метод&nbsp;<strong>имитирует срез строки</strong>, но работает&nbsp;<strong>эффективнее</strong>, так как не создаёт новую строку.</p>
+
+<pre><code class="language-python">text.startswith(prefix, start, end)</code></pre>
+
+<ul>
+	<li>
+	<p>Параметр&nbsp;<code>end</code>&nbsp;<strong>не включительно</strong>&nbsp;как и в срезе&nbsp;<code>str[start:end]</code>.</p>
+	</li>
+	<li>
+	<p>Фактически проверяется:&nbsp;<strong>начинается ли&nbsp;</strong><code>text[start:end]</code><strong>&nbsp;с&nbsp;</strong><code>prefix</code><strong>?</strong></p>
+	</li>
+</ul>
+
+<p>А вот и сам пример:&nbsp;</p>
+
+<pre><code class="language-python">text = "Hello, world!"
+print(text.startswith("world", 7))</code></pre>
+
+<p><strong>Вывод:</strong></p>
+
+<pre><code class="language-no-highlight">True</code></pre>
+
+<p><strong>Как это работает?</strong></p>
+
+<ul>
+	<li>Берётся подстрока&nbsp;начиная с индекса <code>7</code> (включительно) до конца строки (включительно):
+
+	<pre><code class="language-python">text[7:] → "world!"</code></pre>
+	</li>
+	<li>Проверяется:
+	<pre><code class="language-python">"world!".startswith("world")</code></pre>
+	</li>
+</ul>
+
+<h3>Пример 5: Проверка с указанием диапазона&nbsp;<code>start</code> и <code>end</code></h3>
+
+<pre><code class="language-python">text = "Hello, world!"
+print(text.startswith("world", 7, 12))</code></pre>
+
+<p><strong>Вывод:</strong></p>
+
+<pre><code class="language-no-highlight">True</code></pre>
+
+<p><strong>Как это работает?</strong></p>
+
+<ul>
+	<li>Берётся подстрока&nbsp;от индекса <code>7</code> (включительно) до <code>12</code> (НЕ включительно):
+
+	<pre><code class="language-python">text[7:12] → "world"</code></pre>
+	</li>
+	<li>Проверяется:
+	<pre><code class="language-python">"world".startswith("world")</code></pre>
+	</li>
+</ul>
+
+<h3>Пример 6: Проверка пустой строки</h3>
+
+<pre><code class="language-python">print("".startswith(""))
+print("Python".startswith(""))</code></pre>
+
+<p><strong>Вывод:</strong></p>
+
+<pre><code class="language-no-highlight">True
+True</code></pre>
+
+<p><strong>Как это работает?</strong><br>
+Любая строка&nbsp;<strong>содержит пустую подстроку</strong>&nbsp;в любом месте, в том числе в начале.</p>
+
+<h3><strong>❌ </strong>Пример 7: <strong>Ошибка при передаче числа</strong></h3>
+
+<pre><code class="language-python">print("12345".startswith(123))</code></pre>
+
+<p><strong>Ошибка:</strong></p>
+
+<pre><code class="language-no-highlight">TypeError: startswith first arg must be str or a tuple of str, not int</code></pre>
+
+<p><strong>Почему?</strong><br>
+Метод принимает&nbsp;<strong>только строки или кортежи строк</strong>.</p>
+
+<p><strong>Как исправить?</strong><br>
+Преобразуйте число в строку:</p>
+
+<pre><code class="language-python">print("12345".startswith(str(123)))  # True  
+# или  
+print("12345".startswith(f"{123}"))  # True  </code></pre>
+
+<h3>✔️ Когда использовать?</h3>
+
+<ul>
+	<li>
+	<p>Для проверки протоколов URL.</p>
+	</li>
+	<li>
+	<p>При фильтрации файлов по префиксам имен.</p>
+	</li>
+	<li>
+	<p>Для проверки ввода пользователя (например, телефонные номера).</p>
+	</li>
+	<li>
+	<p>При обработке команд (если строка начинается с определённого слова).</p>
+	</li>
+</ul>
+
+<h3>❌ Когда не использовать?</h3>
+
+<ul>
+	<li>
+	<p>Для поиска подстрок&nbsp;<strong>в середине строки</strong>&nbsp;(лучше&nbsp;<code>in</code>&nbsp;или&nbsp;<code>find()</code>).</p>
+	</li>
+	<li>
+	<p>Для сложных шаблонов (используйте&nbsp;<strong>регулярные выражения</strong>).</p>
+	</li>
+	<li>
+	<p>Если нужно проверить несколько сложных условий (лучше&nbsp;<code>if с or</code>&nbsp;или списки).</p>
+	</li>
+</ul>
+
+<h3>⚡ Важно знать</h3>
+
+<ul>
+	<li>
+	<p><strong>Работает в 2-5 раз быстрее</strong>, чем срезы.&nbsp;<strong>Почему?</strong></p>
+
+	<ul>
+		<li>
+		<p>Срез создаёт новую строку, тратя память и время.</p>
+		</li>
+		<li>
+		<p><code>.startswith()</code>&nbsp;сравнивает символы напрямую&nbsp;и&nbsp;не тратит время на создание среза.</p>
+		</li>
+	</ul>
+	</li>
+	<li>
+	<p><strong>Принимает только строку или кортеж строк.</strong>&nbsp;<br>
+	Списки нужно преобразовать с помощью функции <code>tuple()</code>:</p>
+
+	<pre><code class="language-python">prefixes = ["im", "pic"]
+print("image.png".startswith(tuple(prefixes)))  # True</code></pre>
+	</li>
+	<li>
+	<p>В&nbsp;<strong>Python 3.9+</strong>&nbsp;появился метод&nbsp;<code>.removeprefix()</code>&nbsp;для удаления префикса (о нём — в следующих курсах).</p>
+	</li>
+</ul>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("фуфайка".startswith("фу"))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">fact = "У кошки 32 мышцы в каждом ухе"
+print(fact.startswith(fact))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">fact = "Наиболее часто используемая буква в русском алфавите - это буква E"
+print(fact.startswith("н"))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("Все насекомые имеют по 6 ног".startswith(""))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("Хреновый листоед".startswith("лист", 9))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("Лягушка-помидор".startswith("-", 7, 8))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("рыжая навозница".startswith(("Р", "р")))</code></pre>
+
+<p>______________________________________________^_____^____ кириллица </p>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">s = "Плюмбум"
+print(s.startswith("плюм"))
+print(s.lower().startswith("плюм"))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;br&gt;True&lt;/code&gt;&lt;br&gt;&lt;br&gt;</li>
+<li>⬜ &lt;code&gt;True&lt;br&gt;False&lt;/code&gt;&lt;br&gt;&lt;br&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;br&gt;False&lt;/code&gt;&lt;br&gt;&lt;br&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;br&gt;True&lt;/code&gt;&lt;br&gt;&lt;br&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;&lt;br&gt;&lt;br&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;br&gt;True&lt;/code&gt;&lt;br&gt;&lt;br&gt;&quot;,
+    &quot;&lt;code&gt;True&lt;br&gt;False&lt;/code&gt;&lt;br&gt;&lt;br&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;br&gt;False&lt;/code&gt;&lt;br&gt;&lt;br&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;br&gt;True&lt;/code&gt;&lt;br&gt;&lt;br&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&lt;br&gt;&lt;br&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print(" Злая щитоспинка".startswith("Злая"))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("".startswith(""))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">print("516".startswith(5))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>choice</b><br>
+<p>Определите, что будет выведено на экран в результате выполнения следующего кода:</p>
+
+<pre><code class="language-python">s = "Слюнявая пенница"
+print(s.startswith("", len(s)))</code></pre>
+<div class="choice-options"><strong>Варианты ответов:</strong><ul>
+<li>⬜ &lt;code&gt;True&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;False&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;None&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Пустая строка&lt;/code&gt;</li>
+<li>⬜ &lt;code&gt;Ошибка&lt;/code&gt;</li>
+</ul></div>
+<details class="dataset-block"><summary>dataset (служебные данные шага)</summary><pre>{
+  &quot;is_multiple_choice&quot;: false,
+  &quot;options&quot;: [
+    &quot;&lt;code&gt;True&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;False&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;None&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Пустая строка&lt;/code&gt;&quot;,
+    &quot;&lt;code&gt;Ошибка&lt;/code&gt;&quot;
+  ]
+}</pre></details>
+</div>
+<div class="step">
+<b>code</b><br>
+<p>На вход программе подаётся <strong>одна строка</strong> — полный путь к папке, в формате: <code>C:\\Users\\название_папки</code>.</p>
+
+<p>Напишите программу, которая проверяет, начинается ли <strong>название папки</strong> (то есть последняя часть пути)<br>
+с <strong>гласной русской буквы</strong> — одной из: <code>"а", "е", "ё", "и", "о", "у", "ы", "э", "ю", "я"</code> (регистр не имеет значения).</p>
+
+<p>Выведите:</p>
+
+<ul>
+	<li>
+	<p><code>True</code>, если папка начинается с гласной;</p>
+	</li>
+	<li>
+	<p><code>False</code>, если нет.</p>
+	</li>
+</ul>
+
+<details><summary><strong>🍀 Тестовые данные</strong></summary>
+
+<table align="center" border="1" cellpadding="1" cellspacing="1">
+	<tbody>
+		<tr>
+			<td style="text-align:center;"><strong>№ теста</strong></td>
+			<td style="text-align:center;"><strong>Входные данные</strong></td>
+			<td style="text-align:center;"><strong>Выходные данные</strong></td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">1</td>
+			<td style="text-align:center;">C:\\Users\\Анна</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">2</td>
+			<td style="text-align:center;">C:\\Users\\рабочий стол</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">3</td>
+			<td style="text-align:center;">C:\\Users\\е</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">4</td>
+			<td style="text-align:center;">C:\\Users\\ЁЁЁЁЁЁЁЁЁЁЁЁЁЁЁ</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">5</td>
+			<td style="text-align:center;">C:\\Users\\и</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">6</td>
+			<td style="text-align:center;">C:\\Users\\Олег</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">7</td>
+			<td style="text-align:center;">C:\\Users\\ульяна</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">8</td>
+			<td style="text-align:center;">C:\\Users\\ыыыЫыыы</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">9</td>
+			<td style="text-align:center;">C:\\Users\\Эрнест</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">10</td>
+			<td style="text-align:center;">C:\\Users\\юрий</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">11</td>
+			<td style="text-align:center;">C:\\Users\\ЯРИК</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">12</td>
+			<td style="text-align:center;">C:\\Users\\_проект</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+	</tbody>
+</table>
+</details>
+</div>
+<div class="step">
+<b>code</b><br>
+<p>На вход программе подаётся <strong>одна строка</strong> — номер телефона пользователя.</p>
+
+<p>Напишите программу, которая проверяет, является ли номер российским и выводит:</p>
+
+<ul>
+	<li>
+	<p><code>True</code>, если условие выполняется;</p>
+	</li>
+	<li>
+	<p><code>False</code>, в обратном случае.</p>
+	</li>
+</ul>
+
+<p>Российским считается номер, который:</p>
+
+<ul>
+	<li>
+	<p>начинается с <code>+7</code> и содержит ровно <strong>12 символов</strong>,<br>
+	<strong>или</strong></p>
+	</li>
+	<li>
+	<p>начинается с <code>8</code> и содержит ровно <strong>11 символов</strong>.</p>
+	</li>
+</ul>
+
+<details><summary><strong>🍀 Тестовые данные</strong></summary>
+
+<table align="center" border="1" cellpadding="1" cellspacing="1">
+	<tbody>
+		<tr>
+			<td style="text-align:center;"><strong>№ теста</strong></td>
+			<td style="text-align:center;"><strong>Входные данные</strong></td>
+			<td style="text-align:center;"><strong>Выходные данные</strong></td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">1</td>
+			<td style="text-align:center;">+71234567890</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">2</td>
+			<td style="text-align:center;">81234567890</td>
+			<td style="text-align:center;">True</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">3</td>
+			<td style="text-align:center;">+7978 489 58 77</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">4</td>
+			<td style="text-align:center;">85846984568120</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">5</td>
+			<td style="text-align:center;">79841584989</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">6</td>
+			<td style="text-align:center;">8894568100256</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+		<tr>
+			<td style="text-align:center;">7</td>
+			<td style="text-align:center;">+764510257896</td>
+			<td style="text-align:center;">False</td>
+		</tr>
+	</tbody>
+</body>
+</html>
