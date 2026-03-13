@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'django_filters',
-    # Your apps
+    # Apps
     'api',
 ]
 
@@ -133,6 +133,8 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^null$",
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True  # Should be there from before
 
 # REST Framework settings
 REST_FRAMEWORK = {
