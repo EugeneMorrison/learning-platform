@@ -1,0 +1,839 @@
+[
+{
+  "model": "api.user",
+  "pk": 1,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$0Y7Dba7UmI0uPx8fQ7ONGS$t0cUthM2FOjBVO9JgxuwkyjaMYYH18zED8kefahqVZE=",
+    "last_login": "2026-03-11T22:33:58.704Z",
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "email": "admin@example.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-09T16:12:27.884Z",
+    "role": "STUDENT",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 2,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$zQS7QnxoCWf2Bnqd7pQd28$hIvR3KB2AntFfYoi4+a37nkW81hhOGE289Hg+GGi9+o=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "John",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-09T16:18:56Z",
+    "role": "AUTHOR",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 3,
+  "fields": {
+    "password": "123",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Alice",
+    "first_name": "Alice",
+    "last_name": "Wonderland",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-09T16:21:20Z",
+    "role": "STUDENT",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 4,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$BdhtQ6oMKY5sBHPaPVbC4k$SNBCbVN1HOG0hV4VsrdKMWR11/RBUi8NfQ2e6HF4yl4=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Vicky",
+    "first_name": "",
+    "last_name": "",
+    "email": "vick@example.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-09T17:34:43.361Z",
+    "role": "STUDENT",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 5,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$6otYIpUcxh9QdD89CiinrC$exTODMeOVNMxYbBg15gP8482p/9lRXgS/GFL/BgcQAc=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "john",
+    "first_name": "",
+    "last_name": "",
+    "email": "john@example.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-09T17:55:44.884Z",
+    "role": "AUTHOR",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 6,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$8UeHXoWXd6EShZFcZrxBNZ$EtBTP4aTJxh5oeo5+U+6tW4sMwvIg/UbWWLhvLRlzfw=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "alice",
+    "first_name": "",
+    "last_name": "",
+    "email": "alice@example.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-09T17:55:45.544Z",
+    "role": "STUDENT",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 7,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$dQqKR6E57fhvKgfvPjBlab$hXaT4FWt593iRerNdV9kJy+XB9KBq+QEYPO4XUAKpB4=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "testuser",
+    "first_name": "",
+    "last_name": "",
+    "email": "test@example.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-10T22:58:58.340Z",
+    "role": "STUDENT",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 8,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$YxEu9NlBlf4hCAdLaIM0DB$i3RS7gHe6NY+rMASTY5GDuV+gcr7m67xeQfRHuHyuKA=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "author_test",
+    "first_name": "",
+    "last_name": "",
+    "email": "author@test.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-11T15:53:51.553Z",
+    "role": "AUTHOR",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 9,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$1Y3IBHGWnGD0XYM1XUpZll$9BX4rzUWfBmY+ocCTfEu0xrikdZefjrslN7toWjDgdA=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "student_test",
+    "first_name": "",
+    "last_name": "",
+    "email": "student@test.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-11T15:54:19.893Z",
+    "role": "STUDENT",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 10,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$N0Vr5VvHo6hneLJRWk2kBH$84emVTgAITLWLIC3MvOOxmieyHvflZKlATY+D11mZZs=",
+    "last_login": "2026-03-11T18:31:58.894Z",
+    "is_superuser": false,
+    "username": "john_author",
+    "first_name": "",
+    "last_name": "",
+    "email": "john@test.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-11T17:25:21.432Z",
+    "role": "AUTHOR",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.course",
+  "pk": "2380f8de-f43a-47a7-8010-c69a38a8a1ab",
+  "fields": {
+    "title": "Math in unique way of teaching",
+    "description": "School math tought by unique teacher in unique way",
+    "author": 2,
+    "is_published": true,
+    "created_at": "2026-03-09T16:27:03.713Z",
+    "updated_at": "2026-03-09T16:27:03.713Z"
+  }
+},
+{
+  "model": "api.course",
+  "pk": "b73467b8-32da-4845-ae7c-6fbb56583f76",
+  "fields": {
+    "title": "Test Course",
+    "description": "This is math test",
+    "author": 2,
+    "is_published": true,
+    "created_at": "2026-03-10T21:24:54.995Z",
+    "updated_at": "2026-03-10T21:24:54.995Z"
+  }
+},
+{
+  "model": "api.course",
+  "pk": "bd4c4230-f84d-4165-83db-8413112a6811",
+  "fields": {
+    "title": "Курс: Метод .startswith()",
+    "description": "Автоматически импортированный курс из HTML файла",
+    "author": 10,
+    "is_published": true,
+    "created_at": "2026-03-11T22:25:03.152Z",
+    "updated_at": "2026-03-11T22:25:03.152Z"
+  }
+},
+{
+  "model": "api.course",
+  "pk": "c119fa7e-95e6-425e-b951-9117a79e73e7",
+  "fields": {
+    "title": "Updated Title",
+    "description": "Testing permissions",
+    "author": 10,
+    "is_published": false,
+    "created_at": "2026-03-11T18:48:43.472Z",
+    "updated_at": "2026-03-11T18:48:43.503Z"
+  }
+},
+{
+  "model": "api.course",
+  "pk": "db469ea6-0e74-4d77-85ab-c8ba97237e0a",
+  "fields": {
+    "title": "My First Authenticated Course",
+    "description": "I created this while logged in!",
+    "author": 6,
+    "is_published": true,
+    "created_at": "2026-03-11T14:33:53.564Z",
+    "updated_at": "2026-03-11T14:33:53.564Z"
+  }
+},
+{
+  "model": "api.course",
+  "pk": "f6ab4650-7a10-44d5-afb8-f97813334c06",
+  "fields": {
+    "title": "Python Basics",
+    "description": "Learn Python from scratch",
+    "author": 2,
+    "is_published": true,
+    "created_at": "2026-03-09T17:34:43.891Z",
+    "updated_at": "2026-03-09T17:34:43.891Z"
+  }
+},
+{
+  "model": "api.lesson",
+  "pk": "1f5b2534-889a-4d57-b1ad-54f3b9495a6a",
+  "fields": {
+    "course": "f6ab4650-7a10-44d5-afb8-f97813334c06",
+    "title": "String Methods",
+    "order_index": 1,
+    "created_at": "2026-03-09T17:34:43.893Z",
+    "updated_at": "2026-03-09T17:34:43.893Z"
+  }
+},
+{
+  "model": "api.lesson",
+  "pk": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+  "fields": {
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "title": "Метод .startswith()",
+    "order_index": 1,
+    "created_at": "2026-03-11T22:25:03.158Z",
+    "updated_at": "2026-03-11T22:25:03.158Z"
+  }
+},
+{
+  "model": "api.lesson",
+  "pk": "7bbb799e-1361-45b9-9b21-31cd304f2b32",
+  "fields": {
+    "course": "2380f8de-f43a-47a7-8010-c69a38a8a1ab",
+    "title": "Equations",
+    "order_index": 1,
+    "created_at": "2026-03-09T16:28:06.257Z",
+    "updated_at": "2026-03-09T16:28:06.257Z"
+  }
+},
+{
+  "model": "api.lesson",
+  "pk": "856388ba-e519-46fa-916f-f997bb972a0a",
+  "fields": {
+    "course": "2380f8de-f43a-47a7-8010-c69a38a8a1ab",
+    "title": "Function",
+    "order_index": 0,
+    "created_at": "2026-03-09T16:27:39.027Z",
+    "updated_at": "2026-03-09T16:27:39.027Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "018686fb-0613-4764-bdfe-5d1c473dc1af",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "CODE",
+    "order_index": 15,
+    "content": {
+      "prompt": "На вход программе подаётся одна строка — номер телефона пользователя.\nНапишите программу, которая проверяет, является ли номер российским и выводит:\nTrue, если условие выполняется;\nFalse, в обратном случае.\nРоссийским считается номер, который:\nначинается с +7 и содержит ровно 12 символов,\nили\nначинается с 8 и содержит ровно 11 символов.",
+      "starter_code": "# Ваш код здесь\n",
+      "solution": "",
+      "tests": [
+        {
+          "input": "+71234567890",
+          "expected": "True"
+        },
+        {
+          "input": "81234567890",
+          "expected": "True"
+        },
+        {
+          "input": "+7978 489 58 77",
+          "expected": "False"
+        },
+        {
+          "input": "85846984568120",
+          "expected": "False"
+        },
+        {
+          "input": "79841584989",
+          "expected": "False"
+        },
+        {
+          "input": "8894568100256",
+          "expected": "False"
+        },
+        {
+          "input": "+764510257896",
+          "expected": "False"
+        }
+      ]
+    },
+    "created_at": "2026-03-11T22:25:03.197Z",
+    "updated_at": "2026-03-11T22:25:03.197Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "11c90e8d-92dc-48af-94c5-df8d746390c3",
+  "fields": {
+    "lesson": "856388ba-e519-46fa-916f-f997bb972a0a",
+    "type": "TEXT",
+    "order_index": 0,
+    "content": {
+      "html": "<h2>A function in mathematics is a rule that assigns each input exactly one output. Think of it as a machine: you feed in a number (the input), the machine applies its rule, and out comes a result (the output).</p>"
+    },
+    "created_at": "2026-03-09T16:39:58.167Z",
+    "updated_at": "2026-03-09T16:39:58.167Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "16cf8732-1942-4fc7-b8b6-2c38b31bd071",
+  "fields": {
+    "lesson": "1f5b2534-889a-4d57-b1ad-54f3b9495a6a",
+    "type": "CODE",
+    "order_index": 3,
+    "content": {
+      "prompt": "Check if text starts with 'Hello'",
+      "starter_code": "text = 'Hello World'\n# Your code here\nresult = ",
+      "solution": "text.startswith('Hello')",
+      "tests": [
+        "assert result == True"
+      ]
+    },
+    "created_at": "2026-03-09T17:34:43.900Z",
+    "updated_at": "2026-03-09T17:34:43.900Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "170aebed-1651-4437-b859-ece9811c7688",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "TEXT",
+    "order_index": 1,
+    "content": {
+      "html": "<h2>⭐ Метод <code>.startswith()</code> ⭐</h2>\n<p>Проверяет, <strong>начинается ли строка с указанной подстроки</strong> (или одной из подстрок в кортеже).</p>\n<p>Возвращает <code>True</code> или <code>False</code>.</p>\n<blockquote>\n<p>Не пугайтесь, кортеж — это просто несколько значений, записанных через запятую в круглых скобках.<br/>\nПока что мы не будем глубоко в них вникать, достаточно понимать общий принцип.</p>\n</blockquote>\n<h3>Пример 1: Базовое использование</h3>\n<pre><code class=\"language-python\">print(\"Понедельник день тяжёлый\".startswith(\"Пон\"))</code></pre>\n<p><strong>Вывод:</strong></p>\n<pre><code class=\"language-no-highlight\">True</code></pre>\n<p><strong>Как это работает?</strong><br/>\nМетод проверяет, начинается ли строка с подстроки <code>\"Пон\"</code>. <strong>Регистр имеет значение!</strong></p>\n<h3>Пример 2: Проверка нескольких вариантов</h3>\n<pre><code class=\"language-python\">print(\"image.jpg\".startswith((\"image\", \"photo\")))\nprint(\"video.mp4\".startswith((\"image\", \"photo\")))\nprint(\"photo.png\".startswith((\"image\", \"photo\")))</code></pre>\n<p><strong>Вывод:</strong></p>\n<pre><code class=\"language-no-highlight\">True\nFalse\nTrue</code></pre>\n<p><strong>Как это работает?</strong><br/>\nМожно передать <strong>кортеж подстрок </strong>для проверки. Метод вернет <code>True</code>, если строка начинается с <strong>любой из них</strong>.</p>\n<h3>Пример 3: Учет регистра</h3>\n<pre><code class=\"language-python\">print(\"Апельсин\".startswith(\"апе\"))\nprint(\"апельсин\".startswith(\"апе\"))</code></pre>\n<p><strong>Вывод:</strong></p>\n<pre><code class=\"language-no-highlight\">False\nTrue</code></pre>\n<p><strong>Как это работает?</strong><br/>\nМетод <strong>чувствителен к регистру</strong>: заглавная <code>A</code> не равна строчной <code>а</code>.</p>\n<p>✅ <strong>Решение:</strong> <br/>\nДля регистронезависимой проверки используйте метод <code>.lower()</code>:</p>\n<pre><code class=\"language-python\">\"Апельсин\".lower().startswith(\"апе\")  # True</code></pre>\n<h3>Пример 4: Проверка с указанием диапазона (только <code>start</code>)</h3>\n<p>Метод <strong>имитирует срез строки</strong>, но работает <strong>эффективнее</strong>, так как не создаёт новую строку.</p>\n<pre><code class=\"language-python\">text.startswith(prefix, start, end)</code></pre>\n<ul>\n<li>\n<p>Параметр <code>end</code> <strong>не включительно</strong> как и в срезе <code>str[start:end]</code>.</p>\n</li>\n<li>\n<p>Фактически проверяется: <strong>начинается ли </strong><code>text[start:end]</code><strong> с </strong><code>prefix</code><strong>?</strong></p>\n</li>\n</ul>\n<p>А вот и сам пример: </p>\n<pre><code class=\"language-python\">text = \"Hello, world!\"\nprint(text.startswith(\"world\", 7))</code></pre>\n<p><strong>Вывод:</strong></p>\n<pre><code class=\"language-no-highlight\">True</code></pre>\n<p><strong>Как это работает?</strong></p>\n<ul>\n<li>Берётся подстрока начиная с индекса <code>7</code> (включительно) до конца строки (включительно):\n\n\t<pre><code class=\"language-python\">text[7:] → \"world!\"</code></pre>\n</li>\n<li>Проверяется:\n\t<pre><code class=\"language-python\">\"world!\".startswith(\"world\")</code></pre>\n</li>\n</ul>\n<h3>Пример 5: Проверка с указанием диапазона <code>start</code> и <code>end</code></h3>\n<pre><code class=\"language-python\">text = \"Hello, world!\"\nprint(text.startswith(\"world\", 7, 12))</code></pre>\n<p><strong>Вывод:</strong></p>\n<pre><code class=\"language-no-highlight\">True</code></pre>\n<p><strong>Как это работает?</strong></p>\n<ul>\n<li>Берётся подстрока от индекса <code>7</code> (включительно) до <code>12</code> (НЕ включительно):\n\n\t<pre><code class=\"language-python\">text[7:12] → \"world\"</code></pre>\n</li>\n<li>Проверяется:\n\t<pre><code class=\"language-python\">\"world\".startswith(\"world\")</code></pre>\n</li>\n</ul>\n<h3>Пример 6: Проверка пустой строки</h3>\n<pre><code class=\"language-python\">print(\"\".startswith(\"\"))\nprint(\"Python\".startswith(\"\"))</code></pre>\n<p><strong>Вывод:</strong></p>\n<pre><code class=\"language-no-highlight\">True\nTrue</code></pre>\n<p><strong>Как это работает?</strong><br/>\nЛюбая строка <strong>содержит пустую подстроку</strong> в любом месте, в том числе в начале.</p>\n<h3><strong>❌ </strong>Пример 7: <strong>Ошибка при передаче числа</strong></h3>\n<pre><code class=\"language-python\">print(\"12345\".startswith(123))</code></pre>\n<p><strong>Ошибка:</strong></p>\n<pre><code class=\"language-no-highlight\">TypeError: startswith first arg must be str or a tuple of str, not int</code></pre>\n<p><strong>Почему?</strong><br/>\nМетод принимает <strong>только строки или кортежи строк</strong>.</p>\n<p><strong>Как исправить?</strong><br/>\nПреобразуйте число в строку:</p>\n<pre><code class=\"language-python\">print(\"12345\".startswith(str(123)))  # True  \n# или  \nprint(\"12345\".startswith(f\"{123}\"))  # True  </code></pre>\n<h3>✔️ Когда использовать?</h3>\n<ul>\n<li>\n<p>Для проверки протоколов URL.</p>\n</li>\n<li>\n<p>При фильтрации файлов по префиксам имен.</p>\n</li>\n<li>\n<p>Для проверки ввода пользователя (например, телефонные номера).</p>\n</li>\n<li>\n<p>При обработке команд (если строка начинается с определённого слова).</p>\n</li>\n</ul>\n<h3>❌ Когда не использовать?</h3>\n<ul>\n<li>\n<p>Для поиска подстрок <strong>в середине строки</strong> (лучше <code>in</code> или <code>find()</code>).</p>\n</li>\n<li>\n<p>Для сложных шаблонов (используйте <strong>регулярные выражения</strong>).</p>\n</li>\n<li>\n<p>Если нужно проверить несколько сложных условий (лучше <code>if с or</code> или списки).</p>\n</li>\n</ul>\n<h3>⚡ Важно знать</h3>\n<ul>\n<li>\n<p><strong>Работает в 2-5 раз быстрее</strong>, чем срезы. <strong>Почему?</strong></p>\n<ul>\n<li>\n<p>Срез создаёт новую строку, тратя память и время.</p>\n</li>\n<li>\n<p><code>.startswith()</code> сравнивает символы напрямую и не тратит время на создание среза.</p>\n</li>\n</ul>\n</li>\n<li>\n<p><strong>Принимает только строку или кортеж строк.</strong> <br/>\n\tСписки нужно преобразовать с помощью функции <code>tuple()</code>:</p>\n<pre><code class=\"language-python\">prefixes = [\"im\", \"pic\"]\nprint(\"image.png\".startswith(tuple(prefixes)))  # True</code></pre>\n</li>\n<li>\n<p>В <strong>Python 3.9+</strong> появился метод <code>.removeprefix()</code> для удаления префикса (о нём — в следующих курсах).</p>\n</li>\n</ul>"
+    },
+    "created_at": "2026-03-11T22:25:03.162Z",
+    "updated_at": "2026-03-11T22:25:03.162Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "23ea3846-92a5-43ec-b131-a2fc1c5e5ab7",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 10,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\" Злая щитоспинка\".startswith(\"Злая\"))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.187Z",
+    "updated_at": "2026-03-11T22:25:03.187Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "2a81242c-e856-49ff-ac9b-bb8f650662f7",
+  "fields": {
+    "lesson": "856388ba-e519-46fa-916f-f997bb972a0a",
+    "type": "CODE",
+    "order_index": 2,
+    "content": {
+      "prompt": "Write a function that doubles a number",
+      "starter_code": "def double(x):\n    # Your code here\n    return ",
+      "solution": "x * 2",
+      "tests": [
+        "assert double(5) == 10",
+        "assert double(0) == 0"
+      ]
+    },
+    "created_at": "2026-03-09T16:44:17.114Z",
+    "updated_at": "2026-03-09T16:44:17.114Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "488e8da2-0826-4ee8-a9e7-e08c3961e248",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 8,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"рыжая навозница\".startswith((\"Р\", \"р\")))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.180Z",
+    "updated_at": "2026-03-11T22:25:03.180Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "59a6a3fb-f8e5-4090-83c8-6da268c39ef3",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 6,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"Хреновый листоед\".startswith(\"лист\", 9))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.176Z",
+    "updated_at": "2026-03-11T22:25:03.176Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "6fb9e40a-1d1b-4e52-a1ba-063318dafdc6",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "CODE",
+    "order_index": 14,
+    "content": {
+      "prompt": "На вход программе подаётся одна строка — полный путь к папке, в формате: C:\\\\Users\\\\название_папки.\nНапишите программу, которая проверяет, начинается ли название папки (то есть последняя часть пути)\nс гласной русской буквы — одной из: \"а\", \"е\", \"ё\", \"и\", \"о\", \"у\", \"ы\", \"э\", \"ю\", \"я\" (регистр не имеет значения).\nВыведите:\nTrue, если папка начинается с гласной;\nFalse, если нет.",
+      "starter_code": "# Ваш код здесь\n",
+      "solution": "",
+      "tests": [
+        {
+          "input": "C:\\\\Users\\\\Анна",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\рабочий стол",
+          "expected": "False"
+        },
+        {
+          "input": "C:\\\\Users\\\\е",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\ЁЁЁЁЁЁЁЁЁЁЁЁЁЁЁ",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\и",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\Олег",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\ульяна",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\ыыыЫыыы",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\Эрнест",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\юрий",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\ЯРИК",
+          "expected": "True"
+        },
+        {
+          "input": "C:\\\\Users\\\\_проект",
+          "expected": "False"
+        }
+      ]
+    },
+    "created_at": "2026-03-11T22:25:03.195Z",
+    "updated_at": "2026-03-11T22:25:03.195Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "79d9bcc7-ee4d-400c-8401-1e93475c5857",
+  "fields": {
+    "lesson": "1f5b2534-889a-4d57-b1ad-54f3b9495a6a",
+    "type": "QUIZ",
+    "order_index": 2,
+    "content": {
+      "question": "What does .startswith() return?",
+      "options": [
+        "String",
+        "Boolean",
+        "Number",
+        "None"
+      ],
+      "correct_answer": 1,
+      "explanation": "It returns True or False"
+    },
+    "created_at": "2026-03-09T17:34:43.898Z",
+    "updated_at": "2026-03-09T17:34:43.898Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "7c7ba348-2116-4d80-b7ad-78284f1b4f09",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 12,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"516\".startswith(5))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.191Z",
+    "updated_at": "2026-03-11T22:25:03.191Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "98877d7e-60e0-408e-abd4-6b25e21e62cd",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 13,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\ns = \"Слюнявая пенница\"\nprint(s.startswith(\"\", len(s)))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.193Z",
+    "updated_at": "2026-03-11T22:25:03.193Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "a549796d-69f9-4911-86b9-dd1eb5408c27",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 2,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"фуфайка\".startswith(\"фу\"))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.165Z",
+    "updated_at": "2026-03-11T22:25:03.165Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "a8417c00-8bf7-49b2-bc5f-96e1f0c8dd9d",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 9,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\ns = \"Плюмбум\"\nprint(s.startswith(\"плюм\"))\nprint(s.lower().startswith(\"плюм\"))",
+      "options": [
+        "<code>True<br>True</code><br><br>",
+        "<code>True<br>False</code><br><br>",
+        "<code>False<br>False</code><br><br>",
+        "<code>False<br>True</code><br><br>",
+        "<code>Ошибка</code><br><br>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.182Z",
+    "updated_at": "2026-03-11T22:25:03.182Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "c256400d-3600-4391-8c33-1133cff16107",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 7,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"Лягушка-помидор\".startswith(\"-\", 7, 8))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.178Z",
+    "updated_at": "2026-03-11T22:25:03.178Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "c7f6e169-6691-40dd-8fd7-2a8004ea845a",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 11,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"\".startswith(\"\"))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.190Z",
+    "updated_at": "2026-03-11T22:25:03.190Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "d3d03710-646c-41bf-bee8-0dafae526222",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 5,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nprint(\"Все насекомые имеют по 6 ног\".startswith(\"\"))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.174Z",
+    "updated_at": "2026-03-11T22:25:03.174Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "e0e1d3cd-8803-420e-8e28-cdab6471f846",
+  "fields": {
+    "lesson": "856388ba-e519-46fa-916f-f997bb972a0a",
+    "type": "QUIZ",
+    "order_index": 1,
+    "content": {
+      "question": "What is a function in mathematics?",
+      "options": [
+        "A random number generator",
+        "A rule that assigns each input exactly one output",
+        "A type of equation",
+        "A calculator"
+      ],
+      "correct_answer": 1,
+      "explanation": "A function assigns each input exactly one output, like a machine with a specific rule."
+    },
+    "created_at": "2026-03-09T16:41:13.178Z",
+    "updated_at": "2026-03-09T16:41:13.178Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "e3ff62ce-421f-4eae-9b17-8f7c7e53a7e1",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 4,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nfact = \"Наиболее часто используемая буква в русском алфавите - это буква E\"\nprint(fact.startswith(\"н\"))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.172Z",
+    "updated_at": "2026-03-11T22:25:03.172Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "f5173d9f-6d4b-497e-a4b0-a717ef1e193a",
+  "fields": {
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "type": "QUIZ",
+    "order_index": 3,
+    "content": {
+      "question": "Определите, что будет выведено на экран в результате выполнения следующего кода:\n\nfact = \"У кошки 32 мышцы в каждом ухе\"\nprint(fact.startswith(fact))",
+      "options": [
+        "<code>True</code>",
+        "<code>False</code>",
+        "<code>None</code>",
+        "<code>Пустая строка</code>",
+        "<code>Ошибка</code>"
+      ],
+      "correct_answer": 0,
+      "explanation": "Проверьте свой ответ"
+    },
+    "created_at": "2026-03-11T22:25:03.169Z",
+    "updated_at": "2026-03-11T22:25:03.169Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "f89fca1b-5cc7-4f9d-9183-47398cfdc810",
+  "fields": {
+    "lesson": "1f5b2534-889a-4d57-b1ad-54f3b9495a6a",
+    "type": "TEXT",
+    "order_index": 1,
+    "content": {
+      "html": "<h2>Introduction to Strings</h2><p>Strings are sequences of characters...</p>"
+    },
+    "created_at": "2026-03-09T17:34:43.895Z",
+    "updated_at": "2026-03-09T17:34:43.895Z"
+  }
+},
+{
+  "model": "api.enrollment",
+  "pk": "587c94fb-a737-4002-8c40-5ea2171fd12e",
+  "fields": {
+    "student": 4,
+    "course": "f6ab4650-7a10-44d5-afb8-f97813334c06",
+    "enrolled_at": "2026-03-09T17:34:43.902Z"
+  }
+},
+{
+  "model": "api.enrollment",
+  "pk": "d269ba73-a298-4af4-a0f8-d580db2ada8f",
+  "fields": {
+    "student": 6,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "enrolled_at": "2026-03-11T22:34:41.208Z"
+  }
+}
+]
