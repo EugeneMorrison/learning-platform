@@ -120,7 +120,7 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         # For list view
         if self.action == 'list':
-            if user.is_authenticated and user.role == 'AUTHOR':
+            if user.is_authenticated and hasattr(user, 'role') and user.role == 'AUTHOR':
                 # Authors see: published courses + their own unpublished courses
                 return Course.objects.filter(
                     models.Q(is_published=True) | models.Q(author=user)
@@ -191,8 +191,13 @@ class LessonViewSet(viewsets.ModelViewSet):
     CRUD operations for lessons.
 
     Permissions:
-    - Students can view lessons in enrolled courses
+    - Anyone can view lessons in published courses (for embeddable viewer)
     - Authors can create/edit lessons in THEIR courses only
+
+    FIX: Changed from IsAuthenticated to AllowAny for list/retrieve
+    so that the lesson_viewer.html works without JWT token.
+    This is correct for an embeddable platform — published content
+    should be publicly readable, just like on Stepik.
     """
 
     queryset = Lesson.objects.all()
@@ -201,7 +206,9 @@ class LessonViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Set permissions based on action"""
         if self.action in ['list', 'retrieve']:
-            permission_classes = [IsAuthenticated]
+            # FIX: Allow public read access for published courses
+            # This makes the embeddable lesson viewer work without login
+            permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated, IsAuthor, IsOwnerOrReadOnly]
 
@@ -214,6 +221,9 @@ class LessonViewSet(viewsets.ModelViewSet):
         URL patterns:
         - /api/lessons/ → All lessons user has access to
         - /api/lessons/?course={id} → Lessons for specific course
+
+        FIX: Handle anonymous users (no role attribute).
+        Anonymous users see lessons from published courses only.
         """
         user = self.request.user
         queryset = Lesson.objects.all()
@@ -223,13 +233,18 @@ class LessonViewSet(viewsets.ModelViewSet):
         if course_id:
             queryset = queryset.filter(course_id=course_id)
 
-        # Authors see lessons from their courses
-        if user.role == 'AUTHOR':
+        # FIX: Check if user is authenticated before accessing .role
+        # Anonymous users (from lesson_viewer.html) have no role attribute
+        if user.is_authenticated and hasattr(user, 'role') and user.role == 'AUTHOR':
+            # Authors see lessons from their courses
             queryset = queryset.filter(course__author=user)
-        else:
-            # Students see lessons from enrolled courses
+        elif user.is_authenticated:
+            # Authenticated students see lessons from enrolled courses
             enrolled_courses = Enrollment.objects.filter(student=user).values_list('course_id', flat=True)
             queryset = queryset.filter(course_id__in=enrolled_courses)
+        else:
+            # Anonymous users see lessons from published courses only
+            queryset = queryset.filter(course__is_published=True)
 
         return queryset
 
@@ -240,27 +255,17 @@ class LessonViewSet(viewsets.ModelViewSet):
 
         POST /api/lessons/{id}/reorder/
         Body: {"new_order": 3}
-
-        This will:
-        1. Move lesson to new position
-        2. Shift other lessons automatically
         """
         lesson = self.get_object()
         new_order = request.data.get('new_order')
 
-        if not new_order:
+        if new_order is None:
             return Response(
                 {'error': 'new_order is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            new_order = int(new_order)
-        except ValueError:
-            return Response(
-                {'error': 'new_order must be a number'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        new_order = int(new_order)
 
         if new_order < 1:
             return Response(
@@ -314,7 +319,10 @@ class BlockViewSet(viewsets.ModelViewSet):
     CRUD operations for blocks.
 
     Permissions:
-    - Same as lessons (inherited from course ownership)
+    - Anyone can view blocks in published courses (for embeddable viewer)
+    - Authors can create/edit blocks in THEIR courses only
+
+    FIX: Changed from IsAuthenticated to AllowAny for list/retrieve
     """
 
     queryset = Block.objects.all()
@@ -323,7 +331,8 @@ class BlockViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Set permissions based on action"""
         if self.action in ['list', 'retrieve']:
-            permission_classes = [IsAuthenticated]
+            # FIX: Allow public read access for published courses
+            permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated, IsAuthor, IsOwnerOrReadOnly]
 
@@ -335,6 +344,9 @@ class BlockViewSet(viewsets.ModelViewSet):
 
         URL patterns:
         - /api/blocks/?lesson={id} → Blocks for specific lesson
+
+        FIX: Handle anonymous users (no role attribute).
+        Anonymous users see blocks from published courses only.
         """
         user = self.request.user
         queryset = Block.objects.all()
@@ -344,13 +356,17 @@ class BlockViewSet(viewsets.ModelViewSet):
         if lesson_id:
             queryset = queryset.filter(lesson_id=lesson_id)
 
-        # Authors see blocks from their courses
-        if user.role == 'AUTHOR':
+        # FIX: Check if user is authenticated before accessing .role
+        if user.is_authenticated and hasattr(user, 'role') and user.role == 'AUTHOR':
+            # Authors see blocks from their courses
             queryset = queryset.filter(lesson__course__author=user)
-        else:
-            # Students see blocks from enrolled courses
+        elif user.is_authenticated:
+            # Authenticated students see blocks from enrolled courses
             enrolled_courses = Enrollment.objects.filter(student=user).values_list('course_id', flat=True)
             queryset = queryset.filter(lesson__course_id__in=enrolled_courses)
+        else:
+            # Anonymous users see blocks from published courses only
+            queryset = queryset.filter(lesson__course__is_published=True)
 
         return queryset
 

@@ -89,7 +89,11 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-**6. Run the server**
+**6. Load test data**
+```bash
+python -Xutf8 manage.py loaddata fixtures.json 
+```
+**7. Run the server**
 ```bash
 python manage.py runserver
 ```

@@ -56,6 +56,7 @@
             border-radius: 12px;
             background: #f8f9fa;
             border-left: 4px solid #667eea;
+            position: relative;
         }
         
         .block-text {
@@ -142,6 +143,7 @@
             font-weight: 600;
             margin-bottom: 20px;
             color: #1f2937;
+            white-space: pre-wrap;
         }
         
         .quiz-options {
@@ -298,10 +300,6 @@
             font-weight: 600;
             color: #666;
         }
-        
-        .block {
-            position: relative;
-        }
     </style>
 </head>
 <body>
@@ -320,25 +318,26 @@
     </div>
 
     <script>
-        // Configuration
-        const API_BASE = 'http://127.0.0.1:9000/api';
-        const LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c'; // Your lesson ID
-        
-        // Simple token - in real app, this would be from login
-        // For now, we'll try without authentication for demonstration
+        // FIX: Auto-detect API base URL from current page location
+        // This way it works on any port (8000, 9000, etc.)
+        const API_BASE = window.location.origin + '/api';
+        const LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
         
         async function fetchLesson() {
             try {
                 // Fetch lesson info
+                // FIX: No authentication needed — published lessons are public
                 const lessonResponse = await fetch(`${API_BASE}/lessons/${LESSON_ID}/`);
                 
                 if (!lessonResponse.ok) {
-                    throw new Error('Failed to fetch lesson');
+                    const errorData = await lessonResponse.json().catch(() => null);
+                    const detail = errorData?.detail || `HTTP ${lessonResponse.status}`;
+                    throw new Error(`Failed to fetch lesson: ${detail}`);
                 }
                 
                 const lesson = await lessonResponse.json();
                 
-                // Fetch blocks
+                // Fetch blocks for this lesson
                 const blocksResponse = await fetch(`${API_BASE}/blocks/?lesson=${LESSON_ID}`);
                 
                 if (!blocksResponse.ok) {
@@ -356,7 +355,12 @@
                     <div class="error">
                         <h3>⚠️ Error Loading Lesson</h3>
                         <p>${error.message}</p>
-                        <p>Make sure you're enrolled in this course or logged in as the author.</p>
+                        <p style="margin-top: 10px; font-size: 14px;">
+                            <strong>Troubleshooting:</strong><br>
+                            1. Make sure the Django server is running: <code>python manage.py runserver</code><br>
+                            2. Make sure you loaded the test data: <code>python manage.py loaddata fixtures.json</code><br>
+                            3. API URL: <code>${API_BASE}</code>
+                        </p>
                         <p><small>Lesson ID: ${LESSON_ID}</small></p>
                     </div>
                 `;
@@ -367,6 +371,9 @@
             const app = document.getElementById('app');
             
             let html = `<h1 style="margin-bottom: 30px; color: #1f2937;">${lesson.title}</h1>`;
+            
+            // Sort blocks by order_index
+            blocks.sort((a, b) => a.order_index - b.order_index);
             
             blocks.forEach((block, index) => {
                 html += renderBlock(block, index + 1);
