@@ -1,0 +1,10 @@
+.text-content .hljs {
+    background: transparent !important;
+    padding: 0;
+}
+
+.text-content pre,
+.text-content pre code,
+.text-content code {
+    font-family: 'JetBrains Mono', Consolas, monospace !important;
+}

@@ -248,7 +248,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             'course_title',  # Extra: course title
             'enrolled_at'
         ]
-        read_only_fields = ['id', 'enrolled_at']
+        read_only_fields = ['id', 'enrolled_at', 'student']
 
 
 # =============================================================================
@@ -283,7 +283,7 @@ class ProgressSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'student', 'is_correct', 'completed_at', 'created_at', 'updated_at']
 
 
 # =============================================================================
@@ -345,3 +345,5 @@ class LessonDetailSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+

@@ -1,0 +1,14 @@
+.quiz-options code {
+    font-family: 'JetBrains Mono', Consolas, monospace !important;
+    font-size: 14px;
+}
+
+.quiz-block pre {
+    color: #383a42;
+    font-family: 'JetBrains Mono', Consolas, monospace !important;
+}
+
+.quiz-block pre code.hljs {
+    background: transparent !important;
+    font-family: 'JetBrains Mono', Consolas, monospace !important;
+}

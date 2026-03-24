@@ -26,6 +26,15 @@ urlpatterns = [
     # Simple test endpoints
     path('hello/', views.hello_view, name='hello'),
     path('status/', views.status_view, name='status'),
+    path('run-code/', views.RunCodeView.as_view(), name='run-code'),
+    path('run-tests/', views.RunTestsView.as_view(), name='run-tests'),
+    path('enrollments/', views.EnrollmentListCreateView.as_view(), name='enrollment-list'),
+    path('enrollments/<uuid:course_id>/', views.EnrollmentDeleteView.as_view(), name='enrollment-delete'),
+    path('courses/<uuid:course_id>/enrollments/', views.CourseEnrollmentsView.as_view(), name='course-enrollments'),
+
+    path('progress/submit/', views.ProgressSubmitView.as_view(), name='progress-submit'),
+    path('progress/course/<uuid:course_id>/', views.ProgressCourseView.as_view(), name='progress-course'),
+    path('progress/stats/', views.ProgressStatsView.as_view(), name='progress-stats'),
 
     # Router URLs (all the ViewSets)
     path('', include(router.urls)),
