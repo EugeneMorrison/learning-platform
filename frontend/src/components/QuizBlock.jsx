@@ -106,7 +106,7 @@ function QuizBlock({ content }) {
                         fontWeight: '600',
                     }}
                 >
-                    Check Answer
+                    Проверить ответ
                 </button>
             )}
 
@@ -120,7 +120,7 @@ function QuizBlock({ content }) {
                     color: isCorrect ? '#16a34a' : '#dc2626',
                     fontWeight: '600',
                 }}>
-                    {isCorrect ? '✅ Correct! ' + content.explanation : '❌ Not quite. Try again!'}
+                    {isCorrect ? '✅ Верно! ' + content.explanation : '❌ Неверно. Попробуй ещё раз!'}
                 </div>
             )}
         </div>

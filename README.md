@@ -1,125 +1,260 @@
-# Learning Platform - Interactive Course Management System
+# 🎓 Learning Platform
 
-A Django-based learning platform inspired by Stepik and Google Colab, featuring interactive lessons with text, quizzes, and code exercises.
+> An interactive learning platform inspired by Stepik and Google Colab. Built with Django + React, designed to be embedded on external websites via iframe.
 
-This project is a full-stack learning management system that allows:
-- Authors to create and manage interactive courses
-- Students to enroll in courses and track their progress
-- Automatic parsing of HTML lesson files into structured content blocks
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/Django-4.2-green.svg)](https://www.djangoproject.com/)
+[![DRF](https://img.shields.io/badge/DRF-3.14-red.svg)](https://www.django-rest-framework.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
+[![JWT](https://img.shields.io/badge/Auth-JWT-orange.svg)](https://django-rest-framework-simplejwt.readthedocs.io/)
 
-The platform features three types of content blocks:
-- **TEXT** - Theory and explanations
-- **QUIZ** - Interactive multiple-choice questions
-- **CODE** - Programming exercises with automated test cases
+---
 
-## Features
+## 📋 What It Does
 
-### Authentication & Authorization
-- JWT-based authentication system
-- Role-based access control (Author/Student roles)
-- Secure password hashing
-- Token refresh mechanism
+Authors create courses made of **blocks** — theory text, quizzes, and coding exercises. Students work through lessons interactively. The platform can be embedded on any website using a simple `<iframe>` tag.
 
-### Course Management
-- Create and publish courses
-- Organize content into lessons and blocks
-- Search and filter courses
-- Course enrollment system
-- Progress tracking for students
+**Author can:**
+- Create and edit courses, lessons, and blocks
+- Import lessons from HTML files automatically
+- Give students access via enrollment
+- View student progress and statistics
 
-### Content Block System
-- TEXT blocks: Rich HTML content with formatting
-- QUIZ blocks: Multiple-choice questions with instant feedback
-- CODE blocks: Programming exercises with test cases
+**Student can:**
+- Read theory blocks with syntax-highlighted code examples
+- Answer quiz questions with instant feedback and retry on wrong answers
+- Write and run Python code directly in the browser
+- Track their progress through lessons
 
-### HTML Lesson Import
-- Automatic parsing of HTML files
-- Intelligent block type detection
-- Bulk content import with one command
-- Preserves formatting and structure
+---
 
-### Security Features
-- CORS protection
-- Permission-based access control
-- Input validation and sanitization
-- SQL injection prevention via Django ORM
-
-### Advanced Features
-- Full-text search across courses
-- Ordering and filtering
-- Duplicate prevention
-- Custom validation rules
-
-## Requirements
-
-- Python 3.10+
-- Git
-
-## Setup
-
-**1. Clone the repository**
-```bash
-git clone https://github.com/YOUR_USERNAME/learning-platform.git
-cd learning-platform
-```
-
-**2. Create and activate virtual environment**
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Mac/Linux
-python -m venv venv
-source venv/bin/activate
-```
-
-**3. Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-**4. Apply migrations**
-```bash
-python manage.py migrate
-```
-
-**5. Create admin user (optional)**
-```bash
-python manage.py createsuperuser
-```
-
-**6. Load test data**
-```bash
-python -Xutf8 manage.py loaddata fixtures.json 
-```
-**7. Run the server**
-```bash
-python manage.py runserver
-```
-
-Server will be available at:
-
-| Page | URL |
-|------|-----|
-| Admin Panel | http://127.0.0.1:8000/admin/ |
-| API Root | http://127.0.0.1:8000/api/ |
-| Lesson Viewer | http://127.0.0.1:8000/static/lesson_viewer.html |
-
-## Project Structure
+## 🏗️ Architecture
 
 ```
 learning-platform/
-├── api/              # Main app (models, views, serializers)
-├── backend/          # Django settings and URLs
-├── static/           # Static files
-├── manage.py
-└── requirements.txt
+├── backend/                  # Django project settings
+├── api/                      # Main app
+│   ├── models.py             # User, Course, Lesson, Block, Enrollment, Progress
+│   ├── serializers.py        # JSON serializers
+│   ├── views.py              # API views + code execution
+│   ├── urls.py               # URL routing
+│   ├── permissions.py        # IsAuthor, IsOwnerOrReadOnly
+│   └── management/
+│       └── commands/
+│           └── import_lesson.py   # HTML → database importer
+├── frontend/                 # React app (Vite)
+│   └── src/
+│       ├── api.js            # Axios client with JWT auth
+│       ├── pages/
+│       │   └── LessonViewer.jsx
+│       └── components/
+│           ├── TextBlock.jsx
+│           ├── QuizBlock.jsx
+│           └── CodeBlock.jsx
+├── requirements.txt
+└── manage.py
 ```
 
-## Tech Stack
+---
 
-- Django 6.0.3
-- Django REST Framework
-- SimpleJWT (authentication)
-- CORS Headers
+## 🧱 Block System
+
+Each lesson is made of blocks. Three types are supported:
+
+| Type | Description | Content stored as |
+|------|-------------|-------------------|
+| TEXT | Theory with HTML formatting | `{"html": "<p>...</p>"}` |
+| QUIZ | Multiple choice question | `{"question": "...", "options": [...], "correct_answer": 0, "explanation": "..."}` |
+| CODE | Python coding exercise | `{"prompt": "...", "starter_code": "...", "tests": [...]}` |
+
+---
+
+## 🔐 Authentication & Roles
+
+JWT-based authentication with two roles:
+
+- **AUTHOR** — can create/edit/delete their own courses, lessons, blocks
+- **STUDENT** — can view published courses, enroll, submit answers
+
+---
+
+## 🎯 API Endpoints
+
+### Auth
+```
+POST   /api/auth/register/          Register new user
+POST   /api/auth/login/             Login, get JWT token
+POST   /api/auth/refresh/           Refresh token
+GET    /api/auth/user/              Current user info
+```
+
+### Courses & Lessons
+```
+GET    /api/courses/                List published courses
+POST   /api/courses/                Create course (author only)
+GET    /api/courses/{id}/           Course detail
+PUT    /api/courses/{id}/           Update course (author only)
+DELETE /api/courses/{id}/           Delete course (author only)
+GET    /api/lessons/?course={id}    List lessons in a course
+GET    /api/blocks/?lesson={id}     List blocks in a lesson
+```
+
+### Enrollment
+```
+GET    /api/enrollments/                    My enrollments
+POST   /api/enrollments/                    Enroll in a course
+DELETE /api/enrollments/{course_id}/        Unenroll
+GET    /api/courses/{id}/enrollments/       Author sees their students
+```
+
+### Progress
+```
+POST   /api/progress/submit/                Submit block answer
+GET    /api/progress/course/{id}/           Progress for a course
+GET    /api/progress/stats/                 Overall statistics
+```
+
+### Code Execution
+```
+POST   /api/run-code/               Run Python code, get stdout/stderr
+POST   /api/run-tests/              Run code against test cases, get pass/fail
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Python 3.9+
+- Node.js 18+
+
+### Backend Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/EugeneMorrison/learning-platform.git
+cd learning-platform
+
+# Create and activate virtual environment
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Mac/Linux
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run migrations
+python manage.py migrate
+
+# Create superuser
+python manage.py createsuperuser
+
+# Seed sample data (optional)
+python manage.py seed_data
+
+# Start backend server
+python manage.py runserver 8000
+```
+
+### Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` to see the lesson viewer.
+
+### Import a Lesson from HTML
+
+```bash
+python manage.py import_lesson path/to/lesson.html --course-id <uuid> --order 1
+```
+
+---
+
+## 🔗 Embedding via iframe
+
+Once deployed, any lesson can be embedded on an external website:
+
+```html
+<iframe
+  src="https://your-platform.com/lesson/<lesson-id>"
+  width="100%"
+  height="700px"
+  frameborder="0">
+</iframe>
+```
+
+---
+
+## 📦 Tech Stack
+
+### Backend
+| Package | Purpose |
+|---------|---------|
+| Django 4.2 | Web framework |
+| Django REST Framework | API toolkit |
+| djangorestframework-simplejwt | JWT authentication |
+| django-cors-headers | Cross-origin requests |
+| django-filter | Search and filtering |
+| BeautifulSoup4 | HTML lesson importer |
+
+### Frontend
+| Package | Purpose |
+|---------|---------|
+| React 18 | UI framework |
+| Vite | Build tool |
+| Axios | HTTP client |
+| highlight.js | Syntax highlighting |
+
+### Database
+- **SQLite** — development
+- **PostgreSQL** — production-ready (psycopg2 included)
+
+---
+
+## 📊 Project Progress
+
+| Step | Feature | Status |
+|------|---------|--------|
+| 1 | Basic API setup | ✅ |
+| 2 | Database models | ✅ |
+| 3 | Serializers + CRUD | ✅ |
+| 4 | JWT Authentication | ✅ |
+| 5 | Permissions + roles | ✅ |
+| 6 | Validation + filtering | ✅ |
+| 7 | Block system + HTML importer | ✅ |
+| 8 | Enrollment API | ✅ |
+| 9 | Progress tracking API | ✅ |
+| 10 | React frontend — lesson viewer | ✅ |
+| 11 | iframe embedding | ⏳ |
+| 12 | Docker + deployment | ⏳ |
+
+---
+
+## 🧪 Test Users (after seed_data)
+
+| Username | Role | Password |
+|----------|------|----------|
+| john_author | AUTHOR | password123 |
+| alice | STUDENT | password123 |
+
+---
+
+## 🙏 Acknowledgments
+
+- Inspired by [Stepik](https://stepik.org) and Google Colab
+- Built as a portfolio project
+- Teacher's HTML lesson file used as real import test case
+
+---
+
+<div align="center">
+
+Made with ❤️ and Django + React
+
+**[View on GitHub](https://github.com/EugeneMorrison/learning-platform)**
+
+</div>

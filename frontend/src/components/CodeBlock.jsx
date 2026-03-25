@@ -58,7 +58,7 @@ function CodeBlock({ content }) {
 
             {/* Code editor */}
             <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '14px' }}>
-                Your code:
+                Ваш код:
             </div>
             <textarea
                 value={userCode}
@@ -100,7 +100,7 @@ function CodeBlock({ content }) {
                     fontSize: '14px',
                 }}
             >
-                {isRunning ? '⏳ Running...' : '▶ Run Code'}
+                {isRunning ? '⏳ Выполняется...' : '▶ Запустить код'}
             </button>
 
             {/* Results */}
@@ -113,10 +113,10 @@ function CodeBlock({ content }) {
                     marginBottom: '16px',
                 }}>
                     <div style={{ fontSize: '18px', fontWeight: '700', color: '#16a34a', marginBottom: '4px' }}>
-                        Correct!
+                        Верно!
                     </div>
                     <div style={{ color: '#15803d', fontSize: '14px' }}>
-                        All tests passed ({results.total}/{results.total})
+                        Все тесты пройдены ({results.total}/{results.total})
                     </div>
                 </div>
             )}
@@ -185,7 +185,7 @@ function CodeBlock({ content }) {
                         fontSize: '15px',
                         color: '#dc2626',
                     }}>
-                        Wrong Answer on test #{results.test_number}
+                        Неверный ответ на тесте #{results.test_number}
                         <span style={{ fontWeight: '400', fontSize: '13px', marginLeft: '12px', color: '#64748b' }}>
                             ({results.passed}/{results.total} passed)
                         </span>
@@ -194,13 +194,13 @@ function CodeBlock({ content }) {
                         <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                             <div style={{ flex: 1, minWidth: '150px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                    Input
+                                    Входные данные
                                 </div>
                                 <pre style={preBoxStyle}>{results.input || '—'}</pre>
                             </div>
                             <div style={{ flex: 1, minWidth: '150px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                    Expected Output
+                                    Ожидаемый результат
                                 </div>
                                 <pre style={{ ...preBoxStyle, borderColor: '#bbf7d0', background: '#f0fdf4' }}>
                                     {results.expected}
@@ -208,7 +208,7 @@ function CodeBlock({ content }) {
                             </div>
                             <div style={{ flex: 1, minWidth: '150px' }}>
                                 <div style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                    Your Output
+                                    Ваш результат
                                 </div>
                                 <pre style={{ ...preBoxStyle, borderColor: '#fecaca', background: '#fef2f2' }}>
                                     {results.actual || '(empty)'}
@@ -222,7 +222,7 @@ function CodeBlock({ content }) {
             {/* Test case count hint */}
             {!results && content.tests && content.tests.length > 0 && (
                 <div style={{ color: '#94a3b8', fontSize: '13px' }}>
-                    {content.tests.length} test case{content.tests.length > 1 ? 's' : ''} hidden
+                    {content.tests.length} test case{content.tests.length > 1 ? 's' : ''} тестов скрыто
                 </div>
             )}
         </div>

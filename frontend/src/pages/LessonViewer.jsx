@@ -80,13 +80,13 @@ function LessonViewer() {
                 borderTop: '4px solid #0C4B33',
             }}>
                 <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>
-                    Lesson {lesson.order_index}
+                    Урок {lesson.order_index}
                 </div>
                 <h1 style={{ fontSize: '28px', color: '#0C4B33' }}>
                     {lesson.title}
                 </h1>
                 <div style={{ marginTop: '12px', color: '#64748b', fontSize: '14px' }}>
-                    {blocks.length} blocks
+                    {blocks.length} блоков
                 </div>
             </div>
 
