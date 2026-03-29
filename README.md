@@ -2,11 +2,11 @@
 
 > An interactive learning platform inspired by Stepik and Google Colab. Built with Django + React, designed to be embedded on external websites via iframe.
 
-[!\[Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[!\[Django](https://img.shields.io/badge/Django-4.2-green.svg)](https://www.djangoproject.com/)
-[!\[DRF](https://img.shields.io/badge/DRF-3.14-red.svg)](https://www.django-rest-framework.org/)
-[!\[React](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
-[!\[JWT](https://img.shields.io/badge/Auth-JWT-orange.svg)](https://django-rest-framework-simplejwt.readthedocs.io/)
+[![Python](https://img.shields.io/badge/Python-3.14.3-blue.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/Django-6.0.3-green.svg)](https://www.djangoproject.com/)
+[![DRF](https://img.shields.io/badge/DRF-3.16.1-red.svg)](https://www.django-rest-framework.org/)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
+[![JWT](https://img.shields.io/badge/Auth-JWT-orange.svg)](https://django-rest-framework-simplejwt.readthedocs.io/)
 
 \---
 
@@ -133,7 +133,7 @@ POST   /api/run-tests/              Run code against test cases, get pass/fail
 
 ### Prerequisites
 
-* Python 3.9+
+* Python 3.10+
 * Node.js 18+
 
 ### Backend Setup
@@ -203,7 +203,7 @@ Once deployed, any lesson can be embedded on an external website:
 
 |Package|Purpose|
 |-|-|
-|Django 4.2|Web framework|
+|Django 6.0.3|Web framework|
 |Django REST Framework|API toolkit|
 |djangorestframework-simplejwt|JWT authentication|
 |django-cors-headers|Cross-origin requests|
@@ -212,17 +212,16 @@ Once deployed, any lesson can be embedded on an external website:
 
 ### Frontend
 
-|Package|Purpose|
-|-|-|
-|React 18|UI framework|
-|Vite|Build tool|
-|Axios|HTTP client|
-|highlight.js|Syntax highlighting|
+| Package      |Purpose|
+|--------------|-|
+| React 19     |UI framework|
+| Vite         |Build tool|
+| Axios        |HTTP client|
+| highlight.js |Syntax highlighting|
 
 ### Database
 
-* **SQLite** — development
-* **PostgreSQL** — production-ready (psycopg2 included)
+* **SQLite** 
 
 \---
 
@@ -256,7 +255,9 @@ Once deployed, any lesson can be embedded on an external website:
 
 <div align="center">
 
-Made with ❤️ and Django + React
+Made with Django + React
+
+**[View on GitHub](https://github.com/EugeneMorrison/learning-platform)**
 
 </div>
 
