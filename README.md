@@ -1,5 +1,7 @@
 # 🎓 Learning Platform
 
+**[Русская версия](README.ru.md)**
+
 > An interactive learning platform inspired by Stepik and Google Colab. Built with Django + React, designed to be embedded on external websites via iframe.
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
@@ -104,9 +106,9 @@ A test file `iframe_test.html` is included in the repo root for local testing.
 
 ## 🚀 Getting Started
 
-### Option A: Docker (recommended — works on any machine)
-
 The only requirement is [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+**1. Clone and start:**
 
 ```bash
 git clone https://github.com/EugeneMorrison/learning-platform.git
@@ -114,59 +116,37 @@ cd learning-platform
 docker-compose up --build
 ```
 
-Docker will automatically:
-- Install all Python and Node dependencies
-- Build the React frontend
-- Run database migrations
-- Load test data (users, courses, lessons, blocks)
-- Start the server on port 8000
+Docker automatically handles everything:
+- Installs all Python and Node dependencies
+- Builds the React frontend
+- Runs database migrations
+- Loads test data (users, courses, lessons, blocks)
+- Starts the server on port 8000
 
-Open: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
+**2. Open the lesson directly in the browser:**
 
-To stop: `Ctrl+C`, then `docker-compose down`
-
----
-
-### Option B: Manual Setup
-
-**Prerequisites:** Python 3.12+, Node.js 20+
-
-**Backend:**
-
-```bash
-git clone https://github.com/EugeneMorrison/learning-platform.git
-cd learning-platform
-
-python -m venv venv
-venv\Scripts\activate        # Windows
-source venv/bin/activate     # Mac/Linux
-
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py loaddata fixtures.json
-python manage.py runserver
+```
+http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/
 ```
 
-**Frontend (development mode):**
+**3. Test iframe embedding:**
 
-```bash
-cd frontend
-npm install
-npm run dev
+Open `iframe_test.html` from the project root in your browser (double-click it in File Explorer). It loads the same lesson inside an `<iframe>` — this is how the platform is meant to be used on external websites.
+
+To embed a lesson on your own page:
+
+```html
+<iframe
+  src="http://your-server/lesson/<lesson-uuid>/"
+  width="100%"
+  height="800px"
+  frameborder="0">
+</iframe>
 ```
 
-Open `http://localhost:5173` — lesson viewer with hot reload.
+**To stop:** `Ctrl+C` in the terminal, then `docker-compose down`
 
-**Frontend (production mode — served by Django):**
-
-```bash
-cd frontend
-npm run build
-cd ..
-python manage.py runserver
-```
-
-Open `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
+**Next runs** (no code changes): `docker-compose up` — no `--build` needed, uses cached image.
 
 ---
 
