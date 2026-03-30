@@ -8,7 +8,7 @@
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![JWT](https://img.shields.io/badge/Auth-JWT-orange.svg)](https://django-rest-framework-simplejwt.readthedocs.io/)
 
-\---
+---
 
 ## 📋 What It Does
 
@@ -28,7 +28,7 @@ Authors create courses made of **blocks** — theory text, quizzes, and coding e
 * Write and run Python code directly in the browser
 * Track their progress through lessons
 
-\---
+---
 
 ## 🏗️ Architecture
 
@@ -57,7 +57,7 @@ learning-platform/
 └── manage.py
 ```
 
-\---
+---
 
 ## 🧱 Block System
 
@@ -69,7 +69,7 @@ Each lesson is made of blocks. Three types are supported:
 |QUIZ|Multiple choice question|`{"question": "...", "options": \[...], "correct\_answer": 0, "explanation": "..."}`|
 |CODE|Python coding exercise|`{"prompt": "...", "starter\_code": "...", "tests": \[...]}`|
 
-\---
+---
 
 ## 🔐 Authentication \& Roles
 
@@ -78,7 +78,7 @@ JWT-based authentication with two roles:
 * **AUTHOR** — can create/edit/delete their own courses, lessons, blocks
 * **STUDENT** — can view published courses, enroll, submit answers
 
-\---
+---
 
 ## 🎯 API Endpoints
 
@@ -127,7 +127,7 @@ POST   /api/run-code/               Run Python code, get stdout/stderr
 POST   /api/run-tests/              Run code against test cases, get pass/fail
 ```
 
-\---
+---
 
 ## 🚀 Getting Started
 
@@ -180,7 +180,7 @@ Open `http://localhost:5173` to see the lesson viewer.
 python manage.py import\_lesson path/to/lesson.html --course-id <uuid> --order 1
 ```
 
-\---
+---
 
 ## 🔗 Embedding via iframe
 
@@ -195,7 +195,7 @@ Once deployed, any lesson can be embedded on an external website:
 </iframe>
 ```
 
-\---
+---
 
 ## 📦 Tech Stack
 
@@ -223,7 +223,7 @@ Once deployed, any lesson can be embedded on an external website:
 
 * **SQLite** 
 
-\---
+---
 
 ## 📊 Project Progress
 
@@ -242,7 +242,7 @@ Once deployed, any lesson can be embedded on an external website:
 |11|iframe embedding|⏳|
 |12|Docker + deployment|⏳|
 
-\---
+---
 
 ## 🧪 Test Users (after seed\_data)
 
@@ -251,7 +251,7 @@ Once deployed, any lesson can be embedded on an external website:
 |john\_author|AUTHOR|password123|
 |alice|STUDENT|password123|
 
-\---
+---
 
 <div align="center">
 

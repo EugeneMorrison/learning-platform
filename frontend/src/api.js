@@ -19,7 +19,7 @@ api.interceptors.request.use((config) => {
 
 // AUTH
 export const login = (username, password) =>
-    api.post('/auth/login/', { username, password });
+    axios.post('http://127.0.0.1:8000/api/auth/login/', { username, password });
 
 // COURSES
 export const getCourses = () =>
