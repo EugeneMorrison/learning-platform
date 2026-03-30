@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -20,12 +21,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-141-unw@7284(f^5la_k&+m@!tyz_$^z2+%^!m41c8dl_ur_i4'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-141-unw@7284(f^5la_k&+m@!tyz_$^z2+%^!m41c8dl_ur_i4',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+# In Docker: set ALLOWED_HOSTS=localhost,127.0.0.1 via environment variable
+# Locally: empty list works fine with DEBUG=True
+ALLOWED_HOSTS = [
+    h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()
+]
 
 
 # Application definition
@@ -62,7 +70,10 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'frontend' / 'dist',  # React build output (index.html)
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -80,10 +91,15 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# Database
+# DB_DIR env var lets Docker put the database in a mounted volume (/app/db/)
+# so data survives container restarts. Locally it stays in the project root.
+DB_DIR = Path(os.environ.get('DB_DIR', BASE_DIR))
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DB_DIR / 'db.sqlite3',
     }
 }
 
@@ -173,4 +189,11 @@ SIMPLE_JWT = {
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+    BASE_DIR / 'frontend' / 'dist',  # React build output: /static/assets/...
+]
+
+# Allow embedding in iframes (needed for Step 11)
+# SAMEORIGIN = only same-domain iframes; we use per-view exemption for cross-origin
+X_FRAME_OPTIONS = 'SAMEORIGIN'

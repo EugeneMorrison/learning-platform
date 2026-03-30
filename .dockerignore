@@ -1,0 +1,22 @@
+# Python virtual environment (dependencies are installed fresh in Docker)
+venv/
+
+# Node modules (npm ci runs fresh in Docker)
+frontend/node_modules/
+
+# React build output (rebuilt inside Docker)
+frontend/dist/
+
+# Database (Docker uses its own volume)
+db.sqlite3
+
+# Git
+.git/
+
+# IDE files
+.idea/
+.vscode/
+
+# Test files
+iframe_test.html
+test_permissions.py

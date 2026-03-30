@@ -4,10 +4,20 @@ import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 
-// --- CHANGE THIS to the lesson ID you want to display ---
-// Get the ID from Django admin or browsable API:
-// http://127.0.0.1:9000/api/lessons/ - cope lesson id from here
-const LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
+// Extract lesson ID from URL: /lesson/<uuid>/
+// Django serves this page at /lesson/<uuid>/, React reads it from the path
+// Falls back to hardcoded ID during Vite dev mode (localhost:5173/)
+const DEV_LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
+
+function getLessonIdFromUrl() {
+    const parts = window.location.pathname.split('/');
+    // URL looks like: /lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/
+    // parts = ['', 'lesson', '6f1c0c31-...', '']
+    const idx = parts.indexOf('lesson');
+    if (idx !== -1 && parts[idx + 1]) return parts[idx + 1];
+    // Fallback for Vite dev server (no /lesson/ in path)
+    return import.meta.env.DEV ? DEV_LESSON_ID : null;
+}
 
 function LessonViewer() {
     const [lesson, setLesson] = useState(null);
@@ -21,15 +31,23 @@ function LessonViewer() {
 
     async function loadLesson() {
         try {
+            const lessonId = getLessonIdFromUrl();
+            if (!lessonId) {
+                setError('Lesson ID not found in URL. Open /lesson/<uuid>/');
+                setLoading(false);
+                return;
+            }
+
             // Step 1: login as alice (student) to get JWT token
+            // Login response format: { user: {...}, tokens: { access: "...", refresh: "..." } }
             const loginResponse = await login('alice', 'password123');
-            const token = loginResponse.data.access;
+            const token = loginResponse.data.tokens.access;
             localStorage.setItem('access_token', token);
 
             // Step 2: fetch lesson info and blocks in parallel
             const [lessonResponse, blocksResponse] = await Promise.all([
-                getLesson(LESSON_ID),
-                getBlocks(LESSON_ID),
+                getLesson(lessonId),
+                getBlocks(lessonId),
             ]);
 
             setLesson(lessonResponse.data);

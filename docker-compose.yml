@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"        # host:container — access at http://localhost:8000
+    environment:
+      - DEBUG=True
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    volumes:
+      - db-data:/app/db    # persist SQLite database between restarts
+
+volumes:
+  db-data:

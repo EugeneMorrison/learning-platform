@@ -2,11 +2,12 @@
 
 > An interactive learning platform inspired by Stepik and Google Colab. Built with Django + React, designed to be embedded on external websites via iframe.
 
-[![Python](https://img.shields.io/badge/Python-3.14.3-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.0.3-green.svg)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/DRF-3.16.1-red.svg)](https://www.django-rest-framework.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![JWT](https://img.shields.io/badge/Auth-JWT-orange.svg)](https://django-rest-framework-simplejwt.readthedocs.io/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED.svg)](https://www.docker.com/)
 
 ---
 
@@ -43,16 +44,20 @@ learning-platform/
 │   ├── permissions.py        # IsAuthor, IsOwnerOrReadOnly
 │   └── management/
 │       └── commands/
-│           └── import\_lesson.py   # HTML → database importer
+│           └── import_lesson.py   # HTML → database importer
 ├── frontend/                 # React app (Vite)
 │   └── src/
 │       ├── api.js            # Axios client with JWT auth
 │       ├── pages/
-│       │   └── LessonViewer.jsx
+│       │   └── LessonViewer.jsx   # Reads lesson ID from URL path
 │       └── components/
 │           ├── TextBlock.jsx
 │           ├── QuizBlock.jsx
 │           └── CodeBlock.jsx
+├── Dockerfile                # Multi-stage build: Node → Python
+├── docker-compose.yml        # One-command launch
+├── .dockerignore
+├── fixtures.json             # Test data (users, courses, lessons, blocks)
 ├── requirements.txt
 └── manage.py
 ```
@@ -63,20 +68,113 @@ learning-platform/
 
 Each lesson is made of blocks. Three types are supported:
 
-|Type|Description|Content stored as|
-|-|-|-|
-|TEXT|Theory with HTML formatting|`{"html": "<p>...</p>"}`|
-|QUIZ|Multiple choice question|`{"question": "...", "options": \[...], "correct\_answer": 0, "explanation": "..."}`|
-|CODE|Python coding exercise|`{"prompt": "...", "starter\_code": "...", "tests": \[...]}`|
+| Type | Description               | Content stored as                                                                      |
+|------|---------------------------|----------------------------------------------------------------------------------------|
+| TEXT | Theory with HTML formatting | `{"html": "<p>...</p>"}`                                                             |
+| QUIZ | Multiple choice question  | `{"question": "...", "options": [...], "correct_answer": 0, "explanation": "..."}`   |
+| CODE | Python coding exercise    | `{"prompt": "...", "starter_code": "...", "tests": [...]}`                           |
 
 ---
 
-## 🔐 Authentication \& Roles
+## 🔐 Authentication & Roles
 
 JWT-based authentication with two roles:
 
 * **AUTHOR** — can create/edit/delete their own courses, lessons, blocks
 * **STUDENT** — can view published courses, enroll, submit answers
+
+---
+
+## 🔗 Embedding via iframe
+
+Each lesson is served at `/lesson/<uuid>/` by Django. React reads the UUID from the URL and loads the lesson via API. The route is decorated with `@xframe_options_exempt` so it can be embedded on external websites.
+
+```html
+<iframe
+  src="http://your-server/lesson/<lesson-uuid>/"
+  width="100%"
+  height="700px"
+  frameborder="0">
+</iframe>
+```
+
+A test file `iframe_test.html` is included in the repo root for local testing.
+
+---
+
+## 🚀 Getting Started
+
+### Option A: Docker (recommended — works on any machine)
+
+The only requirement is [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+```bash
+git clone https://github.com/EugeneMorrison/learning-platform.git
+cd learning-platform
+docker-compose up --build
+```
+
+Docker will automatically:
+- Install all Python and Node dependencies
+- Build the React frontend
+- Run database migrations
+- Load test data (users, courses, lessons, blocks)
+- Start the server on port 8000
+
+Open: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
+
+To stop: `Ctrl+C`, then `docker-compose down`
+
+---
+
+### Option B: Manual Setup
+
+**Prerequisites:** Python 3.12+, Node.js 20+
+
+**Backend:**
+
+```bash
+git clone https://github.com/EugeneMorrison/learning-platform.git
+cd learning-platform
+
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Mac/Linux
+
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py loaddata fixtures.json
+python manage.py runserver
+```
+
+**Frontend (development mode):**
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` — lesson viewer with hot reload.
+
+**Frontend (production mode — served by Django):**
+
+```bash
+cd frontend
+npm run build
+cd ..
+python manage.py runserver
+```
+
+Open `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
+
+---
+
+### Import a Lesson from HTML
+
+```bash
+python manage.py import_lesson path/to/lesson.html --course-id <uuid> --order 1
+```
 
 ---
 
@@ -86,12 +184,12 @@ JWT-based authentication with two roles:
 
 ```
 POST   /api/auth/register/          Register new user
-POST   /api/auth/login/             Login, get JWT token
-POST   /api/auth/refresh/           Refresh token
-GET    /api/auth/user/              Current user info
+POST   /api/auth/login/             Login, get JWT tokens
+POST   /api/auth/token/refresh/     Refresh access token
+GET    /api/auth/me/                Current user info
 ```
 
-### Courses \& Lessons
+### Courses & Lessons
 
 ```
 GET    /api/courses/                List published courses
@@ -100,6 +198,7 @@ GET    /api/courses/{id}/           Course detail
 PUT    /api/courses/{id}/           Update course (author only)
 DELETE /api/courses/{id}/           Delete course (author only)
 GET    /api/lessons/?course={id}    List lessons in a course
+GET    /api/lessons/{id}/           Lesson detail
 GET    /api/blocks/?lesson={id}     List blocks in a lesson
 ```
 
@@ -108,8 +207,7 @@ GET    /api/blocks/?lesson={id}     List blocks in a lesson
 ```
 GET    /api/enrollments/                    My enrollments
 POST   /api/enrollments/                    Enroll in a course
-DELETE /api/enrollments/{course\_id}/        Unenroll
-GET    /api/courses/{id}/enrollments/       Author sees their students
+DELETE /api/enrollments/{course_id}/        Unenroll
 ```
 
 ### Progress
@@ -129,127 +227,68 @@ POST   /api/run-tests/              Run code against test cases, get pass/fail
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-* Python 3.10+
-* Node.js 18+
-
-### Backend Setup
-
-```bash
-# Clone the repo
-git clone https://github.com/EugeneMorrison/learning-platform.git
-cd learning-platform
-
-# Create and activate virtual environment
-python -m venv venv
-venv\\Scripts\\activate        # Windows
-source venv/bin/activate     # Mac/Linux
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run migrations
-python manage.py migrate
-
-# Create superuser
-python manage.py createsuperuser
-
-# Seed sample data (optional)
-python manage.py seed\_data
-
-# Start backend server
-python manage.py runserver 8000
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173` to see the lesson viewer.
-
-### Import a Lesson from HTML
-
-```bash
-python manage.py import\_lesson path/to/lesson.html --course-id <uuid> --order 1
-```
-
----
-
-## 🔗 Embedding via iframe
-
-Once deployed, any lesson can be embedded on an external website:
-
-```html
-<iframe
-  src="https://your-platform.com/lesson/<lesson-id>"
-  width="100%"
-  height="700px"
-  frameborder="0">
-</iframe>
-```
-
----
-
 ## 📦 Tech Stack
 
 ### Backend
 
-|Package|Purpose|
-|-|-|
-|Django 6.0.3|Web framework|
-|Django REST Framework|API toolkit|
-|djangorestframework-simplejwt|JWT authentication|
-|django-cors-headers|Cross-origin requests|
-|django-filter|Search and filtering|
-|BeautifulSoup4|HTML lesson importer|
+| Package                          | Purpose                |
+|----------------------------------|------------------------|
+| Django 6.0.3                     | Web framework          |
+| Django REST Framework 3.16.1     | API toolkit            |
+| djangorestframework-simplejwt    | JWT authentication     |
+| django-cors-headers              | Cross-origin requests  |
+| django-filter                    | Search and filtering   |
+| BeautifulSoup4                   | HTML lesson importer   |
 
 ### Frontend
 
-| Package      |Purpose|
-|--------------|-|
-| React 19     |UI framework|
-| Vite         |Build tool|
-| Axios        |HTTP client|
-| highlight.js |Syntax highlighting|
+| Package      | Purpose             |
+|--------------|---------------------|
+| React 19     | UI framework        |
+| Vite 8       | Build tool          |
+| Axios        | HTTP client         |
+| highlight.js | Syntax highlighting |
 
-### Database
+### Infrastructure
 
-* **SQLite** 
+| Tool           | Purpose                          |
+|----------------|----------------------------------|
+| Docker         | Containerization                 |
+| docker-compose | Multi-container orchestration    |
+| SQLite         | Database                         |
+
+---
+
+## 🧪 Test Users
+
+Loaded automatically via `fixtures.json` (both with Docker and `loaddata`):
+
+| Username     | Role    | Password    |
+|--------------|---------|-------------|
+| admin        | Admin   | (set yours) |
+| john_author  | AUTHOR  | password123 |
+| alice        | STUDENT | password123 |
+
+Test lesson URL: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
 
 ---
 
 ## 📊 Project Progress
 
-|Step|Feature|Status|
-|-|-|-|
-|1|Basic API setup|✅|
-|2|Database models|✅|
-|3|Serializers + CRUD|✅|
-|4|JWT Authentication|✅|
-|5|Permissions + roles|✅|
-|6|Validation + filtering|✅|
-|7|Block system + HTML importer|✅|
-|8|Enrollment API|✅|
-|9|Progress tracking API|✅|
-|10|React frontend — lesson viewer|✅|
-|11|iframe embedding|⏳|
-|12|Docker + deployment|⏳|
-
----
-
-## 🧪 Test Users (after seed\_data)
-
-|Username|Role|Password|
-|-|-|-|
-|john\_author|AUTHOR|password123|
-|alice|STUDENT|password123|
+| Step | Feature                         | Status |
+|------|---------------------------------|--------|
+| 1    | Basic API setup                 | ✅     |
+| 2    | Database models                 | ✅     |
+| 3    | Serializers + CRUD              | ✅     |
+| 4    | JWT Authentication              | ✅     |
+| 5    | Permissions + roles             | ✅     |
+| 6    | Validation + filtering          | ✅     |
+| 7    | Block system + HTML importer    | ✅     |
+| 8    | Enrollment API                  | ✅     |
+| 9    | Progress tracking API           | ✅     |
+| 10   | React frontend — lesson viewer  | ✅     |
+| 11   | iframe embedding                | ✅     |
+| 12   | Docker                          | ✅     |
 
 ---
 
@@ -260,4 +299,3 @@ Made with Django + React
 **[View on GitHub](https://github.com/EugeneMorrison/learning-platform)**
 
 </div>
-

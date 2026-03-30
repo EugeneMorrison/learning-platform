@@ -33,3 +33,7 @@ Thumbs.db
 
 # Test files
 test_permissions.py
+
+# Frontend build output and dependencies (Docker rebuilds these)
+frontend/node_modules/
+frontend/dist/
