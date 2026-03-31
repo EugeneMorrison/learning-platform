@@ -106,7 +106,7 @@ A test file `iframe_test.html` is included in the repo root for local testing.
 
 ## 🚀 Getting Started
 
-The only requirement is [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+To install/run [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
 **1. Clone and start:**
 
