@@ -25,6 +25,11 @@ function QuizBlock({ content }) {
         }
     }
 
+    function handleReset() {
+        setSelected(null);
+        setSubmitted(false);
+    }
+
     function handleOptionClick(index) {
         // Only allow clicking if correct answer not yet found
         if (isCorrect) return;
@@ -93,20 +98,20 @@ function QuizBlock({ content }) {
             {/* Check Answer button — hidden only after correct answer */}
             {!isCorrect && (
                 <button
-                    onClick={handleSubmit}
-                    disabled={selected === null}
+                    onClick={submitted ? handleReset : handleSubmit}
+                    disabled={!submitted && selected === null}
                     style={{
                         marginTop: '16px',
                         padding: '10px 24px',
-                        background: selected === null ? '#94a3b8' : '#2563eb',
+                        background: submitted ? '#dc2626' : selected === null ? '#94a3b8' : '#2563eb',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
-                        cursor: selected === null ? 'not-allowed' : 'pointer',
+                        cursor: !submitted && selected === null ? 'not-allowed' : 'pointer',
                         fontWeight: '600',
                     }}
                 >
-                    Проверить ответ
+                    {submitted ? 'Попробовать снова' : 'Проверить ответ'}
                 </button>
             )}
 
@@ -122,6 +127,25 @@ function QuizBlock({ content }) {
                 }}>
                     {isCorrect ? '✅ Верно! ' + content.explanation : '❌ Неверно. Попробуй ещё раз!'}
                 </div>
+            )}
+
+            {/* Solve again button — shown only after correct answer */}
+            {isCorrect && (
+                <button
+                    onClick={handleReset}
+                    style={{
+                        marginTop: '12px',
+                        padding: '10px 24px',
+                        background: 'white',
+                        color: '#2563eb',
+                        border: '2px solid #2563eb',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                    }}
+                >
+                    Решить снова
+                </button>
             )}
         </div>
     );
