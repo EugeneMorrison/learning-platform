@@ -104,13 +104,14 @@ function LessonViewer() {
     }
 
     function renderBlock(block) {
+        const blockProgress = progress.find(p => p.block === block.id) || null;
         let inner = null;
         switch (block.type) {
             case 'TEXT':
                 inner = <TextBlock blockId={block.id} content={block.content} />;
                 break;
             case 'QUIZ':
-                inner = <QuizBlock blockId={block.id} content={block.content} />;
+                inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} />;
                 break;
             case 'CODE':
                 inner = <CodeBlock blockId={block.id} content={block.content} />;
@@ -155,6 +156,40 @@ function LessonViewer() {
                     <div style={{ marginTop: '12px', color: '#64748b', fontSize: '14px' }}>
                         {blocks.length} блоков
                     </div>
+                    {(() => {
+                        const taskBlocks = blocks.filter(b => b.type === 'QUIZ' || b.type === 'CODE');
+                        const total = taskBlocks.length;
+                        if (total === 0) return null;
+                        const solved = taskBlocks.filter(b => solvedBlockIds.has(b.id)).length;
+                        const percent = Math.round((solved / total) * 100);
+                        return (
+                            <div style={{ marginTop: '16px' }}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    color: '#475569',
+                                    fontSize: '13px',
+                                    marginBottom: '6px',
+                                }}>
+                                    <span>Решено {solved} из {total} задач</span>
+                                    <span>{percent}%</span>
+                                </div>
+                                <div style={{
+                                    height: '8px',
+                                    background: '#e2e8f0',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden',
+                                }}>
+                                    <div style={{
+                                        width: `${percent}%`,
+                                        height: '100%',
+                                        background: '#0C4B33',
+                                        transition: 'width 0.3s ease',
+                                    }} />
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Render all blocks */}

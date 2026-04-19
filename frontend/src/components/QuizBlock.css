@@ -10,5 +10,6 @@
 
 .quiz-block pre code.hljs {
     background: transparent !important;
+    padding: 0 !important;
     font-family: 'JetBrains Mono', Consolas, monospace !important;
 }

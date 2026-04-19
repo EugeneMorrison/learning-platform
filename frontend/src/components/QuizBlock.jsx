@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import hljs from 'highlight.js/lib/core';
 import python from 'highlight.js/lib/languages/python';
 import './QuizBlock.css';
@@ -6,35 +6,33 @@ import api from '../api';
 
 hljs.registerLanguage('python', python);
 
-function QuizBlock({ content, blockId }) {
-    const [selected, setSelected] = useState(null);
-    const [submitted, setSubmitted] = useState(false);
+function QuizBlock({ content, blockId, savedProgress }) {
+    const savedSelected = savedProgress?.answer?.selected;
+    const hasAttempt = typeof savedSelected === 'number';
+    const [selected, setSelected] = useState(hasAttempt ? savedSelected : null);
+    const [submitted, setSubmitted] = useState(hasAttempt);
 
-    const codeRef = useRef(null);
     const isCorrect = submitted && selected === content.correct_answer;
 
-    useEffect(() => {
-        if (codeRef.current) {
-            hljs.highlightElement(codeRef.current);
-            codeRef.current.style.background = 'transparent';
-        }
-    }, []);
+    // Split question into text + code parts
+    const parts = content.question.split('\n\n');
+    const hasCode = parts.length >= 2;
+    const questionText = hasCode ? parts[0] : content.question;
+    const codePart = hasCode ? parts.slice(1).join('\n') : null;
+    const highlightedCode = codePart
+        ? hljs.highlight(codePart, { language: 'python', ignoreIllegals: true }).value
+        : '';
 
     async function handleSubmit() {
         if (selected === null) return;
         setSubmitted(true);
-        const correct = selected === content.correct_answer;
-        if (correct) {
-            try {
-                await api.post('/progress/submit/', {
-                    block: blockId,
-                    completed: true,
-                    answer: { selected },
-                    is_correct: true,
-                });
-            } catch (err) {
-                console.error('Failed to save progress:', err);
-            }
+        try {
+            await api.post('/progress/submit/', {
+                block: blockId,
+                answer: { selected },
+            });
+        } catch (err) {
+            console.error('Failed to save progress:', err);
         }
     }
 
@@ -50,12 +48,6 @@ function QuizBlock({ content, blockId }) {
         setSubmitted(false);
     }
 
-    // Split question into text + code parts
-    const parts = content.question.split('\n\n');
-    const hasCode = parts.length >= 2;
-    const questionText = hasCode ? parts[0] : content.question;
-    const codePart = hasCode ? parts.slice(1).join('\n') : null;
-
     return (
         <div className="quiz-block" style={{
             background: 'white',
@@ -65,6 +57,21 @@ function QuizBlock({ content, blockId }) {
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             borderLeft: '4px solid #2563eb',
         }}>
+            {/* Block type badge */}
+            <div style={{ marginBottom: '14px' }}>
+                <span style={{
+                    display: 'inline-block',
+                    padding: '4px 12px',
+                    background: '#ede9fe',
+                    color: '#6d28d9',
+                    borderRadius: '999px',
+                    fontWeight: '600',
+                    letterSpacing: '0.3px',
+                }}>
+                    Тест
+                </span>
+            </div>
+
             <p
                 style={{ fontWeight: '600', marginBottom: codePart ? '12px' : '16px' }}
                 dangerouslySetInnerHTML={{ __html: '❓ ' + questionText }}
@@ -73,16 +80,20 @@ function QuizBlock({ content, blockId }) {
                 <pre style={{
                     background: '#f0f0f0',
                     borderRadius: '6px',
-                    padding: '14px 18px',
+                    padding: '10px 16px',
                     fontFamily: "'JetBrains Mono', Consolas, monospace",
                     fontSize: '14px',
                     lineHeight: '1.6',
-                    marginBottom: '16px',
+                    marginBottom: '12px',
                     overflowX: 'auto',
                     whiteSpace: 'pre-wrap',
                     color: '#383a42',
                 }}>
-                    <code ref={codeRef} className="language-python">{codePart}</code>
+                    <code
+                        className="hljs language-python"
+                        style={{ background: 'transparent' }}
+                        dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                    />
                 </pre>
             )}
 
@@ -108,27 +119,27 @@ function QuizBlock({ content, blockId }) {
                 ))}
             </div>
 
-            {/* Check Answer button — hidden only after correct answer */}
-            {!isCorrect && (
+            {/* Check Answer button — shown before submission */}
+            {!submitted && (
                 <button
-                    onClick={submitted ? handleReset : handleSubmit}
-                    disabled={!submitted && selected === null}
+                    onClick={handleSubmit}
+                    disabled={selected === null}
                     style={{
                         marginTop: '16px',
                         padding: '10px 24px',
-                        background: submitted ? '#dc2626' : selected === null ? '#94a3b8' : '#2563eb',
+                        background: selected === null ? '#94a3b8' : '#2563eb',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
-                        cursor: !submitted && selected === null ? 'not-allowed' : 'pointer',
+                        cursor: selected === null ? 'not-allowed' : 'pointer',
                         fontWeight: '600',
                     }}
                 >
-                    {submitted ? 'Попробовать снова' : 'Проверить ответ'}
+                    Проверить ответ
                 </button>
             )}
 
-            {/* Feedback */}
+            {/* Feedback — always appears before the retry/solve button */}
             {submitted && (
                 <div style={{
                     marginTop: '16px',
@@ -142,22 +153,22 @@ function QuizBlock({ content, blockId }) {
                 </div>
             )}
 
-            {/* Solve again button — shown only after correct answer */}
-            {isCorrect && (
+            {/* Retry / Solve again button — after feedback in both cases */}
+            {submitted && (
                 <button
                     onClick={handleReset}
                     style={{
                         marginTop: '12px',
                         padding: '10px 24px',
                         background: 'white',
-                        color: '#2563eb',
-                        border: '2px solid #2563eb',
+                        color: '#475569',
+                        border: '1px solid #cbd5e1',
                         borderRadius: '6px',
                         cursor: 'pointer',
                         fontWeight: '600',
                     }}
                 >
-                    Решить снова
+                    {isCorrect ? 'Решить снова' : 'Попробовать снова'}
                 </button>
             )}
 

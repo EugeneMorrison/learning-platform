@@ -1,15 +1,43 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api';
+
+const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
 function CodeBlock({ content }) {
     const [userCode, setUserCode] = useState(content.starter_code);
     const [testsOpen, setTestsOpen] = useState(false);
     const [testInput, setTestInput] = useState('');
+    const [selectedTestIndex, setSelectedTestIndex] = useState(null);
     const [runOutput, setRunOutput] = useState(null);
     const [submitResults, setSubmitResults] = useState(null);
     const [isRunning, setIsRunning] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasSubmitted, setHasSubmitted] = useState(false);
+    const [pythonVersion, setPythonVersion] = useState('Python 3.12');
+    const [versionOpen, setVersionOpen] = useState(false);
+    const versionRef = useRef(null);
+
+    useEffect(() => {
+        function handleClickOutside(e) {
+            if (versionRef.current && !versionRef.current.contains(e.target)) {
+                setVersionOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    function handleTestCheck(index) {
+        if (selectedTestIndex === index) {
+            setSelectedTestIndex(null);
+            setTestInput('');
+            return;
+        }
+        const test = content.tests[index];
+        const input = typeof test === 'object' ? test.input : test;
+        setSelectedTestIndex(index);
+        setTestInput(input || '');
+    }
 
     // "Запустить код" — runs against student's custom input
     const handleRun = async () => {
@@ -19,6 +47,7 @@ function CodeBlock({ content }) {
             const res = await api.post('/run-code/', {
                 code: userCode,
                 stdin: testInput,
+                version: pythonVersion,
             });
             setRunOutput(res.data);
         } catch (err) {
@@ -40,6 +69,7 @@ function CodeBlock({ content }) {
             const res = await api.post('/run-tests/', {
                 code: userCode,
                 tests: content.tests,
+                version: pythonVersion,
             });
             setSubmitResults(res.data);
         } catch (err) {
@@ -55,6 +85,7 @@ function CodeBlock({ content }) {
     const handleReset = () => {
         setUserCode(content.starter_code);
         setTestInput('');
+        setSelectedTestIndex(null);
         setRunOutput(null);
         setSubmitResults(null);
         setHasSubmitted(false);
@@ -84,6 +115,21 @@ function CodeBlock({ content }) {
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             borderLeft: '4px solid #16a34a',
         }}>
+            {/* Block type badge */}
+            <div style={{ marginBottom: '14px' }}>
+                <span style={{
+                    display: 'inline-block',
+                    padding: '4px 12px',
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    borderRadius: '999px',
+                    fontWeight: '600',
+                    letterSpacing: '0.3px',
+                }}>
+                    Задача
+                </span>
+            </div>
+
             {/* Task prompt */}
             <div
                 style={{ marginBottom: '16px' }}
@@ -91,8 +137,77 @@ function CodeBlock({ content }) {
             />
 
             {/* Code editor */}
-            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '14px' }}>
-                Ваш код:
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+                fontSize: '14px',
+            }}>
+                <span style={{ color: '#64748b' }}>Ваш код:</span>
+                <div ref={versionRef} style={{ position: 'relative' }}>
+                    <button
+                        type="button"
+                        onClick={() => setVersionOpen(!versionOpen)}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '6px 12px',
+                            background: 'white',
+                            color: '#334155',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '500',
+                            cursor: 'pointer',
+                            minWidth: '130px',
+                            justifyContent: 'space-between',
+                        }}
+                    >
+                        <span>{pythonVersion}</span>
+                        <span style={{ fontSize: '10px', color: '#64748b' }}>▼</span>
+                    </button>
+                    {versionOpen && (
+                        <div style={{
+                            position: 'absolute',
+                            top: 'calc(100% + 4px)',
+                            right: 0,
+                            minWidth: '140px',
+                            background: 'white',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                            zIndex: 10,
+                            overflow: 'hidden',
+                        }}>
+                            {PYTHON_VERSIONS.map(v => (
+                                <div
+                                    key={v}
+                                    onClick={() => {
+                                        setPythonVersion(v);
+                                        setVersionOpen(false);
+                                    }}
+                                    style={{
+                                        padding: '8px 12px',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        background: v === pythonVersion ? '#dcfce7' : 'white',
+                                        color: '#334155',
+                                    }}
+                                    onMouseEnter={e => {
+                                        if (v !== pythonVersion) e.currentTarget.style.background = '#f8fafc';
+                                    }}
+                                    onMouseLeave={e => {
+                                        if (v !== pythonVersion) e.currentTarget.style.background = 'white';
+                                    }}
+                                >
+                                    {v}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
             <textarea
                 value={userCode}
@@ -165,7 +280,7 @@ function CodeBlock({ content }) {
                     <pre style={{
                         margin: 0,
                         padding: '12px 16px',
-                        color: runOutput.stderr ? '#f87171' : '#4ade80',
+                        color: runOutput.stderr ? '#dc2626' : '#0f172a',
                         fontFamily: "'JetBrains Mono', Consolas, monospace",
                         fontSize: '13px',
                         lineHeight: '1.5',
@@ -359,6 +474,7 @@ function CodeBlock({ content }) {
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                                 <thead>
                                     <tr style={{ background: '#f1f5f9' }}>
+                                        <th style={{ ...thStyle, width: '36px', textAlign: 'center' }}></th>
                                         <th style={thStyle}>№</th>
                                         <th style={thStyle}>Входные данные</th>
                                         <th style={thStyle}>Выходные данные</th>
@@ -369,6 +485,14 @@ function CodeBlock({ content }) {
                                         <tr key={index} style={{
                                             background: index % 2 === 0 ? 'white' : '#f8fafc'
                                         }}>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedTestIndex === index}
+                                                    onChange={() => handleTestCheck(index)}
+                                                    style={{ cursor: 'pointer' }}
+                                                />
+                                            </td>
                                             <td style={tdStyle}>{index + 1}</td>
                                             <td style={tdStyle}>
                                                 {typeof test === 'object' ? test.input : test}

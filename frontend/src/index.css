@@ -23,11 +23,11 @@ code {
 
 /* Code blocks: multi-line examples */
 pre {
-    background: #1e293b;
-    color: #e2e8f0;
-    padding: 16px;
+    background: #f0f0f0;
+    color: #383a42;
+    padding: 10px 16px;
     border-radius: 6px;
-    font-family: 'Courier New', monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-size: 14px;
     overflow-x: auto;
     margin: 12px 0;
@@ -36,7 +36,7 @@ pre {
 
 pre code {
     background: none;
-    color: #e2e8f0;
+    color: #383a42;
     padding: 0;
     font-size: inherit;
 }

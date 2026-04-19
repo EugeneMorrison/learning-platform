@@ -66,6 +66,16 @@ def status_view(request):
     })
 
 
+PYTHON_BINARIES = {
+    'Python 3.10': '/usr/bin/python3.10',
+    'Python 3.12': '/usr/local/bin/python3.12',
+}
+
+
+def resolve_python(version_str):
+    return PYTHON_BINARIES.get(version_str, sys.executable)
+
+
 class RunCodeView(APIView):
     """Execute Python code and return stdout/stderr"""
     permission_classes = [AllowAny]
@@ -73,6 +83,7 @@ class RunCodeView(APIView):
     def post(self, request):
         code = request.data.get('code', '')
         stdin = request.data.get('stdin', '')
+        version = request.data.get('version', '')
         if not code.strip():
             return Response({'error': 'No code provided'}, status=400)
 
@@ -85,7 +96,7 @@ class RunCodeView(APIView):
                 tmp_path = f.name
 
             result = subprocess.run(
-                [sys.executable, tmp_path],
+                [resolve_python(version), tmp_path],
                 input=stdin,
                 capture_output=True,
                 text=True,
@@ -117,6 +128,7 @@ class RunTestsView(APIView):
     def post(self, request):
         code = request.data.get('code', '')
         tests = request.data.get('tests', [])
+        version = request.data.get('version', '')
         if not code.strip():
             return Response({'error': 'No code provided'}, status=400)
         if not tests:
@@ -136,7 +148,7 @@ class RunTestsView(APIView):
                 expected = test.get('expected', '') if isinstance(test, dict) else test
                 try:
                     proc = subprocess.run(
-                        [sys.executable, tmp_path],
+                        [resolve_python(version), tmp_path],
                         input=stdin,
                         capture_output=True,
                         text=True,
@@ -782,9 +794,9 @@ class ProgressSubmitView(generics.CreateAPIView):
             block=block
         ).first()
 
-        if existing and existing.completed:
+        if existing and existing.is_correct:
             return Response(
-                {'detail': 'This block is already completed.'},
+                {'detail': 'This block is already solved.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
