@@ -9,7 +9,7 @@ Provides:
 """
 
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -185,7 +185,10 @@ def login_view(request):
 # GET CURRENT USER
 # =============================================================================
 
+from rest_framework_simplejwt.authentication import JWTAuthentication
+
 @api_view(['GET'])
+@authentication_classes([JWTAuthentication])
 @permission_classes([IsAuthenticated])  # Must be logged in
 def current_user_view(request):
     """
@@ -206,7 +209,12 @@ def current_user_view(request):
     }
     """
     serializer = UserSerializer(request.user)
-    return Response(serializer.data)
+    response = Response(serializer.data)
+    # Prevent browsers from caching this response — a cached /auth/me/ response
+    # from a previous user would be served to the next user even after re-login.
+    response['Cache-Control'] = 'no-store, private'
+    response['Vary'] = 'Authorization'
+    return response
 
 
 # =============================================================================

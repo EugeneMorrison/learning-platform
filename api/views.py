@@ -28,13 +28,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import render
 from rest_framework.views import APIView
 
-from .models import Course, Lesson, Block, Enrollment, Progress
+from .models import Course, Lesson, Block, Enrollment, Progress, Message
 from .serializers import (
     CourseSerializer,
     LessonSerializer,
     BlockSerializer,
     EnrollmentSerializer,
-    ProgressSerializer
+    ProgressSerializer,
+    MessageSerializer
+
 )
 from .permissions import (
     IsAuthor,
@@ -319,6 +321,52 @@ class CourseViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(course)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAuthor])
+    def enroll_student(self, request, pk=None):
+        """
+        Teacher adds a student to their course by username.
+
+        POST /api/courses/{id}/enroll_student/
+        Body: {"username": "alice"}
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        course = self.get_object()
+        username = request.data.get('username')
+
+        if not username:
+            return Response(
+                {'error': 'Username is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Find the student
+        try:
+            student = User.objects.get(username=username, role='STUDENT')
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check if already enrolled
+        if Enrollment.objects.filter(student=student, course=course).exists():
+            return Response(
+                {'error': 'Student already enrolled'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Enroll the student
+        enrollment = Enrollment.objects.create(
+            student=student,
+            course=course
+        )
+
+        return Response(
+            {'message': f'{username} successfully enrolled'},
+            status=status.HTTP_201_CREATED
+        )
 
 # =============================================================================
 # LESSON VIEWSET
@@ -845,3 +893,136 @@ class ProgressStatsView(APIView):
             })
 
         return Response(stats)
+
+class StudentProgressView(APIView):
+    """
+    GET /api/progress/student/<student_id>/course/<course_id>/
+    Teacher sees a specific student's progress in their course.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, student_id, course_id):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        # Only authors can view student progress
+        if request.user.role != 'AUTHOR':
+            return Response(
+                {'error': 'Only authors can view student progress'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Get the course and verify ownership
+        course = get_object_or_404(Course, id=course_id, author=request.user)
+
+        # Get the student
+        student = get_object_or_404(User, id=student_id)
+
+        # Get all blocks in the course
+        blocks = Block.objects.filter(
+            lesson__course=course
+        ).select_related('lesson').order_by('lesson__order_index', 'order_index')
+
+        # Get student's progress records
+        progress_records = Progress.objects.filter(
+            student=student,
+            lesson__course=course
+        )
+
+        # Map block_id → progress
+        progress_map = {str(p.block_id): p for p in progress_records}
+
+        # Build response
+        lessons_data = {}
+        for block in blocks:
+            lesson_id = str(block.lesson_id)
+            if lesson_id not in lessons_data:
+                lessons_data[lesson_id] = {
+                    'lesson_title': block.lesson.title,
+                    'lesson_order': block.lesson.order_index,
+                    'blocks': []
+                }
+
+            progress = progress_map.get(str(block.id))
+            lessons_data[lesson_id]['blocks'].append({
+                'block_id': str(block.id),
+                'block_type': block.type,
+                'block_order': block.order_index,
+                'completed': progress.completed if progress else False,
+                'is_correct': progress.is_correct if progress else None,
+                'completed_at': progress.completed_at if progress else None,
+            })
+
+        # Count totals
+        total_blocks = blocks.count()
+        completed_blocks = sum(1 for p in progress_map.values() if p.completed)
+        correct_answers = sum(
+            1 for p in progress_map.values()
+            if p.is_correct is True
+        )
+        total_quizzes = blocks.filter(type='QUIZ').count()
+
+        return Response({
+            'student_username': student.username,
+            'course_title': course.title,
+            'total_blocks': total_blocks,
+            'completed_blocks': completed_blocks,
+            'total_quizzes': total_quizzes,
+            'correct_answers': correct_answers,
+            'progress_percentage': round(
+                completed_blocks / total_blocks * 100
+            ) if total_blocks > 0 else 0,
+            'lessons': list(lessons_data.values()),
+        })
+
+class MessageView(APIView):
+    """
+    GET  /api/messages/?course=<id>  ← get all messages in a course
+    POST /api/messages/              ← send a message
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        course_id = request.query_params.get('course')
+        if not course_id:
+            return Response(
+                {'error': 'course parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get all messages in this course where user is sender or receiver
+        messages = Message.objects.filter(
+            course_id=course_id
+        ).filter(
+            models.Q(sender=request.user) | models.Q(receiver=request.user)
+        ).order_by('created_at')
+
+        serializer = MessageSerializer(messages, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        course_id = request.data.get('course')
+        receiver_id = request.data.get('receiver')
+        text = request.data.get('text')
+
+        if not all([course_id, receiver_id, text]):
+            return Response(
+                {'error': 'course, receiver and text are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        course = get_object_or_404(Course, id=course_id)
+
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        receiver = get_object_or_404(User, id=receiver_id)
+
+        message = Message.objects.create(
+            sender=request.user,
+            receiver=receiver,
+            course=course,
+            text=text,
+        )
+
+        serializer = MessageSerializer(message)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)

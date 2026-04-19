@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import hljs from 'highlight.js/lib/core';
 import python from 'highlight.js/lib/languages/python';
 import './QuizBlock.css';
+import api from '../api';
 
 hljs.registerLanguage('python', python);
 
-function QuizBlock({ content }) {
+function QuizBlock({ content, blockId }) {
     const [selected, setSelected] = useState(null);
     const [submitted, setSubmitted] = useState(false);
 
@@ -19,9 +20,21 @@ function QuizBlock({ content }) {
         }
     }, []);
 
-    function handleSubmit() {
-        if (selected !== null) {
-            setSubmitted(true);
+    async function handleSubmit() {
+        if (selected === null) return;
+        setSubmitted(true);
+        const correct = selected === content.correct_answer;
+        if (correct) {
+            try {
+                await api.post('/progress/submit/', {
+                    block: blockId,
+                    completed: true,
+                    answer: { selected },
+                    is_correct: true,
+                });
+            } catch (err) {
+                console.error('Failed to save progress:', err);
+            }
         }
     }
 
@@ -125,7 +138,7 @@ function QuizBlock({ content }) {
                     color: isCorrect ? '#16a34a' : '#dc2626',
                     fontWeight: '600',
                 }}>
-                    {isCorrect ? '✅ Верно! ' + content.explanation : '❌ Неверно. Попробуй ещё раз!'}
+                    {isCorrect ? '✅ Верно! ' + content.explanation : '❌ Неверно! Попробуйте еще раз!'}
                 </div>
             )}
 
@@ -147,6 +160,23 @@ function QuizBlock({ content }) {
                     Решить снова
                 </button>
             )}
+
+            <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                style={{
+                    display: 'block',
+                    marginTop: '16px',
+                    padding: '0',
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                }}
+            >
+                ↑ Вернуться к теории
+            </button>
         </div>
     );
 }

@@ -339,3 +339,34 @@ class Progress(models.Model):
     def __str__(self):
         status = "✓" if self.completed else "○"
         return f"{status} {self.student.username} - {self.block}"
+
+
+class Message(models.Model):
+    """
+    Messages between teacher and student within a course.
+    """
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_messages'
+    )
+    receiver = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='received_messages'
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+    text = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'messages'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.sender.username} → {self.receiver.username}: {self.text[:50]}"

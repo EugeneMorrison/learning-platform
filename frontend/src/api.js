@@ -11,11 +11,14 @@ const api = axios.create({
     baseURL: API_BASE,
 });
 
-// Automatically attach JWT token to every request if it exists
+// Module-level token — updated immediately by login(), read by interceptor.
+// Initialized from localStorage so page refreshes pick up the saved token.
+let currentToken = localStorage.getItem('access_token');
+
+// Automatically attach JWT token to every request
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    if (currentToken) {
+        config.headers.Authorization = `Bearer ${currentToken}`;
     }
     return config;
 });
@@ -25,8 +28,20 @@ const AUTH_BASE = import.meta.env.DEV
     ? 'http://127.0.0.1:8000/api/auth'
     : '/api/auth';
 
-export const login = (username, password) =>
-    axios.post(`${AUTH_BASE}/login/`, { username, password });
+export const login = async (username, password) => {
+    const response = await axios.post(`${AUTH_BASE}/login/`, { username, password });
+    const { access, refresh } = response.data.tokens;
+    localStorage.setItem('access_token', access);
+    localStorage.setItem('refresh_token', refresh);
+    currentToken = access; // Immediately available for the next request
+    return response;
+};
+
+export const logout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    currentToken = null;
+};
 
 // COURSES
 export const getCourses = () =>
