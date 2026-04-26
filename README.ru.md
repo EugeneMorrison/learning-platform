@@ -39,9 +39,9 @@
 learning-platform/
 ├── backend/                  # Настройки Django-проекта
 ├── api/                      # Основное приложение
-│   ├── models.py             # User, Course, Lesson, Block, Enrollment, Progress
+│   ├── models.py             # User, Course, Lesson, Block, Enrollment, Progress, Message
 │   ├── serializers.py        # JSON-сериализаторы
-│   ├── views.py              # API-представления + выполнение кода
+│   ├── views.py              # API + выполнение кода + сообщения + прогресс студентов
 │   ├── urls.py               # Маршрутизация URL
 │   ├── permissions.py        # IsAuthor, IsOwnerOrReadOnly
 │   └── management/
@@ -50,8 +50,14 @@ learning-platform/
 ├── frontend/                 # React-приложение (Vite)
 │   └── src/
 │       ├── api.js            # Axios-клиент с JWT-авторизацией
+│       ├── App.jsx           # Маршрутизация всех страниц
 │       ├── pages/
-│       │   └── LessonViewer.jsx   # Считывает ID урока из URL
+│       │   ├── LoginPage.jsx
+│       │   ├── RegisterPage.jsx
+│       │   ├── DashboardPage.jsx        # Дашборд по роли
+│       │   ├── CoursePage.jsx           # Страница курса (автор/студент)
+│       │   ├── StudentProgressPage.jsx  # Автор смотрит прогресс студента
+│       │   └── LessonViewer.jsx         # Считывает ID урока из URL
 │       └── components/
 │           ├── TextBlock.jsx
 │           ├── QuizBlock.jsx
@@ -205,6 +211,39 @@ POST   /api/run-code/               Запустить Python-код, получ
 POST   /api/run-tests/              Запустить код против тестов, получить результат
 ```
 
+### Инструменты автора (Шаг 13)
+
+```
+GET    /api/courses/my_courses/                            Курсы текущего автора
+POST   /api/courses/{id}/enroll_student/                   Записать студента по username
+GET    /api/progress/course/{id}/student/{student_id}/     Прогресс конкретного студента
+```
+
+### Сообщения (Шаг 13)
+
+```
+GET    /api/messages/?course={id}&user={id}    Переписка преподавателя и студента
+POST   /api/messages/                          Отправить сообщение
+```
+
+---
+
+## 🖥️ Маршруты фронтенда (Шаг 13)
+
+```
+/login/                                    Форма входа
+/register/                                 Регистрация с выбором роли (Студент/Автор)
+/dashboard/                                Дашборд по роли пользователя
+/courses/:courseId/                        Страница курса (автор/студент)
+/courses/:courseId/students/:studentId/    Автор: прогресс студента
+/lesson/:lessonId/                         Просмотр урока
+```
+
+**Дашборд автора:** список своих курсов (через `/api/courses/my_courses/`), форма создания курса.
+**Дашборд студента:** список курсов, на которые записан, с датами записи.
+**Страница курса (автор):** уроки, форма добавления урока, список студентов с кнопками **Прогресс** и **💬 Чат** (встроенный чат для каждого студента).
+**Страница прогресса студента:** % завершения, выполненные задачи, правильные тесты, плюс разбивка по урокам — статус каждого блока, корректность ответа, дата выполнения.
+
 ---
 
 ## 📦 Технологии
@@ -269,6 +308,7 @@ URL тестового урока: `http://localhost:8000/lesson/6f1c0c31-7be5-4
 | 10   | React-фронтенд — просмотр уроков | ✅ |
 | 11   | Встраивание через iframe      | ✅     |
 | 12   | Docker                        | ✅     |
+| 13   | Дашборд управления + сообщения| ✅     |
 
 ---
 

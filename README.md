@@ -39,9 +39,9 @@ Authors create courses made of **blocks** — theory text, quizzes, and coding e
 learning-platform/
 ├── backend/                  # Django project settings
 ├── api/                      # Main app
-│   ├── models.py             # User, Course, Lesson, Block, Enrollment, Progress
+│   ├── models.py             # User, Course, Lesson, Block, Enrollment, Progress, Message
 │   ├── serializers.py        # JSON serializers
-│   ├── views.py              # API views + code execution
+│   ├── views.py              # API views + code execution + messaging + student progress
 │   ├── urls.py               # URL routing
 │   ├── permissions.py        # IsAuthor, IsOwnerOrReadOnly
 │   └── management/
@@ -50,8 +50,14 @@ learning-platform/
 ├── frontend/                 # React app (Vite)
 │   └── src/
 │       ├── api.js            # Axios client with JWT auth
+│       ├── App.jsx           # Routing for all pages
 │       ├── pages/
-│       │   └── LessonViewer.jsx   # Reads lesson ID from URL path
+│       │   ├── LoginPage.jsx
+│       │   ├── RegisterPage.jsx
+│       │   ├── DashboardPage.jsx        # Role-based dashboard
+│       │   ├── CoursePage.jsx           # Course detail (author/student views)
+│       │   ├── StudentProgressPage.jsx  # Author views per-student progress
+│       │   └── LessonViewer.jsx         # Reads lesson ID from URL path
 │       └── components/
 │           ├── TextBlock.jsx
 │           ├── QuizBlock.jsx
@@ -205,6 +211,39 @@ POST   /api/run-code/               Run Python code, get stdout/stderr
 POST   /api/run-tests/              Run code against test cases, get pass/fail
 ```
 
+### Author Tools (Step 13)
+
+```
+GET    /api/courses/my_courses/                            Author's own courses
+POST   /api/courses/{id}/enroll_student/                   Enroll student by username
+GET    /api/progress/course/{id}/student/{student_id}/     View specific student's progress
+```
+
+### Messaging (Step 13)
+
+```
+GET    /api/messages/?course={id}&user={id}    List messages between teacher and student
+POST   /api/messages/                          Send a message
+```
+
+---
+
+## 🖥️ Frontend Routes (Step 13)
+
+```
+/login/                                    Login form
+/register/                                 Registration with role selector (Student/Author)
+/dashboard/                                Role-based dashboard
+/courses/:courseId/                        Course detail (author/student views)
+/courses/:courseId/students/:studentId/    Author: per-student progress
+/lesson/:lessonId/                         Lesson viewer
+```
+
+**Author dashboard:** lists own courses (from `/api/courses/my_courses/`), inline "Create Course" form.
+**Student dashboard:** lists enrolled courses with enrollment dates.
+**Author course page:** lessons list, add-lesson form, students list with **Progress** and **💬 Chat** buttons (inline chat per student).
+**Student progress page:** completion %, tasks done, quizzes correct, plus per-lesson breakdown of each block's status, correctness, and completion date.
+
 ---
 
 ## 📦 Tech Stack
@@ -269,6 +308,7 @@ Test lesson URL: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d
 | 10   | React frontend — lesson viewer  | ✅     |
 | 11   | iframe embedding                | ✅     |
 | 12   | Docker                          | ✅     |
+| 13   | Management dashboard + messaging| ✅     |
 
 ---
 
