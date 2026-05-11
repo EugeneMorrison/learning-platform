@@ -156,6 +156,60 @@ http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/
 
 ---
 
+## 🛠️ Ручная установка (без Docker)
+
+Рекомендуемый способ — Docker, но проект можно запустить и вручную. Понадобятся:
+
+* **Python 3.12+** — [python.org](https://www.python.org/downloads/)
+* **Node.js 20+** — [nodejs.org](https://nodejs.org/) (нужен для сборки React-фронтенда)
+
+> ⚠️ **Важно:** папка `frontend/dist/` находится в `.gitignore` (это артефакт сборки). После свежего клонирования её нет, и Django не сможет отдавать фронтенд, пока вы его не соберёте. Если запустить только шаги Django, появится предупреждение `staticfiles.W004` и страница урока будет пустой. Docker собирает фронтенд автоматически — при ручной установке это нужно делать самому.
+
+**1. Бэкенд — Python-зависимости:**
+
+```bash
+python -m venv venv
+venv\Scripts\activate           # Windows (PowerShell/CMD)
+# source venv/bin/activate      # macOS / Linux
+pip install -r requirements.txt
+```
+
+**2. Фронтенд — собрать React-приложение** (этот шаг легко пропустить):
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+Эта команда создаёт `frontend/dist/`, которую Django использует и как директорию шаблонов (для `index.html`), и как директорию статических файлов (для JS/CSS-бандлов).
+
+**3. Django — миграции, фикстуры, сервер:**
+
+```bash
+python manage.py migrate
+python manage.py loaddata fixtures.json
+python manage.py runserver
+```
+
+**4. Открыть в браузере** — Django работает на порту **8000**:
+
+```
+http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/
+http://localhost:8000/login/
+http://localhost:8000/admin/
+```
+
+> ❗ **Не** открывайте `http://127.0.0.1:5173/` — это порт dev-сервера Vite, он работает только если вы отдельно запустили `npm run dev` внутри `frontend/`. При обычной ручной установке всё отдаёт Django на порту **8000**.
+
+**Повторный запуск после изменений в коде:**
+
+* Изменения в бэкенде (Python) — достаточно перезапустить `python manage.py runserver`.
+* Изменения во фронтенде (React) — заново выполните `npm run build` в `frontend/` и обновите страницу. (Или используйте `npm run dev` на порту 5173 для горячей перезагрузки во время активной разработки — но API-запросы всё равно идут в Django на порт 8000.)
+
+---
+
 ### Импорт урока из HTML
 
 ```bash

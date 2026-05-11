@@ -156,6 +156,60 @@ To embed a lesson on your own page:
 
 ---
 
+## 🛠️ Manual Setup (without Docker)
+
+Docker is recommended, but the project can also be run manually. You'll need:
+
+* **Python 3.12+** — [python.org](https://www.python.org/downloads/)
+* **Node.js 20+** — [nodejs.org](https://nodejs.org/) (required to build the React frontend)
+
+> ⚠️ **Important:** `frontend/dist/` is gitignored (it's a build artifact). On a fresh clone it doesn't exist, so Django can't serve the frontend until you build it. Running only the Django steps will give a `staticfiles.W004` warning and a blank lesson page. The Docker flow builds the frontend automatically — the manual flow does not.
+
+**1. Backend — Python dependencies:**
+
+```bash
+python -m venv venv
+venv\Scripts\activate           # Windows (PowerShell/CMD)
+# source venv/bin/activate      # macOS / Linux
+pip install -r requirements.txt
+```
+
+**2. Frontend — build the React app** (this is the step that's easy to miss):
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+This creates `frontend/dist/`, which Django reads as both a template directory (for `index.html`) and a static files directory (for JS/CSS bundles).
+
+**3. Django — migrations, fixtures, server:**
+
+```bash
+python manage.py migrate
+python manage.py loaddata fixtures.json
+python manage.py runserver
+```
+
+**4. Open in the browser** — Django serves on port **8000**:
+
+```
+http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/
+http://localhost:8000/login/
+http://localhost:8000/admin/
+```
+
+> ❗ Do **not** open `http://127.0.0.1:5173/` — that's the Vite dev server port and is only active if you separately run `npm run dev` inside `frontend/`. For normal manual setup everything is served by Django on **port 8000**.
+
+**Re-running after code changes:**
+
+* Backend changes (Python) — just restart `python manage.py runserver`.
+* Frontend changes (React) — re-run `npm run build` inside `frontend/`, then refresh the browser. (Or use `npm run dev` on port 5173 for hot reload during active development — but API calls still go to Django on 8000.)
+
+---
+
 ### Import a Lesson from HTML
 
 ```bash

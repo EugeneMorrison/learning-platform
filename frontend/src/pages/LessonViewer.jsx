@@ -59,8 +59,12 @@ function LessonViewer() {
             setBlocks(blocksResponse.data);
             const courseResponse = await api.get(`/courses/${lessonResponse.data.course}/`);
             setCourse(courseResponse.data);
-            const progressResponse = await api.get(`/progress/course/${lessonResponse.data.course}/`);
-            setProgress(progressResponse.data);
+            try {
+                const progressResponse = await api.get(`/progress/course/${lessonResponse.data.course}/`);
+                setProgress(progressResponse.data);
+            } catch {
+                setProgress([]);
+            }
         } catch (err) {
             setError('Failed to load lesson. Check console for details.');
             console.error(err);

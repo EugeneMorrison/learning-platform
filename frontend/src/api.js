@@ -23,6 +23,30 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+// Self-heal on 401: if the server rejects a stored token as expired/invalid,
+// clear it and retry the request once without auth. Public endpoints (lessons,
+// blocks) will succeed on the retry. Protected endpoints will still 401, and
+// the UI can redirect to /login/.
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+        if (
+            error.response?.status === 401 &&
+            currentToken &&
+            !originalRequest._retriedAfterTokenClear
+        ) {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            currentToken = null;
+            originalRequest._retriedAfterTokenClear = true;
+            delete originalRequest.headers.Authorization;
+            return api(originalRequest);
+        }
+        return Promise.reject(error);
+    }
+);
+
 // AUTH — uses plain axios (not intercepted instance) to avoid expired token bug
 const AUTH_BASE = import.meta.env.DEV
     ? 'http://127.0.0.1:8000/api/auth'
