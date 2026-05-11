@@ -37,3 +37,6 @@ test_permissions.py
 # Frontend build output and dependencies (Docker rebuilds these)
 frontend/node_modules/
 frontend/dist/
+
+# Claude Code local settings (per-machine, not part of the project)
+.claude/
