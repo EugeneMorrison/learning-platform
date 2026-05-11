@@ -1,10 +1,292 @@
 [
 {
+  "model": "admin.logentry",
+  "pk": 1,
+  "fields": {
+    "action_time": "2026-03-09T16:21:14.078Z",
+    "user": 1,
+    "content_type": 6,
+    "object_id": "2",
+    "object_repr": "John (AUTHOR)",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 2,
+  "fields": {
+    "action_time": "2026-03-09T16:21:49.020Z",
+    "user": 1,
+    "content_type": 6,
+    "object_id": "3",
+    "object_repr": "Alice (STUDENT)",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 3,
+  "fields": {
+    "action_time": "2026-03-09T16:27:03.715Z",
+    "user": 1,
+    "content_type": 7,
+    "object_id": "2380f8de-f43a-47a7-8010-c69a38a8a1ab",
+    "object_repr": "Math in unique way of teaching",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 4,
+  "fields": {
+    "action_time": "2026-03-09T16:27:39.029Z",
+    "user": 1,
+    "content_type": 8,
+    "object_id": "856388ba-e519-46fa-916f-f997bb972a0a",
+    "object_repr": "Math in unique way of teaching - Lesson 0: Function",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 5,
+  "fields": {
+    "action_time": "2026-03-09T16:28:06.259Z",
+    "user": 1,
+    "content_type": 8,
+    "object_id": "7bbb799e-1361-45b9-9b21-31cd304f2b32",
+    "object_repr": "Math in unique way of teaching - Lesson 1: Equations",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 6,
+  "fields": {
+    "action_time": "2026-03-09T16:39:58.169Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "11c90e8d-92dc-48af-94c5-df8d746390c3",
+    "object_repr": "Function - TEXT Block #0",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 7,
+  "fields": {
+    "action_time": "2026-03-09T16:41:13.180Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "e0e1d3cd-8803-420e-8e28-cdab6471f846",
+    "object_repr": "Function - QUIZ Block #1",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 8,
+  "fields": {
+    "action_time": "2026-03-09T16:44:17.116Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "2a81242c-e856-49ff-ac9b-bb8f650662f7",
+    "object_repr": "Function - CODE Block #2",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 9,
+  "fields": {
+    "action_time": "2026-03-11T22:34:41.211Z",
+    "user": 1,
+    "content_type": 10,
+    "object_id": "d269ba73-a298-4af4-a0f8-d580db2ada8f",
+    "object_repr": "alice → Курс: Метод .startswith()",
+    "action_flag": 1,
+    "change_message": "[{\"added\": {}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 10,
+  "fields": {
+    "action_time": "2026-04-18T21:51:39.642Z",
+    "user": 1,
+    "content_type": 7,
+    "object_id": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "object_repr": "String methods",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Title\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 11,
+  "fields": {
+    "action_time": "2026-04-18T21:51:50.435Z",
+    "user": 1,
+    "content_type": 7,
+    "object_id": "58449ede-68b5-4e5c-8b78-7ebc69013f1e",
+    "object_repr": "String methods",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 12,
+  "fields": {
+    "action_time": "2026-04-18T21:52:03.716Z",
+    "user": 1,
+    "content_type": 7,
+    "object_id": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "object_repr": "String methods",
+    "action_flag": 2,
+    "change_message": "[]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 13,
+  "fields": {
+    "action_time": "2026-04-18T21:52:18.457Z",
+    "user": 1,
+    "content_type": 7,
+    "object_id": "c119fa7e-95e6-425e-b951-9117a79e73e7",
+    "object_repr": "Updated Title",
+    "action_flag": 3,
+    "change_message": ""
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 14,
+  "fields": {
+    "action_time": "2026-04-18T21:52:35.132Z",
+    "user": 1,
+    "content_type": 8,
+    "object_id": "4a12207c-e531-4a8b-ab8f-b22e618ec23c",
+    "object_repr": "String methods - Lesson 2: Метод .center()",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Title\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 15,
+  "fields": {
+    "action_time": "2026-04-19T10:25:28.860Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "e3ff62ce-421f-4eae-9b17-8f7c7e53a7e1",
+    "object_repr": "Метод .startswith() - QUIZ Block #4",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Content\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 16,
+  "fields": {
+    "action_time": "2026-04-19T10:28:40.799Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "a8417c00-8bf7-49b2-bc5f-96e1f0c8dd9d",
+    "object_repr": "Метод .startswith() - QUIZ Block #9",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Content\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 17,
+  "fields": {
+    "action_time": "2026-04-19T10:29:16.966Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "23ea3846-92a5-43ec-b131-a2fc1c5e5ab7",
+    "object_repr": "Метод .startswith() - QUIZ Block #10",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Content\"]}}]"
+  }
+},
+{
+  "model": "admin.logentry",
+  "pk": 18,
+  "fields": {
+    "action_time": "2026-04-19T10:30:34.109Z",
+    "user": 1,
+    "content_type": 9,
+    "object_id": "7c7ba348-2116-4d80-b7ad-78284f1b4f09",
+    "object_repr": "Метод .startswith() - QUIZ Block #12",
+    "action_flag": 2,
+    "change_message": "[{\"changed\": {\"fields\": [\"Content\"]}}]"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "2k8iqq0bfnn4vhk9n9fs88cirf0fb67t",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQBe_iGln-BduU9DmDtd5d4wBypDipEHeHSCmgfTPzXiLBtta0dV7SROIitDj9bhnwwW0HdId2myXObV2mLHdFHrTLcSZ-Xg_376BCr9_alZAVamdNyYMaQmSwjopHCwadJ-ed0YQWWWcuUQciRXgOJkfkqL14fwDszThh:1vzdIi:0Mrf1KRjPQ9yfUKL0-RaIWpfpDuybZw2A3i_DIlO20c",
+    "expire_date": "2026-03-23T16:17:48.093Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "dho45cniny8b4x34hvcn2azje5jbxx69",
+  "fields": {
+    "session_data": ".eJxVjEEOwiAQAP-yZ0OWBSz06L1vaBYWbNWUpLQn499Nkx70OjOZN4y8b9O4t7yOs0APGi6_LHJ65uUQ8uDlXlWqy7bOUR2JOm1TQ5X8up3t32DiNkEPAQsVl7xD5CDaBO8YMXqtKVFXCF2J2abSCVnBRNFo1r4z1vpQ5Erw-QLKSjcy:1w181W:FdccNb8s7x6RZg5nvG2x88Sh12hTc7GmhhyZ1XVJUHM",
+    "expire_date": "2026-03-27T19:18:14.080Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "twkf14hylzuzqjnkbmsenqwl7s7gxet3",
+  "fields": {
+    "session_data": ".eJxVjEEOwiAQAP-yZ0OWBSz06L1vaBYWbNWUpLQn499Nkx70OjOZN4y8b9O4t7yOs0APGi6_LHJ65uUQ8uDlXlWqy7bOUR2JOm1TQ5X8up3t32DiNkEPAQsVl7xD5CDaBO8YMXqtKVFXCF2J2abSCVnBRNFo1r4z1vpQ5Erw-QLKSjcy:1wEDYr:wVyxNUBuW-tD2DsqNp7THWDH3yz_5ELd7xzl6dlem_k",
+    "expire_date": "2026-05-02T21:50:45.558Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "vj6t1x6qcdx3soxmrxvcaveusabju49b",
+  "fields": {
+    "session_data": ".eJxVjEEOwiAQAP-yZ0MopQv06N03kAUWqRpISnsy_t006UGvM5N5g6d9K37vvPolwQyDhMsvDBSfXA-THlTvTcRWt3UJ4kjEabu4tcSv69n-DQr1AjOwY6cwJrYTGlSkpBzHnIPTETmjRJsmsiyzIWUHl5GDdpzYRm0k6gyfLw0XOFg:1w0Ns2:wdaVlBZFIsqSREeqTQ446tpaxRDUm1b_xkXoTPruYgE",
+    "expire_date": "2026-03-25T18:01:22.039Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "x1qhkmgxhe7x6iytr9ke3lc6169567xs",
+  "fields": {
+    "session_data": ".eJxVjEEOwiAQAP-yZ0MopQv06N03kAUWqRpISnsy_t006UGvM5N5g6d9K37vvPolwQyDhMsvDBSfXA-THlTvTcRWt3UJ4kjEabu4tcSv69n-DQr1AjOwY6cwJrYTGlSkpBzHnIPTETmjRJsmsiyzIWUHl5GDdpzYRm0k6gyfLw0XOFg:1w0NpF:YVOqXlR9k_ltegRM0ovztQh2o2-YGCI8-TGJvaKHHhw",
+    "expire_date": "2026-03-25T17:58:29.712Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "yvouogbftl5t64j0cucl5ei6kg925gkx",
+  "fields": {
+    "session_data": ".eJxVzEEOwiAQheG7zNoQKKVlunTvGcjADFI1bVLalfHuhqQL3b7_y3tDoGMv4aiyhZlhAqPh8jtGSk9ZWuEHLfdVpXXZtzmqRtRZq7qtLK_raf8OCtUCE3iLfXZWGEfS6LEfvXMpsyHN3aAzc0daImaDPjXlhzRwN6Kwzc5a-HwBAZI4Lg:1w0OLe:8w9S7rTqlepovFc1dwRta61MNxGQq2ZCq2kK0jtv7-g",
+    "expire_date": "2026-03-25T18:31:58.900Z"
+  }
+},
+{
   "model": "api.user",
   "pk": 1,
   "fields": {
     "password": "pbkdf2_sha256$1200000$0Y7Dba7UmI0uPx8fQ7ONGS$t0cUthM2FOjBVO9JgxuwkyjaMYYH18zED8kefahqVZE=",
-    "last_login": "2026-03-11T22:33:58.704Z",
+    "last_login": "2026-04-18T21:50:45.549Z",
     "is_superuser": true,
     "username": "admin",
     "first_name": "",
@@ -98,7 +380,7 @@
   "model": "api.user",
   "pk": 6,
   "fields": {
-    "password": "pbkdf2_sha256$1200000$8UeHXoWXd6EShZFcZrxBNZ$EtBTP4aTJxh5oeo5+U+6tW4sMwvIg/UbWWLhvLRlzfw=",
+    "password": "pbkdf2_sha256$1200000$rvFYgRS8sDOltlvi7LJfxB$nqv0VuSR0iow2JoQMLV45lUQlXPmAM5jdYsWiSqjSPk=",
     "last_login": null,
     "is_superuser": false,
     "username": "alice",
@@ -174,8 +456,8 @@
   "model": "api.user",
   "pk": 10,
   "fields": {
-    "password": "pbkdf2_sha256$1200000$N0Vr5VvHo6hneLJRWk2kBH$84emVTgAITLWLIC3MvOOxmieyHvflZKlATY+D11mZZs=",
-    "last_login": "2026-03-11T18:31:58.894Z",
+    "password": "pbkdf2_sha256$1200000$96SPA7Y8undqvLttzcUDcm$SVafwsOMx3LGWD8FgmVgHW2SKr4vP79RwY89hGrD5Xw=",
+    "last_login": "2026-04-18T17:36:58.298Z",
     "is_superuser": false,
     "username": "john_author",
     "first_name": "",
@@ -185,6 +467,25 @@
     "is_active": true,
     "date_joined": "2026-03-11T17:25:21.432Z",
     "role": "AUTHOR",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "api.user",
+  "pk": 11,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$dhUU4Qi3FsftjzHYJTsu9b$M4Dcp8XM9wMIHS3GypJz9al1LlaxY+N+7q0nyQTkj+w=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "uyyyy",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-11T13:01:39.702Z",
+    "role": "STUDENT",
     "groups": [],
     "user_permissions": []
   }
@@ -203,6 +504,18 @@
 },
 {
   "model": "api.course",
+  "pk": "5afb249f-439a-4e60-901b-5f796617095d",
+  "fields": {
+    "title": "Math",
+    "description": "Math and everything about it",
+    "author": 10,
+    "is_published": false,
+    "created_at": "2026-04-19T09:06:00.608Z",
+    "updated_at": "2026-04-19T09:06:00.608Z"
+  }
+},
+{
+  "model": "api.course",
   "pk": "b73467b8-32da-4845-ae7c-6fbb56583f76",
   "fields": {
     "title": "Test Course",
@@ -217,24 +530,12 @@
   "model": "api.course",
   "pk": "bd4c4230-f84d-4165-83db-8413112a6811",
   "fields": {
-    "title": "Курс: Метод .startswith()",
+    "title": "String methods",
     "description": "Автоматически импортированный курс из HTML файла",
     "author": 10,
     "is_published": true,
     "created_at": "2026-03-11T22:25:03.152Z",
-    "updated_at": "2026-03-11T22:25:03.152Z"
-  }
-},
-{
-  "model": "api.course",
-  "pk": "c119fa7e-95e6-425e-b951-9117a79e73e7",
-  "fields": {
-    "title": "Updated Title",
-    "description": "Testing permissions",
-    "author": 10,
-    "is_published": false,
-    "created_at": "2026-03-11T18:48:43.472Z",
-    "updated_at": "2026-03-11T18:48:43.503Z"
+    "updated_at": "2026-04-18T21:52:03.713Z"
   }
 },
 {
@@ -274,6 +575,17 @@
 },
 {
   "model": "api.lesson",
+  "pk": "4a12207c-e531-4a8b-ab8f-b22e618ec23c",
+  "fields": {
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "title": "Метод .center()",
+    "order_index": 2,
+    "created_at": "2026-04-18T21:45:06.138Z",
+    "updated_at": "2026-04-18T21:52:35.129Z"
+  }
+},
+{
+  "model": "api.lesson",
   "pk": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
   "fields": {
     "course": "bd4c4230-f84d-4165-83db-8413112a6811",
@@ -303,6 +615,17 @@
     "order_index": 0,
     "created_at": "2026-03-09T16:27:39.027Z",
     "updated_at": "2026-03-09T16:27:39.027Z"
+  }
+},
+{
+  "model": "api.lesson",
+  "pk": "d7df72dc-2c9e-4406-94ff-835d5bb4db4e",
+  "fields": {
+    "course": "5afb249f-439a-4e60-901b-5f796617095d",
+    "title": "Function",
+    "order_index": 1,
+    "created_at": "2026-04-19T09:06:10.873Z",
+    "updated_at": "2026-04-19T09:06:10.874Z"
   }
 },
 {
@@ -414,11 +737,11 @@
         "<code>Пустая строка</code>",
         "<code>Ошибка</code>"
       ],
-      "correct_answer": 0,
+      "correct_answer": 1,
       "explanation": "Проверьте свой ответ"
     },
     "created_at": "2026-03-11T22:25:03.187Z",
-    "updated_at": "2026-03-11T22:25:03.187Z"
+    "updated_at": "2026-04-19T10:29:16.963Z"
   }
 },
 {
@@ -591,11 +914,11 @@
         "<code>Пустая строка</code>",
         "<code>Ошибка</code>"
       ],
-      "correct_answer": 0,
+      "correct_answer": 4,
       "explanation": "Проверьте свой ответ"
     },
     "created_at": "2026-03-11T22:25:03.191Z",
-    "updated_at": "2026-03-11T22:25:03.191Z"
+    "updated_at": "2026-04-19T10:30:34.107Z"
   }
 },
 {
@@ -660,11 +983,11 @@
         "<code>False<br>True</code><br><br>",
         "<code>Ошибка</code><br><br>"
       ],
-      "correct_answer": 0,
+      "correct_answer": 3,
       "explanation": "Проверьте свой ответ"
     },
     "created_at": "2026-03-11T22:25:03.182Z",
-    "updated_at": "2026-03-11T22:25:03.182Z"
+    "updated_at": "2026-04-19T10:28:40.795Z"
   }
 },
 {
@@ -774,11 +1097,11 @@
         "<code>Пустая строка</code>",
         "<code>Ошибка</code>"
       ],
-      "correct_answer": 0,
+      "correct_answer": 1,
       "explanation": "Проверьте свой ответ"
     },
     "created_at": "2026-03-11T22:25:03.172Z",
-    "updated_at": "2026-03-11T22:25:03.172Z"
+    "updated_at": "2026-04-19T10:25:28.854Z"
   }
 },
 {
@@ -829,11 +1152,253 @@
 },
 {
   "model": "api.enrollment",
+  "pk": "58b36eb2-909e-42f7-930b-3e882bf6ea59",
+  "fields": {
+    "student": 6,
+    "course": "db469ea6-0e74-4d77-85ab-c8ba97237e0a",
+    "enrolled_at": "2026-03-23T15:10:46.422Z"
+  }
+},
+{
+  "model": "api.enrollment",
+  "pk": "67f663dd-5b84-420d-84fd-1c01c2ec6764",
+  "fields": {
+    "student": 6,
+    "course": "2380f8de-f43a-47a7-8010-c69a38a8a1ab",
+    "enrolled_at": "2026-03-23T15:02:45.983Z"
+  }
+},
+{
+  "model": "api.enrollment",
+  "pk": "79375d7c-32ce-4444-b3a8-b26cd4d6aa4f",
+  "fields": {
+    "student": 6,
+    "course": "b73467b8-32da-4845-ae7c-6fbb56583f76",
+    "enrolled_at": "2026-03-23T15:03:12.946Z"
+  }
+},
+{
+  "model": "api.enrollment",
   "pk": "d269ba73-a298-4af4-a0f8-d580db2ada8f",
   "fields": {
     "student": 6,
     "course": "bd4c4230-f84d-4165-83db-8413112a6811",
     "enrolled_at": "2026-03-11T22:34:41.208Z"
+  }
+},
+{
+  "model": "api.enrollment",
+  "pk": "d63633e0-b1cf-4607-833c-dcfe62fb0190",
+  "fields": {
+    "student": 6,
+    "course": "f6ab4650-7a10-44d5-afb8-f97813334c06",
+    "enrolled_at": "2026-03-23T15:02:56.032Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "30a246ff-f0f6-4ff6-84f5-11d77d27dfa8",
+  "fields": {
+    "student": 6,
+    "lesson": "856388ba-e519-46fa-916f-f997bb972a0a",
+    "block": "11c90e8d-92dc-48af-94c5-df8d746390c3",
+    "completed": true,
+    "answer": "{\"block\": \"11c90e8d-92dc-48af-94c5-df8d746390c3\"}",
+    "is_correct": null,
+    "completed_at": "2026-03-23T17:31:53.895Z",
+    "created_at": "2026-03-23T17:31:53.898Z",
+    "updated_at": "2026-03-23T17:31:53.898Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "490fe4cb-e323-416f-b079-55336c0891cf",
+  "fields": {
+    "student": 10,
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "block": "e3ff62ce-421f-4eae-9b17-8f7c7e53a7e1",
+    "completed": true,
+    "answer": {
+      "selected": 2
+    },
+    "is_correct": false,
+    "completed_at": "2026-04-19T19:52:32.705Z",
+    "created_at": "2026-04-19T19:52:32.707Z",
+    "updated_at": "2026-04-19T19:52:32.707Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "673c9f06-fe76-4d8f-81a9-385624dc3472",
+  "fields": {
+    "student": 6,
+    "lesson": "856388ba-e519-46fa-916f-f997bb972a0a",
+    "block": "e0e1d3cd-8803-420e-8e28-cdab6471f846",
+    "completed": true,
+    "answer": {
+      "selected": 1
+    },
+    "is_correct": true,
+    "completed_at": "2026-03-23T17:37:33.576Z",
+    "created_at": "2026-03-23T17:37:33.579Z",
+    "updated_at": "2026-03-23T17:37:33.579Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "73ac98b4-c6c1-4401-8436-f72028e2a9fe",
+  "fields": {
+    "student": 10,
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "block": "f5173d9f-6d4b-497e-a4b0-a717ef1e193a",
+    "completed": true,
+    "answer": {
+      "selected": 0
+    },
+    "is_correct": true,
+    "completed_at": "2026-04-19T19:47:23.822Z",
+    "created_at": "2026-04-19T19:47:23.826Z",
+    "updated_at": "2026-04-19T19:47:23.826Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "81fdb350-627b-46e0-aaf3-022862db8032",
+  "fields": {
+    "student": 6,
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "block": "a549796d-69f9-4911-86b9-dd1eb5408c27",
+    "completed": true,
+    "answer": {
+      "selected": 0
+    },
+    "is_correct": true,
+    "completed_at": "2026-04-19T10:47:44.041Z",
+    "created_at": "2026-04-19T10:47:44.047Z",
+    "updated_at": "2026-04-19T10:47:44.047Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "878f0708-73b8-44c8-a455-4783e66e5e70",
+  "fields": {
+    "student": 6,
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "block": "e3ff62ce-421f-4eae-9b17-8f7c7e53a7e1",
+    "completed": true,
+    "answer": {
+      "selected": 1
+    },
+    "is_correct": true,
+    "completed_at": "2026-04-19T10:47:51.140Z",
+    "created_at": "2026-04-19T10:47:51.143Z",
+    "updated_at": "2026-04-19T10:47:51.143Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "880b09e7-0676-4cd1-9c6f-938101596688",
+  "fields": {
+    "student": 10,
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "block": "a549796d-69f9-4911-86b9-dd1eb5408c27",
+    "completed": true,
+    "answer": {
+      "selected": 0
+    },
+    "is_correct": true,
+    "completed_at": "2026-04-19T19:07:24.315Z",
+    "created_at": "2026-04-19T19:07:24.322Z",
+    "updated_at": "2026-04-19T19:07:24.322Z"
+  }
+},
+{
+  "model": "api.progress",
+  "pk": "d262e411-0f48-49a8-b666-79c7963d8dbc",
+  "fields": {
+    "student": 6,
+    "lesson": "6f1c0c31-7be5-4434-ac25-c00f8031d15c",
+    "block": "f5173d9f-6d4b-497e-a4b0-a717ef1e193a",
+    "completed": true,
+    "answer": {
+      "selected": 0
+    },
+    "is_correct": true,
+    "completed_at": "2026-04-19T10:47:47.859Z",
+    "created_at": "2026-04-19T10:47:47.863Z",
+    "updated_at": "2026-04-19T10:47:47.863Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": 1,
+  "fields": {
+    "sender": 10,
+    "receiver": 6,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "text": "Hi, Alice! How is it going? How's your study progress? ",
+    "is_read": false,
+    "created_at": "2026-04-19T12:04:19.517Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": 2,
+  "fields": {
+    "sender": 6,
+    "receiver": 10,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "text": "Hi, John Connor! I'm ok, course in process of passing) ",
+    "is_read": false,
+    "created_at": "2026-04-19T12:10:21.288Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": 3,
+  "fields": {
+    "sender": 6,
+    "receiver": 10,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "text": "But stuck with some tech issues",
+    "is_read": false,
+    "created_at": "2026-04-19T13:10:53.017Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": 4,
+  "fields": {
+    "sender": 10,
+    "receiver": 6,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "text": "Ok, I'll help you",
+    "is_read": false,
+    "created_at": "2026-04-19T13:56:08.518Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": 5,
+  "fields": {
+    "sender": 6,
+    "receiver": 10,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "text": "Great! ",
+    "is_read": false,
+    "created_at": "2026-04-19T13:56:45.440Z"
+  }
+},
+{
+  "model": "api.message",
+  "pk": 6,
+  "fields": {
+    "sender": 6,
+    "receiver": 10,
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "text": "It's so great!",
+    "is_read": false,
+    "created_at": "2026-04-19T13:56:51.902Z"
   }
 }
 ]
