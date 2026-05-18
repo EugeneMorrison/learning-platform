@@ -77,6 +77,17 @@ function CoursePage() {
         }
     }
 
+    async function handleDeleteLesson(lessonId) {
+        if (!window.confirm('Вы уверены, что хотите удалить урок?')) return;
+        try {
+            await api.delete(`/lessons/${lessonId}/`);
+            setLessons(lessons.filter(l => l.id !== lessonId));
+        } catch (err) {
+            console.error('Failed to delete lesson:', err);
+            alert('Не удалось удалить урок.');
+        }
+    }
+
     async function handleAddStudent(e) {
         e.preventDefault();
         setStudentError('');
@@ -184,11 +195,38 @@ function CoursePage() {
                             padding: '16px',
                             marginTop: '12px',
                             cursor: 'pointer',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '12px',
                         }} onClick={() => navigate(`/lesson/${lesson.id}/`)}>
-                            <strong>Урок {index + 1}: {lesson.title}</strong>
-                            <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
-                                → Открыть урок
-                            </p>
+                            <div>
+                                <strong>Урок {index + 1}: {lesson.title}</strong>
+                                <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
+                                    → Открыть урок
+                                </p>
+                            </div>
+                            {user?.role === 'AUTHOR' && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteLesson(lesson.id);
+                                    }}
+                                    style={{
+                                        padding: '6px 12px',
+                                        background: 'white',
+                                        color: '#dc2626',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '6px',
+                                        cursor: 'pointer',
+                                        fontSize: '13px',
+                                        fontWeight: '500',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    Удалить урок
+                                </button>
+                            )}
                         </div>
                     ))
                 )}

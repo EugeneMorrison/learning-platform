@@ -118,7 +118,7 @@ function LessonViewer() {
                 inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} />;
                 break;
             case 'CODE':
-                inner = <CodeBlock blockId={block.id} content={block.content} />;
+                inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} />;
                 break;
             default:
                 return null;

@@ -3,16 +3,29 @@ import api from '../api';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
-function CodeBlock({ content }) {
-    const [userCode, setUserCode] = useState(content.starter_code);
+function CodeBlock({ blockId, content, savedProgress }) {
+    const wasSolved = savedProgress?.is_correct === true;
+    const savedCode = savedProgress?.answer?.code;
+
+    const firstTest = content.tests?.[0];
+    const firstTestInput = firstTest
+        ? (typeof firstTest === 'object' ? firstTest.input : firstTest)
+        : '';
+    const hasTests = content.tests?.length > 0;
+
+    const [userCode, setUserCode] = useState(savedCode || content.starter_code);
     const [testsOpen, setTestsOpen] = useState(false);
-    const [testInput, setTestInput] = useState('');
-    const [selectedTestIndex, setSelectedTestIndex] = useState(null);
+    const [testInput, setTestInput] = useState(firstTestInput || '');
+    const [selectedTestIndex, setSelectedTestIndex] = useState(hasTests ? 0 : null);
     const [runOutput, setRunOutput] = useState(null);
-    const [submitResults, setSubmitResults] = useState(null);
+    const [submitResults, setSubmitResults] = useState(
+        wasSolved
+            ? { status: 'success', total: content.tests?.length || 0 }
+            : null
+    );
     const [isRunning, setIsRunning] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [hasSubmitted, setHasSubmitted] = useState(false);
+    const [hasSubmitted, setHasSubmitted] = useState(wasSolved);
     const [pythonVersion, setPythonVersion] = useState('Python 3.12');
     const [versionOpen, setVersionOpen] = useState(false);
     const versionRef = useRef(null);
@@ -72,6 +85,18 @@ function CodeBlock({ content }) {
                 version: pythonVersion,
             });
             setSubmitResults(res.data);
+
+            if (blockId) {
+                try {
+                    await api.post('/progress/submit/', {
+                        block: blockId,
+                        answer: { code: userCode },
+                        is_correct: res.data.status === 'success',
+                    });
+                } catch (err) {
+                    console.error('Failed to save code progress:', err);
+                }
+            }
         } catch (err) {
             setSubmitResults({
                 status: 'error',
@@ -84,8 +109,8 @@ function CodeBlock({ content }) {
 
     const handleReset = () => {
         setUserCode(content.starter_code);
-        setTestInput('');
-        setSelectedTestIndex(null);
+        setTestInput(firstTestInput || '');
+        setSelectedTestIndex(hasTests ? 0 : null);
         setRunOutput(null);
         setSubmitResults(null);
         setHasSubmitted(false);

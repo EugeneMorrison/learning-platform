@@ -73,7 +73,13 @@ PYTHON_BINARIES = {
 
 
 def resolve_python(version_str):
-    return PYTHON_BINARIES.get(version_str, sys.executable)
+    # In Docker (Linux) the mapped binaries exist — return them.
+    # In manual setup (Windows/macOS) they don't, so fall back to the
+    # interpreter running Django, which is whatever's in the venv.
+    path = PYTHON_BINARIES.get(version_str)
+    if path and os.path.exists(path):
+        return path
+    return sys.executable
 
 
 class RunCodeView(APIView):
@@ -809,7 +815,9 @@ class ProgressSubmitView(generics.CreateAPIView):
         elif block.type == 'TEXT':
             is_correct = None  # Not applicable
         elif block.type == 'CODE':
-            is_correct = None  # Frontend will handle execution later
+            # Frontend already ran /run-tests/ and knows the outcome.
+            # Trust its is_correct flag (passed in the request body).
+            is_correct = request.data.get('is_correct')
 
         # Create or update progress record
         progress, created = Progress.objects.update_or_create(
@@ -917,15 +925,20 @@ class StudentProgressView(APIView):
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
-        # Only authors can view student progress
-        if request.user.role != 'AUTHOR':
+        # Authors see any student's progress in their courses;
+        # students see only their own.
+        is_self = str(request.user.id) == str(student_id)
+        is_author = request.user.role == 'AUTHOR'
+
+        if is_self:
+            course = get_object_or_404(Course, id=course_id)
+        elif is_author:
+            course = get_object_or_404(Course, id=course_id, author=request.user)
+        else:
             return Response(
-                {'error': 'Only authors can view student progress'},
+                {'error': 'Not authorized'},
                 status=status.HTTP_403_FORBIDDEN
             )
-
-        # Get the course and verify ownership
-        course = get_object_or_404(Course, id=course_id, author=request.user)
 
         # Get the student
         student = get_object_or_404(User, id=student_id)
