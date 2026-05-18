@@ -36,12 +36,12 @@ function DashboardPage() {
             </div>
             <p>Роль: {user.role === 'AUTHOR' ? 'Автор' : 'Студент'}</p>
             <hr />
-            {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard />}
+            {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard user={user} />}
         </div>
     );
 }
 
-function StudentDashboard() {
+function StudentDashboard({ user }) {
     const [enrollments, setEnrollments] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
@@ -75,11 +75,36 @@ function StudentDashboard() {
                         padding: '16px',
                         marginTop: '12px',
                         cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '12px',
                     }} onClick={() => navigate(`/courses/${enrollment.course}/`)}>
-                        <h4 style={{ margin: '0 0 8px 0' }}>{enrollment.course_title}</h4>
-                        <p style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>
-                            Записан: {new Date(enrollment.enrolled_at).toLocaleDateString('ru-RU')}
-                        </p>
+                        <div>
+                            <h4 style={{ margin: '0 0 8px 0' }}>{enrollment.course_title}</h4>
+                            <p style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>
+                                Записан: {new Date(enrollment.enrolled_at).toLocaleDateString('ru-RU')}
+                            </p>
+                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/courses/${enrollment.course}/students/${user.id}/`);
+                            }}
+                            style={{
+                                padding: '8px 16px',
+                                background: '#0C4B33',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: '500',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            Прогресс
+                        </button>
                     </div>
                 ))
             )}
