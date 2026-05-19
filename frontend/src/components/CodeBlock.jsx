@@ -3,7 +3,7 @@ import api from '../api';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
-function CodeBlock({ blockId, content, savedProgress }) {
+function CodeBlock({ blockId, content, savedProgress, number }) {
     const wasSolved = savedProgress?.is_correct === true;
     const savedCode = savedProgress?.answer?.code;
 
@@ -151,7 +151,7 @@ function CodeBlock({ blockId, content, savedProgress }) {
                     fontWeight: '600',
                     letterSpacing: '0.3px',
                 }}>
-                    Задача
+                    Задача{number ? ` ${number}` : ''}
                 </span>
             </div>
 

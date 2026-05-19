@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
 import TextBlock from '../components/TextBlock';
@@ -15,6 +16,9 @@ function getLessonIdFromUrl() {
 }
 
 function LessonViewer() {
+    const navigate = useNavigate();
+    const isInIframe = window.self !== window.top;
+
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]);
     const [course, setCourse] = useState(null);
@@ -107,18 +111,35 @@ function LessonViewer() {
         if (!showChat) fetchMessages();
     }
 
+    const blockNumbers = (() => {
+        const map = {};
+        let quizCount = 0;
+        let codeCount = 0;
+        blocks.forEach(b => {
+            if (b.type === 'QUIZ') {
+                quizCount += 1;
+                map[b.id] = quizCount;
+            } else if (b.type === 'CODE') {
+                codeCount += 1;
+                map[b.id] = codeCount;
+            }
+        });
+        return map;
+    })();
+
     function renderBlock(block) {
         const blockProgress = progress.find(p => p.block === block.id) || null;
+        const number = blockNumbers[block.id];
         let inner = null;
         switch (block.type) {
             case 'TEXT':
                 inner = <TextBlock blockId={block.id} content={block.content} />;
                 break;
             case 'QUIZ':
-                inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} />;
+                inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
                 break;
             case 'CODE':
-                inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} />;
+                inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
                 break;
             default:
                 return null;
@@ -141,6 +162,16 @@ function LessonViewer() {
     return (
         <>
             <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
+
+                {/* Back button — hidden when embedded in iframe (no parent SPA to go back to) */}
+                {!isInIframe && course && (
+                    <button
+                        onClick={() => navigate(`/courses/${course.id}/`)}
+                        style={{ marginBottom: '20px' }}
+                    >
+                        ← Назад
+                    </button>
+                )}
 
                 {/* Lesson header */}
                 <div style={{

@@ -69,47 +69,64 @@ function StudentProgressPage() {
 
             {/* Lessons breakdown */}
             <div style={{ marginTop: '24px' }}>
-                {data.lessons.map((lesson, idx) => (
-                    <div key={idx} style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        marginTop: '12px',
-                    }}>
-                        <h4 style={{ margin: '0 0 12px 0' }}>
-                            Урок {lesson.lesson_order}: {lesson.lesson_title}
-                        </h4>
-                        {lesson.blocks.map((block, bidx) => (
-                            <div key={bidx} style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '8px 0',
-                                borderTop: bidx > 0 ? '1px solid #f1f5f9' : 'none',
-                            }}>
-                                <span style={{ fontSize: '20px' }}>
-                                    {block.completed ? '✅' : '○'}
-                                </span>
-                                <span style={{ color: '#64748b', fontSize: '14px' }}>
-                                    Блок {block.block_order} — {block.block_type}
-                                </span>
-                                {block.block_type === 'QUIZ' && block.completed && (
-                                    <span style={{
-                                        fontSize: '13px',
-                                        color: block.is_correct ? '#16a34a' : '#dc2626',
-                                    }}>
-                                        {block.is_correct ? '✓ Верно' : '✗ Неверно'}
+                {data.lessons.map((lesson, idx) => {
+                    // Per-type counters reset for each lesson
+                    let quizCount = 0;
+                    let codeCount = 0;
+                    const typeLabels = lesson.blocks.map(block => {
+                        if (block.block_type === 'QUIZ') {
+                            quizCount += 1;
+                            return `Тест ${quizCount}`;
+                        }
+                        if (block.block_type === 'CODE') {
+                            codeCount += 1;
+                            return `Задача ${codeCount}`;
+                        }
+                        return 'Текст';
+                    });
+
+                    return (
+                        <div key={idx} style={{
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            padding: '16px',
+                            marginTop: '12px',
+                        }}>
+                            <h4 style={{ margin: '0 0 12px 0' }}>
+                                Урок {lesson.lesson_order}: {lesson.lesson_title}
+                            </h4>
+                            {lesson.blocks.map((block, bidx) => (
+                                <div key={bidx} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    padding: '8px 0',
+                                    borderTop: bidx > 0 ? '1px solid #f1f5f9' : 'none',
+                                }}>
+                                    <span style={{ fontSize: '20px' }}>
+                                        {block.completed ? '✅' : '○'}
                                     </span>
-                                )}
-                                {block.completed_at && (
-                                    <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
-                                        {new Date(block.completed_at).toLocaleDateString('ru-RU')}
+                                    <span style={{ color: '#64748b', fontSize: '14px' }}>
+                                        Задание {block.block_order} ({typeLabels[bidx]})
                                     </span>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                ))}
+                                    {block.block_type === 'QUIZ' && block.completed && (
+                                        <span style={{
+                                            fontSize: '13px',
+                                            color: block.is_correct ? '#16a34a' : '#dc2626',
+                                        }}>
+                                            {block.is_correct ? '✓ Верно' : '✗ Неверно'}
+                                        </span>
+                                    )}
+                                    {block.completed_at && (
+                                        <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
+                                            {new Date(block.completed_at).toLocaleDateString('ru-RU')}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

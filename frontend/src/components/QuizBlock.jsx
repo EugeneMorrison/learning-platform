@@ -6,7 +6,7 @@ import api from '../api';
 
 hljs.registerLanguage('python', python);
 
-function QuizBlock({ content, blockId, savedProgress }) {
+function QuizBlock({ content, blockId, savedProgress, number }) {
     const savedSelected = savedProgress?.answer?.selected;
     const hasAttempt = typeof savedSelected === 'number';
     const [selected, setSelected] = useState(hasAttempt ? savedSelected : null);
@@ -68,7 +68,7 @@ function QuizBlock({ content, blockId, savedProgress }) {
                     fontWeight: '600',
                     letterSpacing: '0.3px',
                 }}>
-                    Тест
+                    Тест{number ? ` ${number}` : ''}
                 </span>
             </div>
 
