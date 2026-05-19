@@ -117,6 +117,22 @@ function StudentProgressPage() {
                                             {block.is_correct ? '✓ Верно' : '✗ Неверно'}
                                         </span>
                                     )}
+                                    {block.completed && block.block_type !== 'TEXT' && block.attempts > 0 && (
+                                        <span
+                                            title={`Студент отправлял решение ${block.attempts} ${block.attempts === 1 ? 'раз' : 'раз(а)'}`}
+                                            style={{
+                                                fontSize: '12px',
+                                                color: block.attempts === 1
+                                                    ? '#16a34a'
+                                                    : block.attempts <= 3 ? '#ca8a04' : '#dc2626',
+                                                fontWeight: '500',
+                                            }}
+                                        >
+                                            {block.attempts === 1
+                                                ? '🎯 с 1-й попытки'
+                                                : `🔄 попыток: ${block.attempts}`}
+                                        </span>
+                                    )}
                                     {block.completed_at && (
                                         <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
                                             {new Date(block.completed_at).toLocaleDateString('ru-RU')}

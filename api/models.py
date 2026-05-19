@@ -323,6 +323,11 @@ class Progress(models.Model):
         help_text="Whether answer was correct (for QUIZ/CODE blocks)"
     )
 
+    attempts = models.IntegerField(
+        default=0,
+        help_text="How many times the student submitted this block (1 = solved first try)"
+    )
+
     completed_at = models.DateTimeField(
         null=True,
         blank=True,

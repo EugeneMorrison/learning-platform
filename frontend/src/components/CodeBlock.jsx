@@ -29,6 +29,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
     const [pythonVersion, setPythonVersion] = useState('Python 3.12');
     const [versionOpen, setVersionOpen] = useState(false);
     const versionRef = useRef(null);
+    const codeRef = useRef(null);
 
     useEffect(() => {
         function handleClickOutside(e) {
@@ -39,6 +40,14 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Auto-grow the code editor to fit its content
+    useEffect(() => {
+        if (codeRef.current) {
+            codeRef.current.style.height = 'auto';
+            codeRef.current.style.height = codeRef.current.scrollHeight + 'px';
+        }
+    }, [userCode]);
 
     function handleTestCheck(index) {
         if (selectedTestIndex === index) {
@@ -234,29 +243,52 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                     )}
                 </div>
             </div>
-            <textarea
-                value={userCode}
-                onChange={e => setUserCode(e.target.value)}
-                onKeyDown={handleKeyDown}
-                spellCheck={false}
-                style={{
-                    width: '100%',
-                    background: '#1e293b',
-                    color: '#e2e8f0',
+            <div style={{
+                display: 'flex',
+                background: '#1e293b',
+                borderRadius: '6px',
+                marginBottom: '16px',
+                overflow: 'hidden',
+            }}>
+                <div style={{
+                    padding: '16px 10px 16px 14px',
+                    background: '#0f172a',
+                    color: '#64748b',
                     fontFamily: "'JetBrains Mono', Consolas, monospace",
                     fontSize: '14px',
-                    padding: '16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    resize: 'vertical',
-                    minHeight: '120px',
-                    marginBottom: '16px',
-                    boxSizing: 'border-box',
-                    outline: 'none',
                     lineHeight: '1.6',
-                    tabSize: 4,
-                }}
-            />
+                    textAlign: 'right',
+                    userSelect: 'none',
+                    minWidth: '36px',
+                }}>
+                    {Array.from({ length: Math.max(1, userCode.split('\n').length) }, (_, i) => (
+                        <div key={i}>{i + 1}</div>
+                    ))}
+                </div>
+                <textarea
+                    ref={codeRef}
+                    value={userCode}
+                    onChange={e => setUserCode(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    spellCheck={false}
+                    style={{
+                        flex: 1,
+                        background: 'transparent',
+                        color: '#e2e8f0',
+                        fontFamily: "'JetBrains Mono', Consolas, monospace",
+                        fontSize: '14px',
+                        padding: '16px 16px 16px 12px',
+                        border: 'none',
+                        resize: 'none',
+                        minHeight: '120px',
+                        boxSizing: 'border-box',
+                        outline: 'none',
+                        lineHeight: '1.6',
+                        tabSize: 4,
+                        overflow: 'hidden',
+                    }}
+                />
+            </div>
 
             {/* Test input box */}
             <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '14px' }}>

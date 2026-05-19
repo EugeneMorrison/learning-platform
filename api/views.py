@@ -819,18 +819,20 @@ class ProgressSubmitView(generics.CreateAPIView):
             # Trust its is_correct flag (passed in the request body).
             is_correct = request.data.get('is_correct')
 
-        # Create or update progress record
-        progress, created = Progress.objects.update_or_create(
+        # Create or fetch the record, then increment attempts on every submission.
+        # update_or_create can't easily increment, so we do it manually.
+        progress, _ = Progress.objects.get_or_create(
             student=request.user,
             block=block,
-            defaults={
-                'lesson': block.lesson,
-                'completed': True,
-                'answer': answer,
-                'is_correct': is_correct,
-                'completed_at': timezone.now(),
-            }
+            defaults={'lesson': block.lesson, 'attempts': 0},
         )
+        progress.lesson = block.lesson
+        progress.completed = True
+        progress.answer = answer
+        progress.is_correct = is_correct
+        progress.attempts = (progress.attempts or 0) + 1
+        progress.completed_at = timezone.now()
+        progress.save()
 
         serializer = self.get_serializer(progress)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -975,6 +977,7 @@ class StudentProgressView(APIView):
                 'block_order': block.order_index,
                 'completed': progress.completed if progress else False,
                 'is_correct': progress.is_correct if progress else None,
+                'attempts': progress.attempts if progress else 0,
                 'completed_at': progress.completed_at if progress else None,
             })
 
