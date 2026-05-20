@@ -101,6 +101,8 @@ class RunCodeView(APIView):
                 f.write(code)
                 tmp_path = f.name
 
+            run_env = os.environ.copy()
+            run_env['PYTHONUTF8'] = '1'
             result = subprocess.run(
                 [resolve_python(version), tmp_path],
                 input=stdin,
@@ -109,6 +111,7 @@ class RunCodeView(APIView):
                 timeout=5,
                 encoding='utf-8',
                 errors='replace',
+                env=run_env,
             )
             return Response({
                 'stdout': result.stdout,
@@ -153,6 +156,8 @@ class RunTestsView(APIView):
                 stdin = test.get('input', '') if isinstance(test, dict) else ''
                 expected = test.get('expected', '') if isinstance(test, dict) else test
                 try:
+                    run_env = os.environ.copy()
+                    run_env['PYTHONUTF8'] = '1'
                     proc = subprocess.run(
                         [resolve_python(version), tmp_path],
                         input=stdin,
@@ -161,6 +166,7 @@ class RunTestsView(APIView):
                         timeout=5,
                         encoding='utf-8',
                         errors='replace',
+                        env=run_env,
                     )
                     # Code error — return immediately with traceback
                     if proc.returncode != 0:
