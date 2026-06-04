@@ -39,6 +39,9 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
+    # daphne must be listed BEFORE django.contrib.staticfiles so its ASGI-aware
+    # runserver replacement is what `python manage.py runserver` uses.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -48,6 +51,7 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'corsheaders',
+    'channels',
     'django_filters',
     # Apps
     'api',
@@ -86,6 +90,15 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+ASGI_APPLICATION = 'backend.asgi.application'
+
+# Channel layers — InMemory is fine for local dev (single process).
+# For production, switch to channels_redis with a Redis instance.
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 
 # Database

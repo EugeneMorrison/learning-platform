@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import CodeMirror from '@uiw/react-codemirror';
+import { python } from '@codemirror/lang-python';
+import { pycharmDarcula } from './pycharmDarcula';
 import api from '../api';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
@@ -29,7 +32,6 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
     const [pythonVersion, setPythonVersion] = useState('Python 3.12');
     const [versionOpen, setVersionOpen] = useState(false);
     const versionRef = useRef(null);
-    const codeRef = useRef(null);
 
     useEffect(() => {
         function handleClickOutside(e) {
@@ -40,14 +42,6 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
-    // Auto-grow the code editor to fit its content
-    useEffect(() => {
-        if (codeRef.current) {
-            codeRef.current.style.height = 'auto';
-            codeRef.current.style.height = codeRef.current.scrollHeight + 'px';
-        }
-    }, [userCode]);
 
     function handleTestCheck(index) {
         if (selectedTestIndex === index) {
@@ -123,21 +117,6 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         setRunOutput(null);
         setSubmitResults(null);
         setHasSubmitted(false);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            const { selectionStart, selectionEnd } = e.target;
-            const newCode =
-                userCode.substring(0, selectionStart) +
-                '    ' +
-                userCode.substring(selectionEnd);
-            setUserCode(newCode);
-            setTimeout(() => {
-                e.target.selectionStart = e.target.selectionEnd = selectionStart + 4;
-            }, 0);
-        }
     };
 
     return (
@@ -244,49 +223,28 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                 </div>
             </div>
             <div style={{
-                display: 'flex',
-                background: '#1e293b',
                 borderRadius: '6px',
                 marginBottom: '16px',
                 overflow: 'hidden',
             }}>
-                <div style={{
-                    padding: '16px 10px 16px 14px',
-                    background: '#0f172a',
-                    color: '#64748b',
-                    fontFamily: "'JetBrains Mono', Consolas, monospace",
-                    fontSize: '14px',
-                    lineHeight: '1.6',
-                    textAlign: 'right',
-                    userSelect: 'none',
-                    minWidth: '36px',
-                }}>
-                    {Array.from({ length: Math.max(1, userCode.split('\n').length) }, (_, i) => (
-                        <div key={i}>{i + 1}</div>
-                    ))}
-                </div>
-                <textarea
-                    ref={codeRef}
+                <CodeMirror
                     value={userCode}
-                    onChange={e => setUserCode(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    spellCheck={false}
-                    style={{
-                        flex: 1,
-                        background: 'transparent',
-                        color: '#e2e8f0',
-                        fontFamily: "'JetBrains Mono', Consolas, monospace",
-                        fontSize: '14px',
-                        padding: '16px 16px 16px 12px',
-                        border: 'none',
-                        resize: 'none',
-                        minHeight: '120px',
-                        boxSizing: 'border-box',
-                        outline: 'none',
-                        lineHeight: '1.6',
+                    onChange={(value) => setUserCode(value)}
+                    extensions={[python(), pycharmDarcula]}
+                    theme="none"
+                    basicSetup={{
+                        lineNumbers: true,
+                        highlightActiveLine: true,
+                        highlightActiveLineGutter: true,
+                        foldGutter: false,
+                        autocompletion: false,
+                        indentOnInput: true,
+                        bracketMatching: true,
+                        closeBrackets: true,
                         tabSize: 4,
-                        overflow: 'hidden',
                     }}
+                    indentWithTab={true}
+                    minHeight="120px"
                 />
             </div>
 

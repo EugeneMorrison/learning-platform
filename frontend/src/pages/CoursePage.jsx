@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 
@@ -16,6 +16,7 @@ function CoursePage() {
     const [newMessage, setNewMessage] = useState('');
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [sendingMessage, setSendingMessage] = useState(false);
+    const chatSocketRef = useRef(null);
 
     // Lesson form state
     const [showLessonForm, setShowLessonForm] = useState(false);
@@ -120,22 +121,53 @@ function CoursePage() {
 
     async function handleSendMessage(e) {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedStudent) return;
+        const text = newMessage.trim();
+        if (!text || !chatSocketRef.current || chatSocketRef.current.readyState !== WebSocket.OPEN) return;
         setSendingMessage(true);
         try {
-            await api.post('/messages/', {
-                course: courseId,
-                receiver: selectedStudent.id,
-                text: newMessage,
-            });
+            chatSocketRef.current.send(JSON.stringify({ text }));
             setNewMessage('');
-            await fetchMessages(selectedStudent.id);
         } catch (err) {
             console.error('Failed to send message:', err);
         } finally {
             setSendingMessage(false);
         }
     }
+
+    // Open WebSocket while a student is selected for chat. Closes when the
+    // teacher switches student or leaves the page.
+    useEffect(() => {
+        if (!selectedStudent) return;
+
+        const token = localStorage.getItem('access_token');
+        const wsBase = import.meta.env.DEV
+            ? 'ws://127.0.0.1:8000'
+            : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+        const url = `${wsBase}/ws/chat/${courseId}/${selectedStudent.id}/?token=${encodeURIComponent(token || '')}`;
+
+        const socket = new WebSocket(url);
+        chatSocketRef.current = socket;
+
+        socket.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                setMessages((prev) => [...prev, msg]);
+            } catch (err) {
+                console.error('Bad chat message payload:', err);
+            }
+        };
+
+        socket.onerror = (err) => {
+            console.error('Chat socket error:', err);
+        };
+
+        return () => {
+            chatSocketRef.current = null;
+            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+                socket.close();
+            }
+        };
+    }, [selectedStudent, courseId]);
 
 
     if (loading) return <p>Загрузка...</p>;

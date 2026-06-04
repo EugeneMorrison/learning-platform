@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
@@ -29,6 +29,7 @@ function LessonViewer() {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [sendingMessage, setSendingMessage] = useState(false);
+    const chatSocketRef = useRef(null);
 
     const solvedBlockIds = new Set(
         progress.filter(p => p.is_correct === true).map(p => p.block)
@@ -89,16 +90,12 @@ function LessonViewer() {
 
     async function handleSendMessage(e) {
         e.preventDefault();
-        if (!newMessage.trim() || !course) return;
+        const text = newMessage.trim();
+        if (!text || !chatSocketRef.current || chatSocketRef.current.readyState !== WebSocket.OPEN) return;
         setSendingMessage(true);
         try {
-            await api.post('/messages/', {
-                course: course.id,
-                receiver: course.author,
-                text: newMessage,
-            });
+            chatSocketRef.current.send(JSON.stringify({ text }));
             setNewMessage('');
-            await fetchMessages();
         } catch (err) {
             console.error('Failed to send message:', err);
         } finally {
@@ -110,6 +107,41 @@ function LessonViewer() {
         setShowChat(!showChat);
         if (!showChat) fetchMessages();
     }
+
+    // Open WebSocket while chat panel is visible. Closes automatically on
+    // close, route change, or component unmount.
+    useEffect(() => {
+        if (!showChat || !course) return;
+
+        const token = localStorage.getItem('access_token');
+        const wsBase = import.meta.env.DEV
+            ? 'ws://127.0.0.1:8000'
+            : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
+        const url = `${wsBase}/ws/chat/${course.id}/${course.author}/?token=${encodeURIComponent(token || '')}`;
+
+        const socket = new WebSocket(url);
+        chatSocketRef.current = socket;
+
+        socket.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                setMessages((prev) => [...prev, msg]);
+            } catch (err) {
+                console.error('Bad chat message payload:', err);
+            }
+        };
+
+        socket.onerror = (err) => {
+            console.error('Chat socket error:', err);
+        };
+
+        return () => {
+            chatSocketRef.current = null;
+            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+                socket.close();
+            }
+        };
+    }, [showChat, course]);
 
     const blockNumbers = (() => {
         const map = {};
