@@ -346,6 +346,47 @@ class Progress(models.Model):
         return f"{status} {self.student.username} - {self.block}"
 
 
+class Attempt(models.Model):
+    """
+    Full submission history. Progress holds only the latest answer + a counter,
+    so this table records every individual submission so the teacher can review
+    the student's path (wrong attempts, retries, the actual code they wrote).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    student = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='attempts',
+    )
+    block = models.ForeignKey(
+        Block,
+        on_delete=models.CASCADE,
+        related_name='attempts',
+    )
+    answer = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="The submitted answer payload (e.g. {'code': '...'} or {'selected': 2})"
+    )
+    is_correct = models.BooleanField(
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        db_table = 'attempts'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['student', 'block', 'created_at']),
+        ]
+
+    def __str__(self):
+        mark = "✓" if self.is_correct else ("✗" if self.is_correct is False else "·")
+        return f"{mark} {self.student.username} - {self.block} @ {self.created_at:%Y-%m-%d %H:%M:%S}"
+
+
 class Message(models.Model):
     """
     Messages between teacher and student within a course.

@@ -8,3 +8,5 @@ PyJWT==2.12.0
 sqlparse==0.5.5
 tzdata==2025.3
 beautifulsoup4==4.13.4
+channels==4.3.2
+daphne==4.2.2

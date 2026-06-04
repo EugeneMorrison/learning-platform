@@ -28,7 +28,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import render
 from rest_framework.views import APIView
 
-from .models import Course, Lesson, Block, Enrollment, Progress, Message
+from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
 from .serializers import (
     CourseSerializer,
     LessonSerializer,
@@ -840,6 +840,16 @@ class ProgressSubmitView(generics.CreateAPIView):
         progress.completed_at = timezone.now()
         progress.save()
 
+        # Record this individual submission in the attempt history (skip TEXT
+        # blocks — they don't carry a meaningful answer payload).
+        if block.type in ('QUIZ', 'CODE'):
+            Attempt.objects.create(
+                student=request.user,
+                block=block,
+                answer=answer,
+                is_correct=is_correct,
+            )
+
         serializer = self.get_serializer(progress)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -965,6 +975,20 @@ class StudentProgressView(APIView):
         # Map block_id → progress
         progress_map = {str(p.block_id): p for p in progress_records}
 
+        # Map block_id → list of attempts (oldest first)
+        attempts_qs = Attempt.objects.filter(
+            student=student,
+            block__lesson__course=course,
+        ).order_by('created_at')
+        attempts_map = {}
+        for a in attempts_qs:
+            attempts_map.setdefault(str(a.block_id), []).append({
+                'id': str(a.id),
+                'answer': a.answer,
+                'is_correct': a.is_correct,
+                'created_at': a.created_at,
+            })
+
         # Build response
         lessons_data = {}
         for block in blocks:
@@ -985,6 +1009,7 @@ class StudentProgressView(APIView):
                 'is_correct': progress.is_correct if progress else None,
                 'attempts': progress.attempts if progress else 0,
                 'completed_at': progress.completed_at if progress else None,
+                'attempts_history': attempts_map.get(str(block.id), []),
             })
 
         # Count totals
