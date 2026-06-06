@@ -239,25 +239,46 @@ function CoursePage() {
                                 </p>
                             </div>
                             {user?.role === 'AUTHOR' && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteLesson(lesson.id);
-                                    }}
-                                    style={{
-                                        padding: '6px 12px',
-                                        background: 'white',
-                                        color: '#dc2626',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '6px',
-                                        cursor: 'pointer',
-                                        fontSize: '13px',
-                                        fontWeight: '500',
-                                        whiteSpace: 'nowrap',
-                                    }}
-                                >
-                                    Удалить урок
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/lesson/${lesson.id}/edit/`);
+                                        }}
+                                        style={{
+                                            padding: '6px 12px',
+                                            background: 'white',
+                                            color: '#0C4B33',
+                                            border: '1px solid #0C4B33',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        ✎ Редактировать
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteLesson(lesson.id);
+                                        }}
+                                        style={{
+                                            padding: '6px 12px',
+                                            background: 'white',
+                                            color: '#dc2626',
+                                            border: '1px solid #fecaca',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '13px',
+                                            fontWeight: '500',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        Удалить урок
+                                    </button>
+                                </div>
                             )}
                         </div>
                     ))
