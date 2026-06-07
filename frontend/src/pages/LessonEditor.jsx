@@ -5,12 +5,14 @@ import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
 import UserBadge from '../components/UserBadge';
+import { parseTemplate } from '../lib/fillTemplate';
 import api from '../api';
 
 const TYPE_LABELS = {
     TEXT: '📝 Теория',
     QUIZ: '❓ Тест',
     CODE: '💻 Задача с кодом',
+    FILL: '✍️ Заполнить пропуски',
 };
 
 function defaultContent(type) {
@@ -21,6 +23,8 @@ function defaultContent(type) {
             return { question: '', options: ['', ''], correct_answer: 0, explanation: '' };
         case 'CODE':
             return { prompt: '', starter_code: '# Ваш код здесь\n', solution: '', tests: [{ input: '', expected: '' }] };
+        case 'FILL':
+            return { prompt: '', template: '', case_sensitive: false, explanation: '' };
         default:
             return {};
     }
@@ -114,6 +118,10 @@ function LessonEditor() {
         } else if (type === 'CODE') {
             if (!stripHtml(content.prompt)) return 'Опишите условие задачи.';
             if (!content.starter_code.trim()) return 'Добавьте стартовый код.';
+        } else if (type === 'FILL') {
+            const blanks = (content.template || '').match(/\{\{(.*?)\}\}/g) || [];
+            const hasAnswer = blanks.some(b => b.replace(/\{\{|\}\}/g, '').trim());
+            if (!hasAnswer) return 'Добавьте шаблон хотя бы с одним пропуском, например: print({{8}})';
         }
         return '';
     }
@@ -299,6 +307,7 @@ function blockPreview(block) {
     if (block.type === 'TEXT') return stripHtml(block.content.html) || '(пусто)';
     if (block.type === 'QUIZ') return stripHtml(block.content.question) || '(без вопроса)';
     if (block.type === 'CODE') return stripHtml(block.content.prompt) || '(без условия)';
+    if (block.type === 'FILL') return block.content.template || stripHtml(block.content.prompt) || '(пустой шаблон)';
     return '';
 }
 
@@ -328,6 +337,8 @@ function BlockForm({ draft, setContent, onSave, onCancel, saving, formError }) {
             {type === 'QUIZ' && <QuizFields content={content} setContent={setContent} />}
 
             {type === 'CODE' && <CodeFields content={content} setContent={setContent} />}
+
+            {type === 'FILL' && <FillFields content={content} setContent={setContent} />}
 
             {formError && <p style={{ color: '#dc2626', marginTop: 8 }}>{formError}</p>}
 
@@ -485,6 +496,79 @@ function CodeFields({ content, setContent }) {
     );
 }
 
+function FillFields({ content, setContent }) {
+    const segments = parseTemplate(content.template || '');
+    const hasBlanks = segments.some(s => s.type === 'blank');
+
+    return (
+        <>
+            <Field label="Описание (условие)" hint="Текст и код над пропусками. Можно оставить пустым.">
+                <RichTextEditor
+                    value={content.prompt}
+                    onChange={(html) => setContent(c => ({ ...c, prompt: html }))}
+                    placeholder="Например: Модуль подключили так… Напишите строку, которая выведет факториал числа 8."
+                />
+            </Field>
+
+            <Field
+                label="Шаблон с пропусками"
+                hint="Отметьте пропуски как {{ответ}}. Несколько верных ответов — через | , например: print({{math.factorial(8)|factorial(8)}})"
+            >
+                <textarea
+                    value={content.template}
+                    onChange={e => setContent(c => ({ ...c, template: e.target.value }))}
+                    style={{ ...input, minHeight: 70, fontFamily: "'JetBrains Mono', Consolas, monospace" }}
+                    placeholder="print({{8}})"
+                />
+            </Field>
+
+            {/* Live preview of how the blanks will look + which answers are accepted */}
+            {hasBlanks && (
+                <Field label="Предпросмотр">
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, rowGap: 10 }}>
+                        {segments.map((seg, idx) => {
+                            if (seg.type === 'text') {
+                                return seg.value.trim() === ''
+                                    ? <span key={idx}>{seg.value}</span>
+                                    : <span key={idx} style={previewChip}>{seg.value}</span>;
+                            }
+                            return (
+                                <span key={idx} style={previewBlank} title="Принимаемые ответы">
+                                    {seg.answers.join(' / ') || '⌀'}
+                                </span>
+                            );
+                        })}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+                        В пропусках показаны принимаемые ответы — студент увидит пустые поля.
+                    </div>
+                </Field>
+            )}
+
+            <Field label="">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155' }}>
+                    <input
+                        type="checkbox"
+                        checked={!!content.case_sensitive}
+                        onChange={e => setContent(c => ({ ...c, case_sensitive: e.target.checked }))}
+                    />
+                    Учитывать регистр букв
+                </label>
+            </Field>
+
+            <Field label="Пояснение (показывается при верном ответе)">
+                <input
+                    type="text"
+                    value={content.explanation || ''}
+                    onChange={e => setContent(c => ({ ...c, explanation: e.target.value }))}
+                    style={input}
+                    placeholder="Необязательно"
+                />
+            </Field>
+        </>
+    );
+}
+
 function Field({ label, hint, children }) {
     return (
         <div style={{ marginBottom: 16 }}>
@@ -555,6 +639,18 @@ const iconBtn = {
 const deleteBtn = {
     padding: '6px 12px', background: 'white', color: '#dc2626',
     border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500,
+};
+
+const previewChip = {
+    fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14,
+    background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6,
+    padding: '6px 8px', whiteSpace: 'pre', color: '#334155',
+};
+
+const previewBlank = {
+    fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14,
+    background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 999,
+    padding: '4px 12px', color: '#15803d', fontWeight: 600,
 };
 
 export default LessonEditor;

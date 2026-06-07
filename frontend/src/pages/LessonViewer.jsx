@@ -5,7 +5,11 @@ import api from '../api';
 import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
+import FillBlock from '../components/FillBlock';
 import UserBadge from '../components/UserBadge';
+
+// Block types that are solvable tasks (have a pass/fail, count toward progress).
+const TASK_TYPES = new Set(['QUIZ', 'CODE', 'FILL']);
 
 const DEV_LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
 
@@ -36,7 +40,7 @@ function LessonViewer() {
         progress.filter(p => p.is_correct === true).map(p => p.block)
     );
     const firstUnresolved = blocks.find(
-        b => (b.type === 'QUIZ' || b.type === 'CODE') && !solvedBlockIds.has(b.id)
+        b => TASK_TYPES.has(b.type) && !solvedBlockIds.has(b.id)
     );
 
     function scrollToNextTask() {
@@ -148,6 +152,7 @@ function LessonViewer() {
         const map = {};
         let quizCount = 0;
         let codeCount = 0;
+        let fillCount = 0;
         blocks.forEach(b => {
             if (b.type === 'QUIZ') {
                 quizCount += 1;
@@ -155,6 +160,9 @@ function LessonViewer() {
             } else if (b.type === 'CODE') {
                 codeCount += 1;
                 map[b.id] = codeCount;
+            } else if (b.type === 'FILL') {
+                fillCount += 1;
+                map[b.id] = fillCount;
             }
         });
         return map;
@@ -173,6 +181,9 @@ function LessonViewer() {
                 break;
             case 'CODE':
                 inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
+                break;
+            case 'FILL':
+                inner = <FillBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
                 break;
             default:
                 return null;
@@ -228,7 +239,7 @@ function LessonViewer() {
                         {blocks.length} блоков
                     </div>
                     {(() => {
-                        const taskBlocks = blocks.filter(b => b.type === 'QUIZ' || b.type === 'CODE');
+                        const taskBlocks = blocks.filter(b => TASK_TYPES.has(b.type));
                         const total = taskBlocks.length;
                         if (total === 0) return null;
                         const solved = taskBlocks.filter(b => solvedBlockIds.has(b.id)).length;

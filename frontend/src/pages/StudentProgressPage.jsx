@@ -67,6 +67,25 @@ function StudentProgressPage() {
                 </div>
             );
         }
+        if (blockType === 'FILL') {
+            const blanks = Array.isArray(answer.blanks) ? answer.blanks : [];
+            return (
+                <div style={{
+                    padding: '10px 14px',
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontFamily: "'JetBrains Mono', Consolas, monospace",
+                }}>
+                    {blanks.length === 0
+                        ? <em style={{ color: '#94a3b8' }}>пусто</em>
+                        : blanks.map((b, i) => (
+                            <div key={i}>Пропуск {i + 1}: <strong>{b || '—'}</strong></div>
+                        ))}
+                </div>
+            );
+        }
         if (blockType === 'QUIZ') {
             const selected = answer.selected;
             return (
@@ -163,10 +182,15 @@ function StudentProgressPage() {
                     // Per-type counters reset for each lesson
                     let quizCount = 0;
                     let codeCount = 0;
+                    let fillCount = 0;
                     const typeLabels = lessonTasks.map(block => {
                         if (block.block_type === 'QUIZ') {
                             quizCount += 1;
                             return `Тест ${quizCount}`;
+                        }
+                        if (block.block_type === 'FILL') {
+                            fillCount += 1;
+                            return `Пропуски ${fillCount}`;
                         }
                         codeCount += 1;
                         return `Задача ${codeCount}`;

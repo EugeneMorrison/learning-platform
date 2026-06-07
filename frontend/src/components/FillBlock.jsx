@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
+import { parseTemplate } from '../lib/fillTemplate';
 
 /**
  * "Fill in the blanks" task (Stepik-style). The author writes a code/text
@@ -8,26 +9,6 @@ import { highlightPreBlocks } from '../lib/pythonHighlight';
  * type into each blank; we grade client-side for instant feedback and also
  * POST to the backend, which re-grades and records the attempt.
  */
-
-// Split "print({{8}})" into [{text:'print('}, {blank, index, answers:['8']}, {text:')'}]
-export function parseTemplate(template) {
-    const segments = [];
-    const re = /\{\{(.*?)\}\}/g;
-    let last = 0;
-    let blankIndex = 0;
-    let m;
-    while ((m = re.exec(template || '')) !== null) {
-        if (m.index > last) segments.push({ type: 'text', value: template.slice(last, m.index) });
-        segments.push({
-            type: 'blank',
-            index: blankIndex++,
-            answers: m[1].split('|').map(s => s.trim()).filter(Boolean),
-        });
-        last = re.lastIndex;
-    }
-    if (last < (template || '').length) segments.push({ type: 'text', value: template.slice(last) });
-    return segments;
-}
 
 function matches(value, answers, caseSensitive) {
     const v = (value || '').trim();
