@@ -3,8 +3,15 @@ import hljs from 'highlight.js/lib/core';
 import python from 'highlight.js/lib/languages/python';
 import './QuizBlock.css';
 import api from '../api';
+import { highlightPreBlocks } from '../lib/pythonHighlight';
 
 hljs.registerLanguage('python', python);
+
+// Questions authored with the rich-text editor are HTML (wrapped in block tags);
+// older quizzes store plain text with an optional "\n\n + code" convention.
+function isHtmlQuestion(q) {
+    return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|strong|em|code|div|br)\b/i.test(q || '');
+}
 
 function QuizBlock({ content, blockId, savedProgress, number }) {
     const savedSelected = savedProgress?.answer?.selected;
@@ -14,9 +21,11 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
 
     const isCorrect = submitted && selected === content.correct_answer;
 
-    // Split question into text + code parts
+    const htmlQuestion = isHtmlQuestion(content.question);
+
+    // Legacy plain-text format: split question into text + code parts.
     const parts = content.question.split('\n\n');
-    const hasCode = parts.length >= 2;
+    const hasCode = !htmlQuestion && parts.length >= 2;
     const questionText = hasCode ? parts[0] : content.question;
     const codePart = hasCode ? parts.slice(1).join('\n') : null;
     const highlightedCode = codePart
@@ -72,29 +81,39 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
                 </span>
             </div>
 
-            <p
-                style={{ fontWeight: '600', marginBottom: codePart ? '12px' : '16px' }}
-                dangerouslySetInnerHTML={{ __html: '❓ ' + questionText }}
-            />
-            {codePart && (
-                <pre style={{
-                    background: '#f0f0f0',
-                    borderRadius: '6px',
-                    padding: '10px 16px',
-                    fontFamily: "'JetBrains Mono', Consolas, monospace",
-                    fontSize: '14px',
-                    lineHeight: '1.6',
-                    marginBottom: '12px',
-                    overflowX: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    color: '#383a42',
-                }}>
-                    <code
-                        className="hljs language-python"
-                        style={{ background: 'transparent' }}
-                        dangerouslySetInnerHTML={{ __html: highlightedCode }}
+            {htmlQuestion ? (
+                <div
+                    className="text-content"
+                    style={{ marginBottom: '16px' }}
+                    dangerouslySetInnerHTML={{ __html: highlightPreBlocks(content.question) }}
+                />
+            ) : (
+                <>
+                    <p
+                        style={{ fontWeight: '600', marginBottom: codePart ? '12px' : '16px' }}
+                        dangerouslySetInnerHTML={{ __html: '❓ ' + questionText }}
                     />
-                </pre>
+                    {codePart && (
+                        <pre style={{
+                            background: '#f0f0f0',
+                            borderRadius: '6px',
+                            padding: '10px 16px',
+                            fontFamily: "'JetBrains Mono', Consolas, monospace",
+                            fontSize: '14px',
+                            lineHeight: '1.6',
+                            marginBottom: '12px',
+                            overflowX: 'auto',
+                            whiteSpace: 'pre-wrap',
+                            color: '#383a42',
+                        }}>
+                            <code
+                                className="hljs language-python"
+                                style={{ background: 'transparent' }}
+                                dangerouslySetInnerHTML={{ __html: highlightedCode }}
+                            />
+                        </pre>
+                    )}
+                </>
             )}
 
             <div className="quiz-options" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

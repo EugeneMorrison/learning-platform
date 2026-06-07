@@ -28,6 +28,7 @@ urlpatterns = [
     path('status/', views.status_view, name='status'),
     path('run-code/', views.RunCodeView.as_view(), name='run-code'),
     path('run-tests/', views.RunTestsView.as_view(), name='run-tests'),
+    path('upload-image/', views.UploadImageView.as_view(), name='upload-image'),
     path('messages/', views.MessageView.as_view(), name='messages'),
     path('enrollments/', views.EnrollmentListCreateView.as_view(), name='enrollment-list'),
     path('enrollments/<uuid:course_id>/', views.EnrollmentDeleteView.as_view(), name='enrollment-delete'),

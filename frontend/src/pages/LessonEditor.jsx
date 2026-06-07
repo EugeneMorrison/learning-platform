@@ -4,6 +4,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
+import UserBadge from '../components/UserBadge';
 import api from '../api';
 
 const TYPE_LABELS = {
@@ -105,7 +106,7 @@ function LessonEditor() {
         if (type === 'TEXT') {
             if (!stripHtml(content.html)) return 'Добавьте текст теории.';
         } else if (type === 'QUIZ') {
-            if (!content.question.trim()) return 'Введите вопрос.';
+            if (!stripHtml(content.question)) return 'Введите вопрос.';
             const filled = content.options.filter(o => o.trim());
             if (filled.length < 2) return 'Нужно минимум два варианта ответа.';
             if (content.correct_answer == null || !content.options[content.correct_answer]?.trim())
@@ -212,6 +213,7 @@ function LessonEditor() {
 
     return (
         <div style={{ maxWidth: 800, margin: '40px auto', padding: 20 }}>
+            <UserBadge user={user} />
             <button onClick={() => navigate(`/courses/${lesson.course}/`)} style={{ marginBottom: 20 }}>
                 ← Назад к курсу
             </button>
@@ -295,7 +297,7 @@ function LessonEditor() {
 
 function blockPreview(block) {
     if (block.type === 'TEXT') return stripHtml(block.content.html) || '(пусто)';
-    if (block.type === 'QUIZ') return block.content.question || '(без вопроса)';
+    if (block.type === 'QUIZ') return stripHtml(block.content.question) || '(без вопроса)';
     if (block.type === 'CODE') return stripHtml(block.content.prompt) || '(без условия)';
     return '';
 }
@@ -342,11 +344,10 @@ function BlockForm({ draft, setContent, onSave, onCancel, saving, formError }) {
 function QuizFields({ content, setContent }) {
     return (
         <>
-            <Field label="Вопрос" hint="Чтобы добавить код к вопросу, оставьте пустую строку и напишите код под ней.">
-                <textarea
+            <Field label="Вопрос" hint="Используйте «Код-блок» для кода и кнопку «Картинка» для изображений и формул.">
+                <RichTextEditor
                     value={content.question}
-                    onChange={e => setContent(c => ({ ...c, question: e.target.value }))}
-                    style={{ ...input, minHeight: 80, fontFamily: 'inherit' }}
+                    onChange={(html) => setContent(c => ({ ...c, question: html }))}
                     placeholder="Что выведет этот код?"
                 />
             </Field>

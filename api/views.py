@@ -15,13 +15,17 @@ from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.conf import settings
+from django.core.files.storage import default_storage
 from django.db import models
 from datetime import datetime
 import subprocess
 import sys
 import tempfile
 import os
+import uuid
 
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -221,6 +225,52 @@ class RunTestsView(APIView):
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+
+
+class UploadImageView(APIView):
+    """
+    POST /api/upload-image/  (author only, multipart form field: 'image')
+
+    Saves an author-uploaded lesson image to MEDIA_ROOT/lesson_images/ and
+    returns its absolute URL. The rich-text editor inserts that URL as an
+    <img> in the block's HTML. build_absolute_uri makes the URL work both in
+    dev (React on :5173, Django on :8000) and when embedded via iframe.
+    """
+    permission_classes = [IsAuthenticated, IsAuthor]
+    parser_classes = [MultiPartParser, FormParser]
+
+    # content_type -> file extension
+    ALLOWED_TYPES = {
+        'image/png': 'png',
+        'image/jpeg': 'jpg',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg',
+    }
+    MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+    def post(self, request):
+        upload = request.FILES.get('image')
+        if not upload:
+            return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if upload.size > self.MAX_BYTES:
+            return Response(
+                {'error': 'Image too large (max 5 MB)'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ext = self.ALLOWED_TYPES.get(upload.content_type)
+        if not ext:
+            return Response(
+                {'error': f'Unsupported image type: {upload.content_type}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        filename = f'lesson_images/{uuid.uuid4().hex}.{ext}'
+        saved_path = default_storage.save(filename, upload)
+        url = request.build_absolute_uri(settings.MEDIA_URL + saved_path)
+        return Response({'url': url}, status=status.HTTP_201_CREATED)
 
 
 # =============================================================================
@@ -781,6 +831,33 @@ class CourseEnrollmentsView(generics.ListAPIView):
         )
 
 
+def grade_fill(content, answer):
+    """
+    Grade a FILL (fill-in-the-blanks) submission server-side.
+
+    Template holds blanks as {{answer}} or {{ans1|ans2}} (alternatives via |).
+    The student submits answer = {'blanks': ['...', ...]} in template order.
+    Each blank is correct if its trimmed value matches one accepted answer
+    (case-insensitively unless content['case_sensitive'] is true).
+    """
+    import re
+    template = content.get('template', '') or ''
+    case_sensitive = content.get('case_sensitive', False)
+    blanks = re.findall(r'\{\{(.*?)\}\}', template)
+    submitted = (answer or {}).get('blanks', []) or []
+    if len(submitted) != len(blanks) or not blanks:
+        return False
+    for raw, sub in zip(blanks, submitted):
+        accepted = [a.strip() for a in raw.split('|') if a.strip()]
+        value = (sub or '').strip()
+        if not case_sensitive:
+            value = value.lower()
+            accepted = [a.lower() for a in accepted]
+        if value not in accepted:
+            return False
+    return True
+
+
 class ProgressSubmitView(generics.CreateAPIView):
     """
     POST /api/progress/submit/
@@ -824,6 +901,9 @@ class ProgressSubmitView(generics.CreateAPIView):
             # Frontend already ran /run-tests/ and knows the outcome.
             # Trust its is_correct flag (passed in the request body).
             is_correct = request.data.get('is_correct')
+        elif block.type == 'FILL':
+            # Graded server-side against the template's {{answer}} markers.
+            is_correct = grade_fill(block.content, answer)
 
         # Create or fetch the record, then increment attempts on every submission.
         # update_or_create can't easily increment, so we do it manually.
@@ -842,7 +922,7 @@ class ProgressSubmitView(generics.CreateAPIView):
 
         # Record this individual submission in the attempt history (skip TEXT
         # blocks — they don't carry a meaningful answer payload).
-        if block.type in ('QUIZ', 'CODE'):
+        if block.type in ('QUIZ', 'CODE', 'FILL'):
             Attempt.objects.create(
                 student=request.user,
                 block=block,

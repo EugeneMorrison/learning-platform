@@ -21,8 +21,8 @@ Authors create courses made of **blocks** — theory text, quizzes, and coding e
 
 **Author can:**
 
-* Create and edit courses, lessons, and blocks
-* Import lessons from HTML files automatically
+* Create and edit courses, lessons, and blocks — **building blocks visually in the browser, no HTML file required**
+* Import lessons from HTML files automatically (for bulk imports)
 * Give students access via enrollment
 * View student progress and statistics
 * Inspect **every submission a student ever made** — including wrong attempts, with timestamps to the second and the actual code they wrote
@@ -67,12 +67,15 @@ learning-platform/
 │       │   ├── DashboardPage.jsx        # Role-based dashboard
 │       │   ├── CoursePage.jsx           # Author/student views + WebSocket chat
 │       │   ├── StudentProgressPage.jsx  # Per-student progress + expandable attempt history
-│       │   └── LessonViewer.jsx         # Reads lesson ID from URL, WebSocket chat with teacher
+│       │   ├── LessonViewer.jsx         # Reads lesson ID from URL, WebSocket chat with teacher
+│       │   └── LessonEditor.jsx         # Author: visual block editor (add/edit/delete/reorder)
 │       └── components/
 │           ├── TextBlock.jsx
 │           ├── QuizBlock.jsx
 │           ├── CodeBlock.jsx          # CodeMirror 6 editor with PyCharm Darcula theme
-│           └── pycharmDarcula.js      # Theme + Python built-ins highlighter
+│           ├── pycharmDarcula.js      # Theme + Python built-ins highlighter
+│           ├── RichTextEditor.jsx     # TipTap WYSIWYG editor for TEXT blocks / CODE prompts
+│           └── RichTextEditor.css     # Toolbar + prose styling for the editor
 ├── Dockerfile                # Multi-stage build: Node → Python
 ├── docker-compose.yml        # One-command launch
 ├── .dockerignore
@@ -100,6 +103,35 @@ Each lesson is made of blocks. Three types are supported:
 * JetBrains Mono font, dark `#2B2B2B` background
 * Bracket matching, indent-on-input, tab-to-indent
 * Native CodeMirror line numbers and active-line gutter highlight
+
+---
+
+## ✏️ Visual Block Editor
+
+Authors build a lesson **block by block directly in the browser** — no HTML file and no `import_lesson` command needed. The HTML importer stays available for bulk imports, but everyday authoring happens in the UI.
+
+**How to open it:** on a course page, every lesson row has an **✎ Редактировать (Edit)** button (authors only). It opens the editor at `/lesson/<lesson-uuid>/edit/`. A **👁 Предпросмотр (Preview)** button jumps to the normal student view.
+
+**In the editor you can:**
+
+* **Add** a block of any type — 📝 Theory (TEXT), ❓ Quiz (QUIZ), 💻 Code task (CODE)
+* **Edit** any existing block in place
+* **Delete** a block (with confirmation)
+* **Reorder** blocks with ↑ / ↓ buttons
+
+**Per-type editing forms:**
+
+| Type | Editing UI |
+|------|------------|
+| TEXT | **WYSIWYG rich-text editor** (TipTap) — bold, italic, H2/H3, bullet & numbered lists, inline code, code block, quote. The teacher never writes raw HTML; the editor produces the `{"html": ...}` stored in the block. Code blocks become `<pre><code>` and are auto-highlighted in the lesson viewer. |
+| QUIZ | Question field, a dynamic list of options with a radio button to mark the correct one, and an explanation shown on a correct answer. Empty options are dropped on save and `correct_answer` is reindexed automatically. |
+| CODE | Rich-text task description, `starter_code` and an optional **hidden solution** (both in the same CodeMirror + PyCharm Darcula editor as the student side), and a tests table (stdin → expected stdout). Blank test rows are ignored. |
+
+**Implementation notes:**
+
+* Files: `frontend/src/pages/LessonEditor.jsx`, `frontend/src/components/RichTextEditor.jsx` (+ `.css`).
+* **No new backend was needed** — the editor drives the existing DRF `BlockViewSet` (`POST` / `PUT` / `PATCH` / `DELETE /api/blocks/`). `BlockSerializer` validates the required fields per block type and returns `400` on invalid content. Access is author-only via the existing `IsAuthor` / `IsOwnerOrReadOnly` permissions.
+* **Ordering & the unique constraint:** `Block` has `unique_together (lesson, order_index)`. New blocks use `max(order_index) + 1` (not count + 1), so gaps left by deletions never collide. Reordering swaps two blocks through a temporary free index to avoid violating the constraint mid-swap. Lesson creation on the course page uses the same `max + 1` rule.
 
 ---
 
@@ -272,8 +304,19 @@ GET    /api/courses/{id}/           Course detail
 PUT    /api/courses/{id}/           Update course (author only)
 DELETE /api/courses/{id}/           Delete course (author only)
 GET    /api/lessons/?course={id}    List lessons in a course
+POST   /api/lessons/                Create lesson (author only)
 GET    /api/lessons/{id}/           Lesson detail
+DELETE /api/lessons/{id}/           Delete lesson (author only)
+```
+
+### Blocks (used by the visual block editor)
+
+```
 GET    /api/blocks/?lesson={id}     List blocks in a lesson
+POST   /api/blocks/                 Create block (author only)
+PUT    /api/blocks/{id}/            Replace block content/type/order (author only)
+PATCH  /api/blocks/{id}/            Partial update, e.g. order_index (author only)
+DELETE /api/blocks/{id}/            Delete block (author only)
 ```
 
 ### Enrollment
@@ -334,11 +377,13 @@ Receive messages: server → client serialized `Message` JSON, broadcast to both
 /courses/:courseId/                        Course detail (author/student views)
 /courses/:courseId/students/:studentId/    Author: per-student progress with attempt history
 /lesson/:lessonId/                         Lesson viewer
+/lesson/:lessonId/edit/                     Author: visual block editor
 ```
 
 **Author dashboard:** lists own courses (from `/api/courses/my_courses/`), inline "Create Course" form.
 **Student dashboard:** lists enrolled courses with enrollment dates.
-**Author course page:** lessons list, add-lesson form, students list with **Progress** and **💬 Chat** buttons. Chat opens a WebSocket connection scoped to that student.
+**Author course page:** lessons list (each with **✎ Edit** and **Delete** buttons), add-lesson form, students list with **Progress** and **💬 Chat** buttons. Chat opens a WebSocket connection scoped to that student.
+**Lesson editor (author):** add/edit/delete/reorder TEXT, QUIZ and CODE blocks with per-type forms and a WYSIWYG editor for theory; **👁 Preview** opens the student view.
 **Student progress page:** completion %, tasks done, quizzes correct, plus per-lesson breakdown. Each task shows a `▶ попыток: N` pill — click it to expand the full submission history with timestamps; click any attempt to view the submitted code/answer in a syntax-highlighted viewer.
 **Lesson viewer:** PyCharm-style CodeMirror editor for code tasks, floating chat bubble with WebSocket connection to the teacher.
 
@@ -368,6 +413,7 @@ Receive messages: server → client serialized `Message` JSON, broadcast to both
 | Axios                    | HTTP client (with JWT refresh interceptor)|
 | @uiw/react-codemirror    | CodeMirror 6 React wrapper               |
 | @codemirror/lang-python  | Python syntax parser                     |
+| @tiptap/react + starter-kit | WYSIWYG rich-text editor for TEXT blocks |
 | highlight.js             | Syntax highlighting for read-only theory blocks |
 
 ### Infrastructure
@@ -417,6 +463,7 @@ Test lesson URL: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d
 | 14   | PyCharm-style code editor (CodeMirror + Darcula) | ✅     |
 | 15   | Real-time chat via WebSockets (Channels + Daphne)| ✅     |
 | 16   | Full attempt history (per-submission timestamps + answer viewer) | ✅     |
+| 17   | In-app visual block editor (WYSIWYG TEXT, QUIZ & CODE forms, reorder) | ✅     |
 
 ---
 

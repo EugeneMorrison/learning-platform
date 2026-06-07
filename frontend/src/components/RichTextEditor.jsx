@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Image from '@tiptap/extension-image';
+import api from '../api';
 import './RichTextEditor.css';
 
 /**
@@ -9,13 +11,41 @@ import './RichTextEditor.css';
  * The teacher edits visually (no HTML knowledge needed); we persist the
  * generated HTML via onChange. TipTap's codeBlock renders as <pre><code>,
  * which TextBlock already syntax-highlights with highlight.js.
+ *
+ * Images (incl. formulas pasted as pictures) are uploaded to Django via
+ * POST /api/upload-image/ and inserted as <img src="<absolute url>">. Authors
+ * can add them three ways: the toolbar button, Ctrl+V paste, and drag-and-drop.
  */
 function RichTextEditor({ value, onChange, placeholder }) {
+    const fileInputRef = useRef(null);
+
     const editor = useEditor({
-        extensions: [StarterKit],
+        extensions: [
+            StarterKit,
+            Image.configure({ inline: false, allowBase64: false }),
+        ],
         content: value || '',
         // Avoid SSR hydration warnings; harmless on the client.
         immediatelyRender: false,
+        editorProps: {
+            // Screenshot/clipboard image paste: upload the blob, insert the URL.
+            // Returning false for non-image pastes lets TipTap handle normal
+            // content (including remote <img> URLs inside pasted HTML).
+            handlePaste: (_view, event) => {
+                const file = firstImageFile(event.clipboardData?.files);
+                if (!file) return false;
+                event.preventDefault();
+                uploadAndInsert(file);
+                return true;
+            },
+            handleDrop: (_view, event) => {
+                const file = firstImageFile(event.dataTransfer?.files);
+                if (!file) return false;
+                event.preventDefault();
+                uploadAndInsert(file);
+                return true;
+            },
+        },
         onUpdate: ({ editor }) => {
             const html = editor.getHTML();
             // TipTap emits "<p></p>" for an empty doc — normalise to "".
@@ -34,6 +64,30 @@ function RichTextEditor({ value, onChange, placeholder }) {
         }
     }, [value, editor]);
 
+    function firstImageFile(fileList) {
+        if (!fileList || !fileList.length) return null;
+        return Array.from(fileList).find(f => f.type.startsWith('image/')) || null;
+    }
+
+    async function uploadAndInsert(file) {
+        try {
+            const form = new FormData();
+            form.append('image', file);
+            // Let axios set the multipart Content-Type (with boundary) itself.
+            const res = await api.post('/upload-image/', form);
+            editor?.chain().focus().setImage({ src: res.data.url }).run();
+        } catch (err) {
+            console.error('Image upload failed:', err);
+            alert('Не удалось загрузить изображение. Поддерживаются PNG/JPG/GIF/WEBP/SVG до 5 МБ.');
+        }
+    }
+
+    function handleFilePick(e) {
+        const file = e.target.files?.[0];
+        if (file) uploadAndInsert(file);
+        e.target.value = ''; // allow re-selecting the same file
+    }
+
     if (!editor) return null;
 
     const btn = (active) => ({
@@ -48,9 +102,23 @@ function RichTextEditor({ value, onChange, placeholder }) {
         lineHeight: 1.4,
     });
 
+    const stepBtn = (enabled) => ({
+        ...btn(false),
+        opacity: enabled ? 1 : 0.4,
+        cursor: enabled ? 'pointer' : 'default',
+    });
+
+    const canUndo = editor.can().undo();
+    const canRedo = editor.can().redo();
+
     return (
         <div className="rte">
             <div className="rte-toolbar">
+                <button type="button" title="Отменить (Ctrl+Z)" disabled={!canUndo} style={stepBtn(canUndo)}
+                    onClick={() => editor.chain().focus().undo().run()}>↶</button>
+                <button type="button" title="Повторить (Ctrl+Y / Ctrl+Shift+Z)" disabled={!canRedo} style={stepBtn(canRedo)}
+                    onClick={() => editor.chain().focus().redo().run()}>↷</button>
+                <span className="rte-sep" />
                 <button type="button" title="Жирный" style={btn(editor.isActive('bold'))}
                     onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></button>
                 <button type="button" title="Курсив" style={btn(editor.isActive('italic'))}
@@ -72,7 +140,17 @@ function RichTextEditor({ value, onChange, placeholder }) {
                     onClick={() => editor.chain().focus().toggleCodeBlock().run()}>Код-блок</button>
                 <button type="button" title="Цитата" style={btn(editor.isActive('blockquote'))}
                     onClick={() => editor.chain().focus().toggleBlockquote().run()}>❝</button>
+                <span className="rte-sep" />
+                <button type="button" title="Вставить изображение (или просто вставьте/перетащите картинку)"
+                    style={btn(false)} onClick={() => fileInputRef.current?.click()}>🖼 Картинка</button>
             </div>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                style={{ display: 'none' }}
+                onChange={handleFilePick}
+            />
             <EditorContent editor={editor} className="rte-content" data-placeholder={placeholder} />
         </div>
     );

@@ -221,6 +221,20 @@ class BlockSerializer(serializers.ModelSerializer):
                         f"CODE blocks must have '{field}' field in content"
                     )
 
+        elif block_type == 'FILL':
+            # Fill-in-the-blanks: a code/text template with {{answer}} markers.
+            template = value.get('template')
+            if not template:
+                raise serializers.ValidationError(
+                    "FILL blocks must have a non-empty 'template' field in content"
+                )
+            import re
+            blanks = re.findall(r'\{\{(.*?)\}\}', template)
+            if not blanks or not any(b.strip() for b in blanks):
+                raise serializers.ValidationError(
+                    "FILL template must contain at least one blank with an answer, e.g. print({{8}})"
+                )
+
         return value
 
 

@@ -145,6 +145,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
 
             {/* Task prompt */}
             <div
+                className="text-content"
                 style={{ marginBottom: '16px' }}
                 dangerouslySetInnerHTML={{ __html: content.prompt }}
             />

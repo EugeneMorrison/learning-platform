@@ -5,6 +5,7 @@ import api from '../api';
 import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
+import UserBadge from '../components/UserBadge';
 
 const DEV_LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
 
@@ -193,6 +194,9 @@ function LessonViewer() {
 
     return (
         <>
+            {/* Hidden when embedded in an iframe — external sites shouldn't show our user chrome */}
+            {!isInIframe && <UserBadge />}
+
             <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
 
                 {/* Back button — hidden when embedded in iframe (no parent SPA to go back to) */}

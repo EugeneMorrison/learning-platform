@@ -207,6 +207,12 @@ STATICFILES_DIRS = [
     BASE_DIR / 'frontend' / 'dist',  # React build output: /static/assets/...
 ]
 
+# Media files (author-uploaded lesson images)
+# Served at /media/... — see backend/urls.py. In Docker, /app/media is a
+# persistent volume so uploaded images survive container restarts.
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Allow embedding in iframes (needed for Step 11)
 # SAMEORIGIN = only same-domain iframes; we use per-view exemption for cross-origin
 X_FRAME_OPTIONS = 'SAMEORIGIN'

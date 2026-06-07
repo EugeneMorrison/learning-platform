@@ -183,6 +183,7 @@ class Block(models.Model):
         ('TEXT', 'Text Block'),
         ('QUIZ', 'Quiz Block'),
         ('CODE', 'Code Block'),
+        ('FILL', 'Fill-in-the-blanks Block'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

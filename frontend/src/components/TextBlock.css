@@ -8,3 +8,11 @@
 .text-content code {
     font-family: 'JetBrains Mono', Consolas, monospace !important;
 }
+
+/* Author-uploaded images (incl. formulas pasted as pictures) stay responsive */
+.text-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 8px 0;
+}

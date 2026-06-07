@@ -4,6 +4,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import api from '../api';
+import UserBadge from '../components/UserBadge';
 
 function StudentProgressPage() {
     const { courseId, studentId } = useParams();
@@ -104,8 +105,17 @@ function StudentProgressPage() {
     if (loading) return <p>Загрузка...</p>;
     if (!data) return <p>Данные не найдены.</p>;
 
+    // Theory (TEXT) blocks aren't tasks — there's nothing to solve — so the
+    // "Заданий" stats count only QUIZ/CODE blocks. This also lets the bar reach
+    // 100% (TEXT blocks never get a Progress record and would otherwise drag it).
+    const taskBlocks = data.lessons.flatMap(l => l.blocks.filter(b => b.block_type !== 'TEXT'));
+    const totalTasks = taskBlocks.length;
+    const completedTasks = taskBlocks.filter(b => b.completed).length;
+    const taskPercentage = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
     return (
         <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
+            <UserBadge />
 
             {/* Header */}
             <button onClick={() => navigate(`/courses/${courseId}/`)} style={{ marginBottom: '20px' }}>
@@ -126,13 +136,13 @@ function StudentProgressPage() {
             }}>
                 <div>
                     <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0C4B33' }}>
-                        {data.progress_percentage}%
+                        {taskPercentage}%
                     </div>
                     <div style={{ color: '#64748b', fontSize: '14px' }}>Выполнено</div>
                 </div>
                 <div>
                     <div style={{ fontSize: '28px', fontWeight: 'bold' }}>
-                        {data.completed_blocks}/{data.total_blocks}
+                        {completedTasks}/{totalTasks}
                     </div>
                     <div style={{ color: '#64748b', fontSize: '14px' }}>Заданий</div>
                 </div>
@@ -147,19 +157,19 @@ function StudentProgressPage() {
             {/* Lessons breakdown */}
             <div style={{ marginTop: '24px' }}>
                 {data.lessons.map((lesson, idx) => {
+                    // Theory (TEXT) blocks aren't tasks — skip them entirely.
+                    const lessonTasks = lesson.blocks.filter(b => b.block_type !== 'TEXT');
+
                     // Per-type counters reset for each lesson
                     let quizCount = 0;
                     let codeCount = 0;
-                    const typeLabels = lesson.blocks.map(block => {
+                    const typeLabels = lessonTasks.map(block => {
                         if (block.block_type === 'QUIZ') {
                             quizCount += 1;
                             return `Тест ${quizCount}`;
                         }
-                        if (block.block_type === 'CODE') {
-                            codeCount += 1;
-                            return `Задача ${codeCount}`;
-                        }
-                        return 'Текст';
+                        codeCount += 1;
+                        return `Задача ${codeCount}`;
                     });
 
                     return (
@@ -172,7 +182,12 @@ function StudentProgressPage() {
                             <h4 style={{ margin: '0 0 12px 0' }}>
                                 Урок {lesson.lesson_order}: {lesson.lesson_title}
                             </h4>
-                            {lesson.blocks.map((block, bidx) => {
+                            {lessonTasks.length === 0 && (
+                                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
+                                    В этом уроке нет заданий — только теория.
+                                </p>
+                            )}
+                            {lessonTasks.map((block, bidx) => {
                                 const history = block.attempts_history || [];
                                 const isOpen = openBlocks.has(block.block_id);
                                 const hasHistory = history.length > 0;
@@ -190,9 +205,11 @@ function StudentProgressPage() {
                                                 {block.completed ? '✅' : '○'}
                                             </span>
                                             <span style={{ color: '#64748b', fontSize: '14px' }}>
-                                                Задание {block.block_order} ({typeLabels[bidx]})
+                                                Задание {bidx + 1} ({typeLabels[bidx]})
                                             </span>
-                                            {block.block_type === 'QUIZ' && block.completed && (
+                                            {/* QUIZ and CODE both report is_correct, so show the
+                                                verdict for either once submitted. */}
+                                            {block.completed && block.is_correct != null && (
                                                 <span style={{
                                                     fontSize: '13px',
                                                     color: block.is_correct ? '#16a34a' : '#dc2626',

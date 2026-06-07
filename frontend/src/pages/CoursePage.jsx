@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
+import UserBadge from '../components/UserBadge';
 
 function CoursePage() {
     const { courseId } = useParams();
@@ -62,10 +63,16 @@ function CoursePage() {
         if (!newLessonTitle.trim()) return;
         setCreatingLesson(true);
         try {
+            // Use max(order_index)+1, not length+1: deleting a lesson leaves a
+            // gap, so length+1 can collide with an existing order_index and the
+            // serializer's unique-together check rejects the create.
+            const nextOrder = lessons.length
+                ? Math.max(...lessons.map(l => l.order_index)) + 1
+                : 1;
             await api.post('/lessons/', {
                 course: courseId,
                 title: newLessonTitle,
-                order_index: lessons.length + 1,
+                order_index: nextOrder,
             });
             setNewLessonTitle('');
             setShowLessonForm(false);
@@ -73,6 +80,7 @@ function CoursePage() {
             setLessons(res.data);
         } catch (err) {
             console.error('Failed to create lesson:', err);
+            alert('Не удалось создать урок. Попробуйте ещё раз.');
         } finally {
             setCreatingLesson(false);
         }
@@ -175,6 +183,7 @@ function CoursePage() {
 
     return (
         <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
+            <UserBadge user={user} />
 
             {/* Header */}
             <button onClick={() => navigate('/dashboard/')} style={{ marginBottom: '20px' }}>

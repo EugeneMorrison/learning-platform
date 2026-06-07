@@ -84,6 +84,18 @@
     padding: 0;
 }
 
+.rte-content .ProseMirror img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 4px 0;
+}
+
+/* Selected image highlight (ProseMirror node selection) */
+.rte-content .ProseMirror img.ProseMirror-selectednode {
+    outline: 2px solid #0C4B33;
+}
+
 /* Placeholder for empty editor */
 .rte-content .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);

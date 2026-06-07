@@ -9,7 +9,9 @@ services:
       - DEBUG=True
       - ALLOWED_HOSTS=*
     volumes:
-      - db-data:/app/db    # persist SQLite database between restarts
+      - db-data:/app/db          # persist SQLite database between restarts
+      - media-data:/app/media    # persist author-uploaded lesson images
 
 volumes:
   db-data:
+  media-data:
