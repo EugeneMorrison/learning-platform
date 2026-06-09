@@ -93,27 +93,21 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                 Заполните пропуски:
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', rowGap: '10px' }}>
+            {/* Text flows as plain text (author's line breaks preserved); only the
+                blanks are bordered inputs that grow with what the student types. */}
+            <div style={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: 2.2,
+                fontFamily: "'JetBrains Mono', Consolas, monospace",
+                fontSize: '14px',
+                color: '#334155',
+            }}>
                 {segments.map((seg, idx) => {
-                    if (seg.type === 'text') {
-                        return seg.value.trim() === '' ? (
-                            <span key={idx}>{seg.value}</span>
-                        ) : (
-                            <span key={idx} style={{
-                                fontFamily: "'JetBrains Mono', Consolas, monospace",
-                                fontSize: '14px',
-                                background: '#f1f5f9',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '6px',
-                                padding: '6px 8px',
-                                whiteSpace: 'pre',
-                                color: '#334155',
-                            }}>{seg.value}</span>
-                        );
-                    }
+                    if (seg.type === 'text') return <span key={idx}>{seg.value}</span>;
                     const i = seg.index;
-                    const longest = Math.max(8, ...seg.answers.map(a => a.length));
                     const ok = perBlankCorrect[i];
+                    const ch = Math.max(8, (values[i]?.length || 0) + 2);
                     return (
                         <input
                             key={idx}
@@ -124,14 +118,15 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                             style={{
                                 fontFamily: "'JetBrains Mono', Consolas, monospace",
                                 fontSize: '14px',
-                                padding: '6px 12px',
+                                padding: '4px 12px',
                                 borderRadius: '999px',
                                 border: '2px solid',
                                 borderColor: submitted ? (ok ? '#16a34a' : '#dc2626') : '#c7d2fe',
                                 background: submitted ? (ok ? '#dcfce7' : '#fee2e2') : '#eef2ff',
-                                width: `${longest + 3}ch`,
-                                minWidth: '90px',
+                                width: `${ch}ch`,
+                                maxWidth: '100%',
                                 outline: 'none',
+                                verticalAlign: 'middle',
                             }}
                         />
                     );

@@ -291,7 +291,7 @@ function LessonEditor() {
                 <div style={{ marginTop: 24, padding: 16, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
                     <div style={{ fontWeight: 600, marginBottom: 10, color: '#334155' }}>Добавить блок:</div>
                     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {['TEXT', 'QUIZ', 'CODE'].map(type => (
+                        {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
                             <button key={type} onClick={() => startAdd(type)} style={addBtn}>
                                 {TYPE_LABELS[type]}
                             </button>
@@ -525,19 +525,12 @@ function FillFields({ content, setContent }) {
             {/* Live preview of how the blanks will look + which answers are accepted */}
             {hasBlanks && (
                 <Field label="Предпросмотр">
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, rowGap: 10 }}>
-                        {segments.map((seg, idx) => {
-                            if (seg.type === 'text') {
-                                return seg.value.trim() === ''
-                                    ? <span key={idx}>{seg.value}</span>
-                                    : <span key={idx} style={previewChip}>{seg.value}</span>;
-                            }
-                            return (
-                                <span key={idx} style={previewBlank} title="Принимаемые ответы">
-                                    {seg.answers.join(' / ') || '⌀'}
-                                </span>
-                            );
-                        })}
+                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 2.2, fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14, color: '#334155' }}>
+                        {segments.map((seg, idx) => (
+                            seg.type === 'text'
+                                ? <span key={idx}>{seg.value}</span>
+                                : <span key={idx} style={previewBlank} title="Принимаемые ответы">{seg.answers.join(' / ') || '⌀'}</span>
+                        ))}
                     </div>
                     <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
                         В пропусках показаны принимаемые ответы — студент увидит пустые поля.
@@ -641,16 +634,11 @@ const deleteBtn = {
     border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500,
 };
 
-const previewChip = {
-    fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14,
-    background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6,
-    padding: '6px 8px', whiteSpace: 'pre', color: '#334155',
-};
-
 const previewBlank = {
+    display: 'inline-block', verticalAlign: 'middle',
     fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14,
     background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 999,
-    padding: '4px 12px', color: '#15803d', fontWeight: 600,
+    padding: '2px 12px', color: '#15803d', fontWeight: 600,
 };
 
 export default LessonEditor;

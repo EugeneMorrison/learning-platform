@@ -69,13 +69,18 @@ learning-platform/
 │       │   ├── StudentProgressPage.jsx  # Per-student progress + expandable attempt history
 │       │   ├── LessonViewer.jsx         # Reads lesson ID from URL, WebSocket chat with teacher
 │       │   └── LessonEditor.jsx         # Author: visual block editor (add/edit/delete/reorder)
-│       └── components/
-│           ├── TextBlock.jsx
-│           ├── QuizBlock.jsx
-│           ├── CodeBlock.jsx          # CodeMirror 6 editor with PyCharm Darcula theme
-│           ├── pycharmDarcula.js      # Theme + Python built-ins highlighter
-│           ├── RichTextEditor.jsx     # TipTap WYSIWYG editor for TEXT blocks / CODE prompts
-│           └── RichTextEditor.css     # Toolbar + prose styling for the editor
+│       ├── components/
+│       │   ├── TextBlock.jsx
+│       │   ├── QuizBlock.jsx
+│       │   ├── CodeBlock.jsx          # CodeMirror 6 editor with PyCharm Darcula theme
+│       │   ├── FillBlock.jsx          # Fill-in-the-blanks task (auto-growing inputs)
+│       │   ├── pycharmDarcula.js      # Theme + Python built-ins highlighter
+│       │   ├── RichTextEditor.jsx     # TipTap WYSIWYG editor (TEXT/QUIZ/CODE) + image upload
+│       │   ├── RichTextEditor.css     # Toolbar + prose styling for the editor
+│       │   └── UserBadge.jsx          # Fixed top-right "who am I" avatar + menu
+│       └── lib/
+│           ├── pythonHighlight.js   # Shared highlight.js code-block highlighter
+│           └── fillTemplate.js      # Parses {{answer}} blanks for FILL blocks
 ├── Dockerfile                # Multi-stage build: Node → Python
 ├── docker-compose.yml        # One-command launch
 ├── .dockerignore
@@ -88,13 +93,14 @@ learning-platform/
 
 ## 🧱 Block System
 
-Each lesson is made of blocks. Three types are supported:
+Each lesson is made of blocks. Four types are supported:
 
 | Type | Description                | Content stored as                                                                      |
 |------|----------------------------|----------------------------------------------------------------------------------------|
 | TEXT | Theory with HTML formatting | `{"html": "<p>...</p>"}`                                                              |
 | QUIZ | Multiple choice question   | `{"question": "...", "options": [...], "correct_answer": 0, "explanation": "..."}`    |
 | CODE | Python coding exercise     | `{"prompt": "...", "starter_code": "...", "tests": [...]}`                            |
+| FILL | Fill-in-the-blanks task    | `{"prompt": "...", "template": "print({{8}})", "case_sensitive": false}`              |
 
 **Code blocks** use **CodeMirror 6** with a custom **PyCharm Darcula** theme (`frontend/src/components/pycharmDarcula.js`):
 
@@ -114,7 +120,7 @@ Authors build a lesson **block by block directly in the browser** — no HTML fi
 
 **In the editor you can:**
 
-* **Add** a block of any type — 📝 Theory (TEXT), ❓ Quiz (QUIZ), 💻 Code task (CODE)
+* **Add** a block of any type — 📝 Theory (TEXT), ❓ Quiz (QUIZ), 💻 Code task (CODE), ✍️ Fill in the blanks (FILL)
 * **Edit** any existing block in place
 * **Delete** a block (with confirmation)
 * **Reorder** blocks with ↑ / ↓ buttons
@@ -123,14 +129,17 @@ Authors build a lesson **block by block directly in the browser** — no HTML fi
 
 | Type | Editing UI |
 |------|------------|
-| TEXT | **WYSIWYG rich-text editor** (TipTap) — bold, italic, H2/H3, bullet & numbered lists, inline code, code block, quote. The teacher never writes raw HTML; the editor produces the `{"html": ...}` stored in the block. Code blocks become `<pre><code>` and are auto-highlighted in the lesson viewer. |
-| QUIZ | Question field, a dynamic list of options with a radio button to mark the correct one, and an explanation shown on a correct answer. Empty options are dropped on save and `correct_answer` is reindexed automatically. |
+| TEXT | **WYSIWYG rich-text editor** (TipTap) — bold, italic, H2/H3, bullet & numbered lists, inline code, code block, quote. The teacher never writes raw HTML; the editor produces the `{"html": ...}` stored in the block. Code blocks become `<pre><code>` and are auto-highlighted in the lesson viewer. Supports **image upload** (toolbar button, paste, or drag-and-drop) and **undo/redo**. |
+| QUIZ | WYSIWYG question (same rich editor), a dynamic list of options with a radio button to mark the correct one, and an explanation shown on a correct answer. Empty options are dropped on save and `correct_answer` is reindexed automatically. |
 | CODE | Rich-text task description, `starter_code` and an optional **hidden solution** (both in the same CodeMirror + PyCharm Darcula editor as the student side), and a tests table (stdin → expected stdout). Blank test rows are ignored. |
+| FILL | Rich-text description plus a **template** where blanks are written inline as `{{answer}}` (alternatives via `\|`, e.g. `print({{math.factorial(8)\|factorial(8)}})`). A **live preview** shows the fixed text and the accepted answers; a *case-sensitive* toggle and explanation are optional. |
 
 **Implementation notes:**
 
-* Files: `frontend/src/pages/LessonEditor.jsx`, `frontend/src/components/RichTextEditor.jsx` (+ `.css`).
-* **No new backend was needed** — the editor drives the existing DRF `BlockViewSet` (`POST` / `PUT` / `PATCH` / `DELETE /api/blocks/`). `BlockSerializer` validates the required fields per block type and returns `400` on invalid content. Access is author-only via the existing `IsAuthor` / `IsOwnerOrReadOnly` permissions.
+* Files: `frontend/src/pages/LessonEditor.jsx`, `frontend/src/components/RichTextEditor.jsx` (+ `.css`), `frontend/src/components/FillBlock.jsx`, `frontend/src/lib/fillTemplate.js`, `frontend/src/lib/pythonHighlight.js`.
+* The editor drives the existing DRF `BlockViewSet` (`POST` / `PUT` / `PATCH` / `DELETE /api/blocks/`). `BlockSerializer` validates the required fields per block type and returns `400` on invalid content. Access is author-only via the existing `IsAuthor` / `IsOwnerOrReadOnly` permissions.
+* **Image upload:** `POST /api/upload-image/` (author-only) saves to `MEDIA_ROOT/lesson_images/` and returns an absolute URL that the editor inserts as `<img>`. Served from `/media/` (persisted via a Docker volume).
+* **FILL grading:** fill-in-the-blanks answers are checked **server-side** in `ProgressSubmitView` (`grade_fill()` — trims, optional case-fold, all blanks must match); the viewer also grades client-side for instant feedback. Blanks auto-grow as the student types.
 * **Ordering & the unique constraint:** `Block` has `unique_together (lesson, order_index)`. New blocks use `max(order_index) + 1` (not count + 1), so gaps left by deletions never collide. Reordering swaps two blocks through a temporary free index to avoid violating the constraint mid-swap. Lesson creation on the course page uses the same `max + 1` rule.
 
 ---
@@ -276,6 +285,47 @@ http://localhost:8000/admin/
 
 ---
 
+## 🔌 Which port do I use? (Dev workflow: 8000 vs 5173)
+
+This trips everyone up. There are **two servers**, each with its own job:
+
+| Port | Server | What it does | When it runs |
+|------|--------|--------------|--------------|
+| **8000** | **Django** | Backend: REST API, database, WebSocket chat, media. Also serves the **built** frontend. | Always (your `runserver` / PyCharm). |
+| **5173** | **Vite** | Frontend dev server (React UI) with **instant hot-reload**. Talks to Django on 8000 for all data. | Only while `npm run dev` is running. |
+
+**Two ways to run the app:**
+
+**A) Dev mode (recommended while coding) — two terminals, open `:5173`**
+
+Terminal 1 — backend:
+```bash
+python manage.py runserver        # → http://localhost:8000  (banner must say "Starting ASGI/Daphne")
+```
+Terminal 2 — frontend:
+```bash
+cd frontend
+npm run dev                       # → http://localhost:5173
+```
+Then **open `http://localhost:5173/`**. Editing a React file updates the page instantly. API and chat calls still go to Django on 8000 behind the scenes.
+
+**B) Production-style — one server, open `:8000`**
+
+Build the frontend once, then Django serves everything itself:
+```bash
+cd frontend && npm run build && cd ..
+python manage.py runserver        # → open http://localhost:8000/
+```
+No hot-reload — re-run `npm run build` after each frontend change.
+
+**Rule of thumb when something seems broken:**
+
+* `localhost:5173` won't load but `8000` works → **Vite isn't running.** Start `npm run dev`.
+* `5173` loads pages but login / data / chat fail → **Django isn't running** (or not on 8000).
+* Chat specifically dead → make sure **only one** `runserver` is running and its banner says **"Starting ASGI/Daphne"**. Kill any stray `runserver` processes squatting port 8000 (`Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.CommandLine -like '*runserver*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }` on Windows).
+
+---
+
 ### Import a Lesson from HTML
 
 ```bash
@@ -341,6 +391,7 @@ GET    /api/progress/student/{student_id}/course/{id}/    Per-student progress w
 ```
 POST   /api/run-code/               Run Python code, get stdout/stderr
 POST   /api/run-tests/              Run code against test cases, get pass/fail
+POST   /api/upload-image/           Upload a lesson image (author only) → returns URL
 ```
 
 ### Author Tools
@@ -464,6 +515,7 @@ Test lesson URL: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d
 | 15   | Real-time chat via WebSockets (Channels + Daphne)| ✅     |
 | 16   | Full attempt history (per-submission timestamps + answer viewer) | ✅     |
 | 17   | In-app visual block editor (WYSIWYG TEXT, QUIZ & CODE forms, reorder) | ✅     |
+| 18   | Image upload in blocks + fill-in-the-blanks (FILL) task type | ✅     |
 
 ---
 
