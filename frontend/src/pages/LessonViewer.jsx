@@ -27,6 +27,7 @@ function LessonViewer() {
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]);
     const [course, setCourse] = useState(null);
+    const [user, setUser] = useState(null);
     const [progress, setProgress] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -69,6 +70,12 @@ function LessonViewer() {
             setBlocks(blocksResponse.data);
             const courseResponse = await api.get(`/courses/${lessonResponse.data.course}/`);
             setCourse(courseResponse.data);
+            try {
+                const userResponse = await api.get('/auth/me/');
+                setUser(userResponse.data);
+            } catch {
+                setUser(null);
+            }
             try {
                 const progressResponse = await api.get(`/progress/course/${lessonResponse.data.course}/`);
                 setProgress(progressResponse.data);
@@ -206,7 +213,7 @@ function LessonViewer() {
     return (
         <>
             {/* Hidden when embedded in an iframe — external sites shouldn't show our user chrome */}
-            {!isInIframe && <UserBadge />}
+            {!isInIframe && <UserBadge user={user} />}
 
             <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
 
@@ -303,7 +310,9 @@ function LessonViewer() {
                 </button>
             )}
 
-            {/* Floating chat button */}
+            {/* Floating chat button — student→teacher chat. Hidden for the course
+                author, who has a dedicated per-student chat on the course page. */}
+            {user && course && user.id !== course.author && (
             <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000 }}>
 
                 {showChat && (
@@ -412,6 +421,7 @@ function LessonViewer() {
                     💬
                 </button>
             </div>
+            )}
         </>
     );
 }
