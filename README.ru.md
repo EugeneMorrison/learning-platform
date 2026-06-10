@@ -2,7 +2,7 @@
 
 **[English version](README.md)**
 
-> Интерактивная обучающая платформа по типу Stepik и Google Colab. Построена на Django + React, может встраиваться на внешние сайты через iframe. Чат в реальном времени по WebSocket, редактор кода в стиле PyCharm прямо в браузере, полная история отправок ответов для преподавателя.
+> Интерактивная обучающая платформа по типу Stepik и Google Colab. Построена на Django + React, может встраиваться на внешние сайты через iframe.
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.0.3-green.svg)](https://www.djangoproject.com/)

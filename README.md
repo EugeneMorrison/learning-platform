@@ -2,7 +2,7 @@
 
 **[Русская версия](README.ru.md)**
 
-> An interactive learning platform inspired by Stepik and Google Colab. Built with Django + React, designed to be embedded on external websites via iframe. Real-time chat over WebSockets, PyCharm-style in-browser code editor, and full submission history for teachers.
+> An interactive learning platform inspired by Stepik and Google Colab. Built with Django + React, designed to be embedded on external websites via iframe.
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.0.3-green.svg)](https://www.djangoproject.com/)
