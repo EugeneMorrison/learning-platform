@@ -1400,5 +1400,210 @@
     "is_read": false,
     "created_at": "2026-04-19T13:56:51.902Z"
   }
+},
+{
+  "model": "api.lesson",
+  "pk": "2f8422e4-168b-4f59-9413-d87421896a6b",
+  "fields": {
+    "course": "bd4c4230-f84d-4165-83db-8413112a6811",
+    "title": "Модуль Math",
+    "order_index": 4,
+    "created_at": "2026-06-06T21:22:00.090Z",
+    "updated_at": "2026-06-06T21:22:00.090Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "09a75ad8-3baf-4688-9f9c-1b52441d125c",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "TEXT",
+    "order_index": 1,
+    "content": {
+      "html": "<h1>⭐ <strong>Модуль </strong><code>math </code>⭐</h1><p>Модуль <code>math</code> содержит готовые математические функции и константы.</p><p>Например, квадратный корень или число π.&nbsp;</p><p>Перед использованием модуль нужно сначала подключить.</p><p>Это называется <strong>импортировать модуль</strong>.</p><h2><strong>Способ 1. Подключить весь модуль</strong></h2><pre><code class=\"language-python\">import math\n                  </code></pre><p>Теперь, чтобы использовать функции, нужно писать так:</p><pre><code class=\"language-python\">math.название_функции\n                  </code></pre><p>Например:</p><pre><code>import math\n\nprint(math.sqrt(16))\n                  </code></pre><p>То есть мы говорим:</p><blockquote><p><em>возьми функцию </em><code>sqrt()</code><em> из модуля </em><code>math</code><em>.</em></p></blockquote><h2><strong>Способ 2. Импортировать всё сразу</strong></h2><pre><code class=\"language-python\">from math import *\n\n                  </code></pre><p>Теперь писать <code>math.</code> не нужно:</p><pre><code class=\"language-python\">from math import *\n\nprint(sqrt(16))\n\n                  </code></pre><p>Работает, потому что мы импортировали всё содержимое модуля.</p><h2><strong>Способ 3. Импортировать только то, что нужно</strong></h2><p>Например, только <code>sqrt</code> и <code>pi</code>:</p><pre><code class=\"language-python\">from math import sqrt, pi\n                  </code></pre><p>Теперь можно писать так:</p><pre><code class=\"language-python\">from math import sqrt, pi\n\nprint(sqrt(25))\nprint(pi)\n                  </code></pre><p>Но если попытаться использовать другую функцию:</p><pre><code class=\"language-python\">print(sin(1))\n                  </code></pre><p>которую мы не подключили, будет ошибка:</p><pre><code class=\"language-no-highlight\">NameError\n                  </code></pre><h2><strong>Способ 4. Короткое имя модуля</strong></h2><p>Иногда имя модуля делают короче.</p><pre><code class=\"language-python\">import math as m\n                  </code></pre><p>Теперь вместо <code>math</code> пишем <code>m</code>:</p><pre><code class=\"language-python\">import math as m\n\nprint(m.sqrt(25))\nprint(m.pi)\n                  </code></pre><p></p><h2><strong>Зайки, не нужно пытаться запомнить все функции сразу.</strong></h2><p>Лучше <strong>пропустите теорию</strong> ниже и возвращайтесь к ней тогда,&nbsp;когда она действительно понадобится.</p><p>Если нужно быстро найти функцию или тему, используйте <strong>поиск по странице</strong>.</p><p>На&nbsp;Windows или Linux нажмите сочетание клавиш:</p><pre><code class=\"language-no-highlight\">Ctrl + F\n                  </code></pre><p>На Mac нажмите:</p><pre><code class=\"language-no-highlight\">Cmd + F\n                  </code></pre><p>После этого:</p><ul><li><p>Вверху страницы появится строка поиска.</p></li><li><p>Начните вводить нужное слово (например: <code>sqrt</code>, <code>random</code>, <code>shuffle</code>).</p></li><li><p>Браузер автоматически подсветит все совпадения на странице.</p></li></ul><p>Так вы сможете быстро найти нужную информацию, не перечитывая весь урок.</p><h2><strong>✔️&nbsp;</strong><code>sqrt(x)</code></h2><p>Вычисляет&nbsp;<strong>квадратный корень</strong> числа <code>x</code>.</p><p>То есть какое число нужно умножить само на себя, чтобы получилось <code>x</code>?&nbsp;</p><p>Тип возвращаемого числа <code>float</code>.</p><pre><code class=\"language-python\">​import math \n\nmath.sqrt(16)  # 4.0\nmath.sqrt(144)  # 12.0\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>ceil(x)</code></h2><p><strong>Округляет </strong>дробное&nbsp;число <code>x</code>&nbsp;<strong>вверх</strong> до ближайшего целого.&nbsp;</p><p>Тип возвращаемого числа&nbsp;&nbsp;<code>int</code>.</p><pre><code class=\"language-python\">from math import *\n\nceil(5)&nbsp;# 5\nceil(5.2)  # 6\nceil(5.8)  # 6\nceil(-5.2)  # -5\nceil(-5.8)  # -5\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>floor(x)</code></h2><p><strong>Округляет </strong>дробное&nbsp;число <code>x</code>&nbsp;<strong>вниз&nbsp;</strong>до ближайшего целого.&nbsp;</p><p>Тип возвращаемого числа&nbsp;&nbsp;<code>int</code>.</p><pre><code class=\"language-python\">from math import floor\n\nfloor(5)  # 5\nfloor(5.2)  # 5\nfloor(5.8)  # 5\nfloor(-5.2)  # -6\nfloor(-5.8)  # -6\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>fabs(x)</code></h2><p>Вычисляет&nbsp;<strong>модуль</strong>&nbsp;дробного&nbsp;числа <code>x</code>, то есть расстояние от <code>х</code> до нуля.&nbsp;</p><p>Тип возвращаемого числа&nbsp;&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">import math as m\n\nm.fabs(-3.1415)  # 3.1415\nm.fabs(2.71828)  # 2.71828\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>copysign(x, y)</code></h2><p><strong>Копирует знак</strong> у&nbsp;<code>y</code>&nbsp;и применяет&nbsp;его к <code>x</code>.</p><p>Тип возвращаемого числа&nbsp;&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">​import math\n\nmath.copysign(3, -7)  # -3.0\nmath.copysign(-25.5, -1)  # -25.5\nmath.copysign(-12, 87)  # 12.0\nmath.copysign(0, -5)  # -0.0\nmath.copysign(3.15, 12.786)  # 3.15\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>factorial(x)</code></h2><p>Вычисляет&nbsp;<strong>факториал</strong> целого&nbsp;числа&nbsp;<code>x</code>, то есть произведение всех положительных целых чисел от 1 до <code>х</code> включительно.&nbsp;</p><p>Тип возвращаемого числа&nbsp;&nbsp;<code>int</code>.</p><pre><code class=\"language-python\">from math import *\n\nfactorial(5)  # 120 (5! = 1 * 2 * 3 * 4 * 5 = 120)\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>fmod(x, y)</code></h2><p>Вычисляет&nbsp;<strong>остаток от деления</strong>&nbsp;дробных чисел.</p><p>Тип возвращаемого числа&nbsp;&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">import math as mth\n\nmth.fmod(5.5, 2)  # 1.5\nmth.fmod(-10.8, 3.1)  # -1.5\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>modf(x)</code></h2><p><strong>Разделяет </strong>число&nbsp;<code>x</code>&nbsp;<strong>на целую и дробную части</strong>, возвращая их в виде:</p><p><code>(дробная часть, целая часть)</code> – это называется кортеж.</p><pre><code class=\"language-python\">import math\n\na, b = math.modf(4.5)\nprint(a, b)  # 0.5 4.0\n\nx, y = math.modf(-3.25)\nprint(x, y)  # -0.25 -3.0\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>fsum()</code></h2><p>Вычисляет сумму вещественных чисел <strong>с повышенной точностью</strong>.</p><p>В отличие от обычной функции <code>sum()</code>, использует специальный алгоритм,<br>который <strong>уменьшает ошибки округления при работе с числами типа </strong><code>float</code>.</p><p>Тип возвращаемого числа&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">import math\n\nmath.fsum([0.1, 0.2, 0.3])  # 0.6\nmath.fsum([7.2, 3.8, -4.7, -5.4])  # 0.9\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>prod()</code></h2><p>Вычисляет <strong>произведение </strong>всех элементов списка. Эта функция аналогична <code>sum()</code>, но вместо суммы вычисляет произведение.</p><p>Тип возвращаемого значения: <code>int</code> или <code>float</code>.</p><pre><code class=\"language-python\">import math\n\nprint(math.prod([1, 2, 3, 4, 5]))# 120 (1 * 2 * 3 * 4 * 5)\nprint(math.prod([1.5, 2, 3])) &nbsp;  # 9.0 (1.5 * 2 * 3)\nprint(math.prod([7])) &nbsp;          # 7 (произведение одного числа — это само число)\nprint(math.prod([])) &nbsp;           # 1 (по определению произведение пустого множества равно 1)\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>comb(n, k)</code></h2><p>Возвращает количество сочетаний из <code>n</code> по <code>k</code>. Сочетание — это способ выбрать <code>k</code> элементов из <code>n</code>, где порядок не важен.</p><p>Тип возвращаемого числа&nbsp;<code>int</code>.</p><p>Формула сочетаний:&nbsp;</p><img src=\"http://127.0.0.1:8000/media/lesson_images/4ec45a8d8aee4b019bfb21b6317c5870.png\"><p><strong>Простой пример:</strong></p><p>У вас есть <strong>3 фрукта</strong>: 🍎 (яблоко), 🍌 (банан), 🍓 (клубника).<br>Вы хотите выбрать <strong>2 фрукта</strong>, и порядок <strong>не имеет значения</strong>.</p><p>Возможные сочетания:</p><ol><li><p>🍎 и 🍌</p></li><li><p>🍎 и 🍓</p></li><li><p>🍌 и 🍓</p></li></ol><p><strong>Итого:</strong> 3 сочетания.</p><pre><code class=\"language-python\">import math\n\n# Сочетания из 5 элементов по 2\nprint(math.comb(5, 2)) &nbsp;# 10 (возможные пары: {1,2}, {1,3}, {1,4}, {1,5}, {2,3}, и т.д.)\n\n# Сочетания, если n = k\nprint(math.comb(4, 4)) &nbsp;# 1 (есть только один способ выбрать все 4 элемента)\n\n# Сочетания, если k = 0\nprint(math.comb(6, 0)) &nbsp;# 1 (есть только один способ выбрать ничего — пустое множество)\n\n# Сочетания, если k &gt; n\nprint(math.comb(3, 5)) &nbsp;# 0 (невозможно выбрать 5 элементов из 3)\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>perm(n, k)</code></h2><p>Возвращает количество размещений из <code>n</code> по <code>k</code>. Размещения — это способ выбрать <code>k</code> элементов из <code>n</code>, где порядок важен.</p><p>Тип возвращаемого числа&nbsp;<code>int</code>.</p><p>Формула размещений:&nbsp;</p><img src=\"http://127.0.0.1:8000/media/lesson_images/6a9155eb3fa245da8d38361a929ee5b1.png\"><p><strong>Простой пример:</strong></p><p>У вас есть <strong>3 фрукта</strong>: 🍎 (яблоко), 🍌 (банан), 🍓 (клубника).<br>Вы хотите выбрать <strong>2 фрукта</strong>, и порядок <strong>имеет значение</strong>.</p><p>Возможные размещения:</p><ol><li><p>🍎 и 🍌</p></li><li><p>🍎 и 🍓</p></li><li><p>🍌 и 🍎</p></li><li><p>🍌 и 🍓</p></li><li><p>🍓 и 🍎</p></li><li><p>🍓 и 🍌</p></li></ol><p><strong>Итого:</strong> 6 размещений.</p><pre><code class=\"language-python\">import math\n\n# Размещения из 5 элементов по 2\nprint(math.perm(5, 2))  # 20 (например: {1,2}, {1,3}, {2,1}, {2,3}, и т.д.)\n\n# Размещения, если n = k\nprint(math.perm(4, 4))  # 24 (все возможные перестановки элементов множества)\n\n# Размещения, если k = 0\nprint(math.perm(6, 0))  # 1 (есть только один способ выбрать ничего — пустое множество)\n\n# Размещения, если k &gt; n\nprint(math.perm(3, 5))  # 0 (невозможно выбрать 5 элементов из 3)\n\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>gcd(x, y)</code></h2><p>Возвращает наибольший общий делитель (НОД) двух чисел. НОД - это самое большое число, на которое оба числа делятся без остатка.</p><p>Тип возвращаемого числа&nbsp;<code>int</code>.</p><pre><code class=\"language-python\">import math\n\nprint(math.gcd(12, 18)) &nbsp;# 6 (так как 6 — наибольшее число, на которое делятся 12 и 18)\nprint(math.gcd(-24, 36)) # 12 (отрицательное число не влияет на результат)\nprint(math.gcd(0, 15)) &nbsp; # 15 (НОД любого числа и нуля равен числу)\nprint(math.gcd(0, 0)) &nbsp;  # 0 (нет общего делителя)\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>lcm()</code></h2><p>Вычисляет <strong>наименьшее общее кратное (НОК)</strong> переданных чисел. НОК — это наименьшее число, которое делится на каждое из переданных чисел без остатка.</p><p>Тип возвращаемого числа&nbsp;<code>int</code>.</p><pre><code class=\"language-python\">import math\n\nprint(math.lcm(12, 18))     # 36 (наименьшее число, делящееся на 12 и 18)\nprint(math.lcm(4, 5, 6))    # 60 (наименьшее общее кратное чисел 4, 5 и 6)\nprint(math.lcm(7))          # 7\nprint(math.lcm(0, 8, 12))   # 0 (НОК с нулем всегда равен нулю)\nprint(math.lcm(-4, 6))      # 12\nprint(math.lcm(-3, -9, 15)) # 45\n                  </code></pre><h2><strong>✔️&nbsp;</strong><code>hypot(a, b)</code></h2><p>Вычисляет&nbsp;<strong>длину гипотенузы</strong> <code>c</code> прямоугольного треугольника с катетами&nbsp;<code>a</code>&nbsp;и&nbsp;<code>b</code>.              </p><img src=\"http://127.0.0.1:8000/media/lesson_images/60e71937855e4173951fcd0d8abcbb10.png\"><p>Тип возвращаемого числа&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">from math import hypot\n\nhypot(3, 4)  # 5.0\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>degrees(x)</code></h2><p>Переводит угол из <strong>радианов в градусы</strong>.</p><p>Тип возвращаемого числа&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">import math\n\nmath.degrees(3.14)  # ~180.0\n                  </code></pre><ul><li><p></p></li></ul><h2><strong>✔️&nbsp;</strong><code>radians(x)</code></h2><p>Переводит угол из <strong>градусов в радианы</strong>.</p><p>Тип возвращаемого числа&nbsp;<code>float</code>.</p><pre><code class=\"language-python\">from math import *\n\nradians(180)  # ~3.14159</code></pre><p></p>"
+    },
+    "created_at": "2026-06-06T21:27:42.630Z",
+    "updated_at": "2026-06-07T17:24:56.292Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "98572b03-6b9f-4d97-9f5a-0644201a870d",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "QUIZ",
+    "order_index": 2,
+    "content": {
+      "question": "<p>Вы написали программу: </p><pre><code>print(sqrt(25)) </code></pre><p>Ожидалось, что она выведет: </p><pre><code>5 </code></pre><p>Но появилась ошибка: </p><pre><code>NameError: name 'sqrt' is not defined </code></pre><p>Почему это произошло?</p>",
+      "options": [
+        "Потому что функция sqrt работает только с дробными числами.",
+        "Потому что забыли подключить модуль math.",
+        "Потому что нужно было написать sqrt = 25 перед print().",
+        "Потому что print() не умеет выводить результат математических функций их модуля math."
+      ],
+      "correct_answer": 1,
+      "explanation": ""
+    },
+    "created_at": "2026-06-06T21:39:25.006Z",
+    "updated_at": "2026-06-07T18:13:04.123Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "52c50576-481d-49f6-ac79-74d0d80a72b3",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "CODE",
+    "order_index": 3,
+    "content": {
+      "prompt": "<h3><strong>Округлятор</strong></h3><p>На вход программе подается <strong>одно вещественное число</strong> <code>n</code>.</p><p>Напишите программу, которая выводит:</p><ol><li><p>Целую часть числа <code>n</code>.</p></li><li><p>Дробную часть числа <code>n</code>&nbsp;(то, что идёт после запятой).</p></li><li><p>Число <code>n</code>, округленное в меньшую сторону.</p></li><li><p>Число <code>n</code>, округленное в большую сторону.</p></li><li><p>Число <code>n</code>, округленное до ближайшего целого числа.</p></li><li><p>Число <code>n</code>, округленное с точностью до 3 знаков после запятой.&nbsp;</p></li></ol><p></p>",
+      "starter_code": "# Ваш код здесь\n",
+      "solution": "",
+      "tests": [
+        {
+          "input": "3.1415926",
+          "expected": "3\n0.14159260000000007\n3\n4\n3\n3.142"
+        },
+        {
+          "input": "-8.9999999",
+          "expected": "-8\n-0.9999999000000006\n-9\n-8\n-9\n-9.0"
+        },
+        {
+          "input": "2.5",
+          "expected": "2\n0.5\n2\n3\n2\n2.5"
+        },
+        {
+          "input": "3.5",
+          "expected": "3\n0.5\n3\n4\n4\n3.5"
+        }
+      ]
+    },
+    "created_at": "2026-06-06T21:44:02.797Z",
+    "updated_at": "2026-06-06T21:44:02.797Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "e653313c-4e5f-4349-ad95-f680f1c9ecd6",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "CODE",
+    "order_index": 4,
+    "content": {
+      "prompt": "<h3><strong>Выбор игроков для команды: сочетания и размещения</strong></h3><p>В онлайн-игру зашло <code>n</code> игроков. Необходимо сформировать команду из <code>m</code> игроков.</p><p>На вход программе подаются <strong>2 целых числа</strong>, каждое на отдельной строке:</p><ol><li><p>Количество игроков, зашедших в игру <code>n</code>;</p></li><li><p>Количество игроков, которые должны попасть в команду&nbsp;<code>m</code>.</p></li></ol><p>Напишите программу, которая:&nbsp;</p><ul><li><p>Вычисляет <strong>количество сочетаний</strong> — число способов выбрать <code>m</code> игроков из <code>n</code>, если порядок не важен.</p></li><li><p>Вычисляет <strong>количество размещений</strong> — число способов выбрать и упорядочить <code>m</code> игроков из <code>n</code>, если порядок важен.</p></li><li><p>Выводит результат в формате:</p><pre><code class=\"language-no-highlight\">Количество сочетаний: &lt;значение&gt;\nКоличество размещений: &lt;значение&gt;</code></pre></li></ul><p></p>",
+      "starter_code": "# Ваш код здесь\n",
+      "solution": "",
+      "tests": [
+        {
+          "input": "4\n2",
+          "expected": "Количество сочетаний: 6\nКоличество размещений: 12"
+        },
+        {
+          "input": "20\n4",
+          "expected": "Количество сочетаний: 4845\nКоличество размещений: 116280"
+        },
+        {
+          "input": "123\n2",
+          "expected": "Количество сочетаний: 7503\nКоличество размещений: 15006"
+        }
+      ]
+    },
+    "created_at": "2026-06-06T21:44:57.050Z",
+    "updated_at": "2026-06-06T21:44:57.050Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "49b4de66-af86-4ae6-af02-57c9a717f293",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "FILL",
+    "order_index": 5,
+    "content": {
+      "prompt": "<ul><li><p><code>ceil(x)</code> — округляет дробное&nbsp;число <code>x</code>&nbsp;<strong>вверх </strong>до ближайшего целого.</p></li><li><p><code>floor(x)</code> — округляет дробное&nbsp;число <code>x</code>&nbsp;<strong>вниз </strong>до ближайшего целого.&nbsp;</p></li></ul><p></p>",
+      "template": "Подключите модуль math так, чтобы функции использовались через math.:\n{{import math}}\n\nПодключите модуль math так, чтобы можно было использовать его функции без math. и других префиксов:\n{{from math import *}}\n\nПодключите из модуля math только функции округления вверх и вниз так, чтобы их можно было писать без math.:\n{{from math import ceil, floor}}\n\nПодключите модуль math дав ему короткое имя m, чтобы функции вызывались через m.:\n{{import math as m}}",
+      "case_sensitive": false,
+      "explanation": ""
+    },
+    "created_at": "2026-06-09T21:20:04.365Z",
+    "updated_at": "2026-06-09T21:25:28.824Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "6b99fd5f-50d9-42a4-a542-4a6713158c98",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "FILL",
+    "order_index": 6,
+    "content": {
+      "prompt": "<p>Модуль подключили так:</p><pre><code class=\"language-haskell\">import math               </code></pre><p>Напишите одну строку кода,<br>которая выведет <strong>факториал числа </strong><code>8</code>.</p>",
+      "template": "Заполните пропуски\n\nprint({{math.factorial(8)}})",
+      "case_sensitive": false,
+      "explanation": ""
+    },
+    "created_at": "2026-06-09T21:48:27.948Z",
+    "updated_at": "2026-06-09T21:50:00.577Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "2abb248e-cb04-4aa6-980a-fedf2ec184f7",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "CODE",
+    "order_index": 7,
+    "content": {
+      "prompt": "<p></p><img src=\"https://ucarecdn.stepik.net/d941fc01-95d7-466a-9569-d6229101af86/\" alt=\"\" width=\"60\" height=\"60\"><p>На вход программе подаются&nbsp;<strong>6 целых чисел</strong>, каждое на отдельной строке:</p><ol><li><p><code>x1</code>&nbsp;твоя координата <code>х</code></p></li><li><p><code>y1</code>&nbsp;твоя координата <code>y</code></p></li><li><p><code>z1</code>&nbsp;твоя координата <code>z</code></p></li><li><p><code>x2</code>&nbsp;координата <code>х</code> друга</p></li><li><p><code>y2</code>&nbsp;координата <code>y</code>&nbsp;друга</p></li><li><p><code>z2</code>&nbsp;координата <code>z</code> друга</p></li></ol><p>Напишите программу, которая определит и выведет <strong>в соответствии с тестовыми данными</strong> одно число —<br>расстояние между тобой и другом, <strong>округлённое</strong> до 2 знаков после запятой.</p><p>Расстояние можно вычислить с помощью формулы:</p><img src=\"http://127.0.0.1:8000/media/lesson_images/daac801a99d74161a948e39a1fd65f64.png\"><p></p>",
+      "starter_code": "# Ваш код здесь\n",
+      "solution": "",
+      "tests": [
+        {
+          "input": "10\n20\n30\n40\n50\n60",
+          "expected": "Мои координаты: 10, 20, 30\nКоординаты бро: 40, 50, 60\nРасстояние между нами: 51.96"
+        },
+        {
+          "input": "0\n0\n0\n0\n0\n0",
+          "expected": "Мои координаты: 0, 0, 0\nКоординаты бро: 0, 0, 0\nРасстояние между нами: 0.0"
+        },
+        {
+          "input": "Мои координаты: 0, 0, 0\nКоординаты бро: 0, 0, 0\nРасстояние между нами: 0.0",
+          "expected": "Мои координаты: -65145, 25158, -84\nКоординаты бро: 125897, -23463, 125\nРасстояние между нами: 197132.17"
+        }
+      ]
+    },
+    "created_at": "2026-06-09T21:51:05.668Z",
+    "updated_at": "2026-06-09T21:52:29.960Z"
+  }
+},
+{
+  "model": "api.block",
+  "pk": "5bccd324-2948-426e-9c9d-3551da5c9e19",
+  "fields": {
+    "lesson": "2f8422e4-168b-4f59-9413-d87421896a6b",
+    "type": "CODE",
+    "order_index": 8,
+    "content": {
+      "prompt": "<h3><strong>Расчет критического урона в RPG-игре</strong></h3><p></p><p>В RPG-игре урон персонажа зависит от его уровня и показателя удачи.&nbsp;</p><p>На вход программе поступает <strong>2 числа</strong>, каждое на отдельной строке:&nbsp;</p><ol><li><p>Уровень персонажа <code>level</code>&nbsp;(целое число);</p></li><li><p>Показатель удачи <code>luck</code> (вещественное число от 0 до 1 не включительно).</p></li></ol><p>Напишите программу, которая:</p><ul><li><p>Рассчитывает <strong>базовый урон</strong> персонажа по формуле:</p><img src=\"http://127.0.0.1:8000/media/lesson_images/fe08cd66d73c4a74ad1c494c23409058.png\"></li></ul><ul><li><p>Затем рассчитывает <strong>критический урон</strong> персонажа по формуле:</p></li></ul><img src=\"http://127.0.0.1:8000/media/lesson_images/7067ccae44f24075bb22c1972850ab11.png\"><ul><li><p>Выводит оба результата&nbsp;в соответствии с тестовыми данными (<strong>с округлением</strong> до 2 знаков после запятой).</p></li></ul><p></p>",
+      "starter_code": "# Ваш код здесь\n",
+      "solution": "",
+      "tests": [
+        {
+          "input": "10\n0.5",
+          "expected": "Базовый урон: 34.59\nКритический урон: 89.29"
+        },
+        {
+          "input": "1\n0.23432",
+          "expected": "Базовый урон: 10.0\nКритический урон: 12.34"
+        },
+        {
+          "input": "5\n0.8941",
+          "expected": "Базовый урон: 25.85\nКритический урон: 77.53"
+        }
+      ]
+    },
+    "created_at": "2026-06-09T21:53:47.298Z",
+    "updated_at": "2026-06-09T21:54:05.290Z"
+  }
 }
 ]
