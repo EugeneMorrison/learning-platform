@@ -7,7 +7,7 @@ services:
       - "8000:8000"        # host:container — access at http://localhost:8000
     environment:
       - DEBUG=True
-      - ALLOWED_HOSTS=*
+      - ALLOWED_HOSTS=186.246.9.251
     volumes:
       - db-data:/app/db          # persist SQLite database between restarts
       - media-data:/app/media    # persist author-uploaded lesson images
