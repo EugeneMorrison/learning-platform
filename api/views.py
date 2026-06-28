@@ -71,7 +71,7 @@ def status_view(request):
 
 
 PYTHON_BINARIES = {
-    'Python 3.10': '/usr/bin/python3.10',
+    'Python 3.10': '/usr/local/bin/python3.10',
     'Python 3.12': '/usr/local/bin/python3.12',
 }
 

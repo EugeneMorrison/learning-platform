@@ -19,17 +19,36 @@ RUN npm run build
 
 
 # =============================================================
+# Stage 1b: Official Python 3.10 image (source for the code runner)
+# =============================================================
+# Debian — the base of python:3.12-slim — has no apt package for
+# python3.10, so we pull the official 3.10 image and copy just the
+# interpreter + standard library into the final image below. Pinned
+# to the same Debian release (bookworm) as the 3.12 base so the
+# shared system libraries (OpenSSL, sqlite, ...) are compatible.
+# =============================================================
+FROM python:3.10-slim-bookworm AS py310
+
+
+# =============================================================
 # Stage 2: Django backend + built React files
 # =============================================================
 # Uses Python to run Django. Copies the React build from stage 1.
 # This is the final image that actually runs.
 # =============================================================
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-# Install Python 3.10 alongside the default 3.12
-RUN apt-get update && apt-get install -y --no-install-recommends python3.10 && rm -rf /var/lib/apt/lists/*
+# --- Python 3.10 for the multi-version code runner -----------------
+# Copy only what's needed to run plain Python 3.10 scripts: the
+# interpreter, its standard library, and the shared libpython. Then
+# refresh the linker cache and assert the binary actually runs (this
+# fails the build early if anything is missing).
+COPY --from=py310 /usr/local/bin/python3.10 /usr/local/bin/python3.10
+COPY --from=py310 /usr/local/lib/python3.10 /usr/local/lib/python3.10
+COPY --from=py310 /usr/local/lib/libpython3.10.so.1.0 /usr/local/lib/libpython3.10.so.1.0
+RUN ldconfig && python3.10 --version
 
 # Install Python dependencies
 COPY requirements.txt .
