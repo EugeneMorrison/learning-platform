@@ -78,6 +78,7 @@ CMD ["bash", "-c", "\
     echo 'Running migrations...' && \
     python manage.py migrate && \
     python manage.py loaddata fixtures.json 2>/dev/null || true && \
+    python manage.py collectstatic --noinput && \
     echo 'Starting server on port 8000...' && \
     exec python manage.py runserver 0.0.0.0:8000 \
 "]
