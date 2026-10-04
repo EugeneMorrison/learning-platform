@@ -20,12 +20,15 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['title', 'author', 'is_published', 'created_at']
+    list_display = ['title', 'slug', 'price', 'old_price', 'sort_order', 'is_published', 'created_at']
+    list_editable = ['price', 'sort_order']  # tweak pricing/order straight from the list
     list_filter = ['is_published', 'created_at']
     search_fields = ['title', 'description']
-    ordering = ['-created_at']
+    ordering = ['sort_order', '-created_at']
 
-    # Show related lessons in course detail page
+    # NOTE: no prepopulated_fields for slug — the admin's JS prepopulate strips
+    # non-ASCII, so Cyrillic titles would yield empty slugs. Leaving slug blank
+    # lets Course.save() transliterate it server-side instead.
     readonly_fields = ['created_at', 'updated_at']
 
 

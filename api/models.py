@@ -12,6 +12,7 @@ Model Relationships:
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from slugify import slugify
 
 
 # =============================================================================
@@ -87,6 +88,54 @@ class Course(models.Model):
         help_text="Course description/overview"
     )
 
+    # --- Sales / landing-page fields -------------------------------------
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        blank=True,  # Left blank in admin → auto-filled (transliterated) in save()
+        help_text="URL identifier; auto-generated from the title (transliterated) when left blank"
+    )
+
+    tagline = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text="Short marketing subtitle shown on the course card"
+    )
+
+    cover = models.ImageField(
+        upload_to="covers/",
+        blank=True,
+        help_text="Cover image for the course card (stored under MEDIA_ROOT/covers/)"
+    )
+
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Price in rubles (0 = free)"
+    )
+
+    old_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Original price for a strikethrough discount; leave empty if none"
+    )
+
+    sort_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Manual ordering on the landing page (lower = earlier)"
+    )
+
+    stepik_id = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        help_text="Linked Stepik course id, if the course also lives on Stepik"
+    )
+    # ---------------------------------------------------------------------
+
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,  # If user deleted, delete courses
@@ -104,10 +153,33 @@ class Course(models.Model):
 
     class Meta:
         db_table = 'courses'
-        ordering = ['-created_at']  # Newest first by default
+        ordering = ['sort_order', '-created_at']  # Manual order first, then newest
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_free(self):
+        """True when the course costs nothing. Computed, NOT a DB column."""
+        return self.price == 0
+
+    def save(self, *args, **kwargs):
+        """Fill a unique slug from the (transliterated) title when left blank."""
+        if not self.slug:
+            self.slug = self._generate_unique_slug()
+        super().save(*args, **kwargs)
+
+    def _generate_unique_slug(self):
+        """Transliterate the title to a slug, falling back to 'course' for
+        titles that transliterate to nothing, and dedupe with a -N suffix.
+        Caps the base at 250 chars so the suffix fits SlugField's 255 limit."""
+        base = (slugify(self.title or '')[:250].rstrip('-')) or 'course'
+        slug = base
+        n = 2
+        while Course.objects.exclude(pk=self.pk).filter(slug=slug).exists():
+            slug = f"{base}-{n}"
+            n += 1
+        return slug
 
 
 # =============================================================================
