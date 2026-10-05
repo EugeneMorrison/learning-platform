@@ -1,0 +1,64 @@
+{% load i18n static %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% translate "[Название]" %}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{% translate "Онлайн-курсы с практикой прямо в браузере." %}{% endblock %}">
+  <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+  <link rel="preload" href="{% static 'public/fonts/golos-text-cyrillic-400.woff2' %}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{% static 'public/css/fonts.css' %}">
+  <link rel="stylesheet" href="{% static 'public/css/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'public/css/base.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="site-logo" href="{% url 'landing' %}">{% translate "[Название]" %}</a>
+
+      <nav class="site-nav" aria-label="{% translate "Основная навигация" %}">
+        <ul class="site-nav__list">
+          <li><a class="site-nav__link" href="{% url 'landing' %}#courses">{% translate "Курсы" %}</a></li>
+          <li><a class="site-nav__link" href="{% url 'landing' %}#how">{% translate "Как это устроено" %}</a></li>
+          <li><a class="site-nav__link" href="{% url 'landing' %}#reviews">{% translate "Отзывы" %}</a></li>
+          <li><a class="site-nav__link" href="{% url 'landing' %}#faq">{% translate "Вопросы" %}</a></li>
+        </ul>
+      </nav>
+
+      <div class="site-header__actions">
+        {# Django's set_language view: stores the choice and redirects to "next" in the new language. #}
+        <form class="lang-switch" action="{% url 'set_language' %}" method="post" aria-label="{% translate "Язык сайта" %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button class="lang-switch__btn" type="submit" name="language" value="ru" lang="ru"
+                  aria-pressed="{% if LANGUAGE_CODE == 'ru' %}true{% else %}false{% endif %}">RU</button>
+          <button class="lang-switch__btn" type="submit" name="language" value="en" lang="en"
+                  aria-pressed="{% if LANGUAGE_CODE == 'en' %}true{% else %}false{% endif %}">EN</button>
+        </form>
+        {# React login page (client-side route served by spa_view). #}
+        <a class="btn btn-primary" href="/login/">{% translate "Войти" %}</a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      <div>
+        <p class="site-footer__name">{% translate "[Название]" %}</p>
+        <p class="site-footer__legal">{% translate "[Юридическое лицо, ИНН, ОГРН]" %}</p>
+      </div>
+      <ul class="site-footer__links">
+        {# Legal pages arrive in a later step; links are placeholders until then. #}
+        <li><a href="#">{% translate "Публичная оферта" %}</a></li>
+        <li><a href="#">{% translate "Политика обработки персональных данных" %}</a></li>
+        <li><a href="#">{% translate "Контакты" %}</a></li>
+      </ul>
+    </div>
+  </footer>
+</body>
+</html>

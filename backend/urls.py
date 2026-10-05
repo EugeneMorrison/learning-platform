@@ -2,18 +2,23 @@
 Main URL Configuration for Learning Platform
 
 Includes:
+- Landing page: / (Russian) and /en/ (English), rendered by Django
+- Language switch: /i18n/setlang/ (Django's set_language view)
 - Admin panel: /admin/
 - API endpoints: /api/
 - Auth endpoints: /api/auth/
 - Lesson viewer: /lesson/<uuid>/ (serves React app, embeddable via iframe)
 """
 
+from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.shortcuts import render
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.static import serve
 from django.conf import settings
+
+from .views import landing_view
 
 
 @xframe_options_exempt
@@ -39,6 +44,17 @@ urlpatterns = [
     # Serve author-uploaded media (lesson images). Explicit serve() works under
     # Daphne regardless of DEBUG; must come before the SPA catch-all below.
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    path('i18n/', include('django.conf.urls.i18n')),  # set_language for the RU/EN switch
+]
+
+# Django-rendered public pages. Russian has no prefix (/), English gets /en/.
+# Must come before the SPA catch-all, which would otherwise answer at /.
+urlpatterns += i18n_patterns(
+    path('', landing_view, name='landing'),
+    prefix_default_language=False,
+)
+
+urlpatterns += [
     # Catch-all for client-side React Router routes (/login/, /register/, /dashboard/, /courses/...)
     # Must be last — Django checks urlpatterns in order, so this only matches what nothing above did.
     re_path(r'^(?!api/|admin/|api-auth/|media/|static/).*$', spa_view, name='spa-fallback'),

@@ -63,6 +63,9 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # After sessions, before common: picks the language from the URL prefix
+    # (/en/...) for i18n_patterns, otherwise falls back to LANGUAGE_CODE.
+    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -77,6 +80,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             BASE_DIR / 'templates',
+            BASE_DIR / 'backend' / 'templates',  # Django-rendered public pages (landing, ...)
             BASE_DIR / 'frontend' / 'dist',  # React build output (index.html)
         ],
         'APP_DIRS': True,
@@ -140,7 +144,18 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+# Russian is the default and lives at / (prefix_default_language=False in
+# backend/urls.py); English lives at /en/.
+LANGUAGE_CODE = 'ru'
+
+LANGUAGES = [
+    ('ru', 'Русский'),
+    ('en', 'English'),
+]
+
+LOCALE_PATHS = [
+    BASE_DIR / 'backend' / 'locale',
+]
 
 TIME_ZONE = 'UTC'
 
@@ -206,6 +221,7 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
+    BASE_DIR / 'backend' / 'static',  # public pages: /static/public/...
     BASE_DIR / 'frontend' / 'dist',  # React build output: /static/assets/...
 ]
 

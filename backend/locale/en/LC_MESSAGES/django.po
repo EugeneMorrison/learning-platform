@@ -1,0 +1,75 @@
+# English translations for the public pages (landing, course and legal pages).
+# Source strings (msgid) are Russian. Regenerate with:
+#   python manage.py makemessages -l en --ignore=.venv --ignore=frontend --ignore=staticfiles
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: learning_embedded_app public pages\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-06 00:01+0300\n"
+"PO-Revision-Date: 2026-10-06 00:05+0300\n"
+"Last-Translator: \n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#:.\backend\templates\public\base.html:6
+#: .\backend\templates\public\base.html:18
+#: .\backend\templates\public\base.html:52
+msgid "[Название]"
+msgstr "[Name]"
+
+#: .\backend\templates\public\base.html:7
+msgid "Онлайн-курсы с практикой прямо в браузере."
+msgstr "Online courses with hands-on practice right in your browser."
+
+#: .\backend\templates\public\base.html:20
+msgid "Основная навигация"
+msgstr "Main navigation"
+
+#: .\backend\templates\public\base.html:22
+msgid "Курсы"
+msgstr "Courses"
+
+#: .\backend\templates\public\base.html:23
+msgid "Как это устроено"
+msgstr "How it works"
+
+#: .\backend\templates\public\base.html:24
+msgid "Отзывы"
+msgstr "Reviews"
+
+#: .\backend\templates\public\base.html:25
+msgid "Вопросы"
+msgstr "FAQ"
+
+#: .\backend\templates\public\base.html:31
+msgid "Язык сайта"
+msgstr "Site language"
+
+#: .\backend\templates\public\base.html:40
+msgid "Войти"
+msgstr "Log in"
+
+#: .\backend\templates\public\base.html:53
+msgid "[Юридическое лицо, ИНН, ОГРН]"
+msgstr "[Legal entity, tax and registration numbers]"
+
+#: .\backend\templates\public\base.html:57
+msgid "Публичная оферта"
+msgstr "Public offer"
+
+#: .\backend\templates\public\base.html:58
+msgid "Политика обработки персональных данных"
+msgstr "Personal data processing policy"
+
+#: .\backend\templates\public\base.html:59
+msgid "Контакты"
+msgstr "Contacts"
+
+#: .\backend\templates\public\landing.html:5
+msgid "Главный экран"
+msgstr "Hero"
