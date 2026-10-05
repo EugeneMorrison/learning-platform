@@ -64,6 +64,24 @@ a {
   outline-offset: var(--space-1);
 }
 
+/* Hidden visually, still read by screen readers. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Vertical rhythm for top-level page sections. */
+.page-section {
+  padding: var(--space-8) 0;
+}
+
 .container {
   width: 100%;
   max-width: var(--container-width);
@@ -95,6 +113,17 @@ a {
 
 .btn-primary:hover {
   background: var(--color-ink);
+}
+
+.btn-secondary {
+  background: var(--color-ground);
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .pill {

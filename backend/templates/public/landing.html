@@ -1,10 +1,83 @@
 {% extends "public/base.html" %}
-{% load i18n %}
+{% load i18n static %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/landing.css' %}">
+{% endblock %}
 
 {% block content %}
-  <section class="hero" aria-label="{% translate "Главный экран" %}">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="container hero__inner">
+      <div class="hero__text">
+        {# TODO: copy from Lyudmila #}
+        <h1 id="hero-title" class="hero__title">{% translate "Учитесь программированию шаг за шагом" %}</h1>
+        {# TODO: copy from Lyudmila #}
+        <p class="hero__lead">{% translate "Короткие уроки и практика прямо в браузере: каждый шаг ведёт к следующему." %}</p>
+        <div class="hero__actions">
+          <a class="btn btn-primary" href="#catalog">{% translate "Смотреть курсы" %}</a>
+          {# React login page (client-side route served by spa_view). #}
+          <a class="btn btn-secondary" href="/login/">{% translate "Войти в аккаунт" %}</a>
+        </div>
+      </div>
+
+      {# Decorative learning path, direction C. #}
+      <ol class="hero-path" aria-hidden="true">
+        <li class="hero-path__step">01</li>
+        <li class="hero-path__step">02</li>
+        <li class="hero-path__step hero-path__step--goal">03</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="catalog" class="catalog" aria-labelledby="catalog-title">
     <div class="container">
-      {# Hero content comes in step 3. #}
+      <h2 id="catalog-title" class="catalog__title">{% translate "Курсы" %}</h2>
+
+      {% if courses %}
+        <ol class="catalog__list">
+          {% for course in courses %}
+            <li>
+              <a class="course-card" href="{% url 'course_detail' slug=course.slug %}">
+                <div class="course-card__media">
+                  {% if course.cover %}
+                    {# Fixed 16:9 box; width/height reserve space so the grid doesn't shift. #}
+                    <img class="course-card__cover" src="{{ course.cover.url }}"
+                         alt="{% blocktranslate with title=course.title %}Обложка курса «{{ title }}»{% endblocktranslate %}"
+                         width="640" height="360" loading="lazy">
+                  {% else %}
+                    <div class="course-card__fallback" aria-hidden="true">{{ course.title|first|upper }}</div>
+                  {% endif %}
+                </div>
+
+                <div class="course-card__body">
+                  <span class="course-card__step">{{ forloop.counter|stringformat:"02d" }}</span>
+                  <h3 class="course-card__title">{{ course.title }}</h3>
+                  {% if course.tagline %}
+                    <p class="course-card__tagline">{{ course.tagline }}</p>
+                  {% endif %}
+
+                  <div class="course-card__meta">
+                    {# Not blocktranslate count: Russian msgids would get English plural rules. #}
+                    <span class="pill">{% translate "Уроков:" %} {{ course.lesson_count }}</span>
+                    <span class="course-card__price">
+                      {% if course.is_free %}
+                        {% translate "Бесплатно" %}
+                      {% else %}
+                        {% if course.old_price_label %}
+                          <s class="course-card__old-price"><span class="visually-hidden">{% translate "Старая цена:" %} </span>{{ course.old_price_label }}</s>
+                        {% endif %}
+                        {{ course.price_label }}
+                      {% endif %}
+                    </span>
+                  </div>
+                </div>
+              </a>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="catalog__empty">{% translate "Курсы скоро появятся. Загляните позже." %}</p>
+      {% endif %}
     </div>
   </section>
 {% endblock %}

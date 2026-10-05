@@ -3,6 +3,7 @@ Main URL Configuration for Learning Platform
 
 Includes:
 - Landing page: / (Russian) and /en/ (English), rendered by Django
+- Course page: /course/<slug>/ and /en/course/<slug>/ (Django)
 - Language switch: /i18n/setlang/ (Django's set_language view)
 - Admin panel: /admin/
 - API endpoints: /api/
@@ -18,7 +19,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.static import serve
 from django.conf import settings
 
-from .views import landing_view
+from .views import course_detail_view, landing_view
 
 
 @xframe_options_exempt
@@ -51,6 +52,7 @@ urlpatterns = [
 # Must come before the SPA catch-all, which would otherwise answer at /.
 urlpatterns += i18n_patterns(
     path('', landing_view, name='landing'),
+    path('course/<slug:slug>/', course_detail_view, name='course_detail'),
     prefix_default_language=False,
 )
 

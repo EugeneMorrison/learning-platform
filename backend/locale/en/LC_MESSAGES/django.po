@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 00:01+0300\n"
-"PO-Revision-Date: 2026-10-06 00:05+0300\n"
+"POT-Creation-Date: 2026-10-06 01:18+0300\n"
+"PO-Revision-Date: 2026-10-06 01:20+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
 "Language: en\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#:.\backend\templates\public\base.html:6
+#: .\backend\templates\public\base.html:6
 #: .\backend\templates\public\base.html:18
 #: .\backend\templates\public\base.html:52
 msgid "[Название]"
@@ -31,6 +31,7 @@ msgid "Основная навигация"
 msgstr "Main navigation"
 
 #: .\backend\templates\public\base.html:22
+#: .\backend\templates\public\landing.html:34
 msgid "Курсы"
 msgstr "Courses"
 
@@ -70,6 +71,44 @@ msgstr "Personal data processing policy"
 msgid "Контакты"
 msgstr "Contacts"
 
-#: .\backend\templates\public\landing.html:5
-msgid "Главный экран"
-msgstr "Hero"
+#: .\backend\templates\public\course_detail.html:9
+msgid "Страница курса скоро появится"
+msgstr "The course page is coming soon"
+
+#: .\backend\templates\public\landing.html:13
+msgid "Учитесь программированию шаг за шагом"
+msgstr "Learn to code step by step"
+
+#: .\backend\templates\public\landing.html:15
+msgid ""
+"Короткие уроки и практика прямо в браузере: каждый шаг ведёт к следующему."
+msgstr "Short lessons and practice right in your browser: each step leads to the next."
+
+#: .\backend\templates\public\landing.html:17
+msgid "Смотреть курсы"
+msgstr "Browse courses"
+
+#: .\backend\templates\public\landing.html:19
+msgid "Войти в аккаунт"
+msgstr "Log in to your account"
+
+#: .\backend\templates\public\landing.html:45
+#, python-format
+msgid "Обложка курса «%(title)s»"
+msgstr "Cover of the course “%(title)s”"
+
+#: .\backend\templates\public\landing.html:61
+msgid "Уроков:"
+msgstr "Lessons:"
+
+#: .\backend\templates\public\landing.html:64
+msgid "Бесплатно"
+msgstr "Free"
+
+#: .\backend\templates\public\landing.html:67
+msgid "Старая цена:"
+msgstr "Old price:"
+
+#: .\backend\templates\public\landing.html:79
+msgid "Курсы скоро появятся. Загляните позже."
+msgstr "Courses are coming soon. Check back later."
