@@ -29,8 +29,8 @@
           <p class="course-offer__price">{% include "public/includes/course_price.html" %}</p>
           {# No checkout yet: payments don't exist. #}
           {% if course.is_free %}
-            {# React registration page (client-side route served by spa_view). #}
-            <a class="btn btn-primary" href="/register/">{% translate "Начать бесплатно" %}</a>
+            {# React /enroll/<uuid>/ (served by spa_view): sends anonymous visitors to register, then enrols. #}
+            <a class="btn btn-primary" href="/enroll/{{ course.id }}/">{% translate "Начать бесплатно" %}</a>
           {% elif course.stepik_id %}
             <a class="btn btn-primary" href="https://stepik.org/course/{{ course.stepik_id }}/promo" rel="noopener">{% translate "Доступен на Stepik" %}</a>
           {% else %}

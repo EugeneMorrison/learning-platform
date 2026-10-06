@@ -237,13 +237,22 @@ class CourseDetailTests(PublicPagesTestCase):
 
         self.assertNotContains(response, 'course-description')
 
-    def test_free_course_cta_goes_to_register(self):
+    def test_free_course_cta_goes_to_react_enrol_route(self):
         course = self.make_course('Free', price=0, stepik_id=111)
 
-        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+        ru = self.client.get(f'/course/{course.slug}/')
+        en = self.client.get(f'/en/course/{course.slug}/')
 
-        self.assertContains(response, 'href="/register/">Начать бесплатно</a>')
-        self.assertNotContains(response, 'stepik.org')
+        # Same href in both languages: /enroll/ is a React route, not i18n-prefixed.
+        self.assertContains(ru, f'href="/enroll/{course.id}/">Начать бесплатно</a>')
+        self.assertContains(en, f'href="/enroll/{course.id}/">Start for free</a>')
+        self.assertNotContains(ru, 'stepik.org')
+
+    def test_enrol_route_is_served_by_the_react_app(self):
+        from django.urls import resolve
+        from backend.urls import spa_view
+
+        self.assertIs(resolve('/enroll/3fa85f64-5717-4562-b3fc-2c963f66afa6/').func, spa_view)
 
     def test_priced_course_with_stepik_id_links_to_stepik(self):
         course = self.make_course('On Stepik', price=Decimal('1990'), stepik_id=123456)

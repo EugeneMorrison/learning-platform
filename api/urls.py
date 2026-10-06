@@ -19,7 +19,6 @@ router = DefaultRouter()
 router.register(r'courses', views.CourseViewSet, basename='course')
 router.register(r'lessons', views.LessonViewSet, basename='lesson')
 router.register(r'blocks', views.BlockViewSet, basename='block')
-router.register(r'enrollments', views.EnrollmentViewSet, basename='enrollment')
 router.register(r'progress', views.ProgressViewSet, basename='progress')
 
 urlpatterns = [
@@ -72,9 +71,10 @@ BLOCKS:
 - DELETE /api/blocks/{id}/          → Delete block (owner only)
 
 ENROLLMENTS:
-- GET    /api/enrollments/          → My enrollments
-- POST   /api/enrollments/enroll/   → Enroll in course
-- DELETE /api/enrollments/{id}/     → Unenroll
+- GET    /api/enrollments/              → My enrollments
+- POST   /api/enrollments/              → Self-enrol in a published free course (students only)
+- DELETE /api/enrollments/{course_id}/  → Unenroll
+- POST   /api/courses/{id}/enroll_student/ → Teacher enrols a student by username
 
 PROGRESS:
 - GET    /api/progress/             → My progress

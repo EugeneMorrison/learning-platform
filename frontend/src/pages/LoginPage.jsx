@@ -1,19 +1,22 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { login } from '../api';
+import { safeNext, withNext } from '../lib/safeNext';
 
 function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const next = safeNext(searchParams.get('next'));
 
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
         try {
             await login(username, password);
-            navigate('/dashboard/');
+            navigate(next || '/dashboard/');
         } catch (err) {
             setError('Неверный логин или пароль');
         }
@@ -47,7 +50,7 @@ function LoginPage() {
                 </button>
             </form>
             <p style={{ marginTop: '15px', textAlign: 'center' }}>
-                Нет аккаунта? <Link to="/register/">Зарегистрироваться</Link>
+                Нет аккаунта? <Link to={withNext('/register/', next)}>Зарегистрироваться</Link>
             </p>
         </div>
     );

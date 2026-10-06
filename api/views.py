@@ -12,7 +12,6 @@ ViewSets provide automatic CRUD operations:
 
 from rest_framework import generics, permissions, viewsets, status, filters, views
 from rest_framework.decorators import action, api_view
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -48,6 +47,7 @@ from .permissions import (
     IsPublishedOrAuthor
 )
 from django.utils import timezone
+from django.utils.translation import gettext
 
 # =============================================================================
 # SIMPLE API VIEWS (from Step 1)
@@ -632,67 +632,6 @@ class BlockViewSet(viewsets.ModelViewSet):
 
 
 # =============================================================================
-# ENROLLMENT VIEWSET
-# =============================================================================
-
-class EnrollmentViewSet(viewsets.ModelViewSet):
-    """
-    Manage course enrollments.
-
-    Endpoints:
-    - GET /api/enrollments/ → My enrollments
-    - POST /api/enrollments/ → Enroll in course
-    - DELETE /api/enrollments/{id}/ → Unenroll
-    """
-
-    queryset = Enrollment.objects.all()
-    serializer_class = EnrollmentSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """Students see only their enrollments"""
-        return Enrollment.objects.filter(student=self.request.user)
-
-    def perform_create(self, serializer):
-        """Automatically set student when enrolling"""
-        serializer.save(student=self.request.user)
-
-    @action(detail=False, methods=['post'])
-    def enroll(self, request):
-        """
-        Enroll in a course.
-
-        POST /api/enrollments/enroll/
-        Body: {"course": "course-uuid"}
-        """
-        course_id = request.data.get('course')
-
-        if not course_id:
-            return Response(
-                {'error': 'Course ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        course = get_object_or_404(Course, id=course_id, is_published=True)
-
-        # Check if already enrolled
-        if Enrollment.objects.filter(student=request.user, course=course).exists():
-            return Response(
-                {'message': 'Already enrolled in this course'},
-                status=status.HTTP_200_OK
-            )
-
-        # Create enrollment
-        enrollment = Enrollment.objects.create(
-            student=request.user,
-            course=course
-        )
-
-        serializer = self.get_serializer(enrollment)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-# =============================================================================
 # PROGRESS VIEWSET
 # =============================================================================
 
@@ -781,7 +720,19 @@ def lesson_viewer(request):
 class EnrollmentListCreateView(generics.ListCreateAPIView):
     """
     GET  /api/enrollments/  → student sees their own enrollments
-    POST /api/enrollments/  → student enrolls in a course
+    POST /api/enrollments/  → student self-enrolls in a course
+                              Body: {"course": "<course uuid>"}
+
+    The only self-enrolment endpoint. Rules, in this order:
+    - not authenticated              → 401 (permission class)
+    - role is not STUDENT            → 403
+    - course missing or unpublished  → 404
+    - course not free (price > 0)    → 403 (no payments yet)
+    - already enrolled               → 200 with the existing enrollment
+    - otherwise                      → 201 with the new enrollment
+    Error bodies are {"detail": ..., "course_slug": ...}; course_slug is set when
+    the course is published, so the client can link back to its public page.
+    Teachers enrol students manually via POST /api/courses/{id}/enroll_student/.
     """
     serializer_class = EnrollmentSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -790,13 +741,45 @@ class EnrollmentListCreateView(generics.ListCreateAPIView):
         # Student only sees their own enrollments
         return Enrollment.objects.filter(student=self.request.user)
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
+        course = self._published_course(request.data.get('course'))
+        course_slug = course.slug if course else None
+
+        if request.user.role != 'STUDENT':
+            return Response(
+                {'detail': gettext('Записаться на курс может только учащийся.'),
+                 'course_slug': course_slug},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if course is None:
+            return Response(
+                {'detail': gettext('Курс не найден.'), 'course_slug': None},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if not course.is_free:
+            return Response(
+                {'detail': gettext('Это платный курс: самостоятельно записаться можно только на бесплатные курсы.'),
+                 'course_slug': course_slug},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # get_or_create handles the duplicate race (unique_together) itself,
+        # so a repeated or concurrent request never ends in an IntegrityError.
+        enrollment, created = Enrollment.objects.get_or_create(
+            student=request.user, course=course
+        )
+        return Response(
+            self.get_serializer(enrollment).data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    @staticmethod
+    def _published_course(course_id):
+        """The published course with this id, or None (also for a missing or malformed id)."""
         try:
-            serializer.save(student=self.request.user)
-        except Exception:
-            raise ValidationError("You are already enrolled in this course.")
-        # Automatically set student to the logged-in user
-        serializer.save(student=self.request.user)
+            return Course.objects.get(pk=uuid.UUID(str(course_id)), is_published=True)
+        except (ValueError, Course.DoesNotExist):
+            return None
 
 
 class EnrollmentDeleteView(generics.DestroyAPIView):

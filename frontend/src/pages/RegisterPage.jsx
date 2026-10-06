@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import api from '../api';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import api, { storeTokens } from '../api';
+import { safeNext, withNext } from '../lib/safeNext';
 
 function RegisterPage() {
     const [username, setUsername] = useState('');
@@ -8,13 +9,22 @@ function RegisterPage() {
     const [role, setRole] = useState('STUDENT');
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const next = safeNext(searchParams.get('next'));
 
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
         try {
-            await api.post('/auth/register/', { username, password, role });
-            navigate('/login/');
+            const response = await api.post('/auth/register/', { username, password, role });
+            if (next) {
+                // Register returns tokens: sign in right away so the user lands on
+                // `next` (e.g. /enroll/<id>/) instead of a second login form.
+                storeTokens(response.data.tokens);
+                navigate(next);
+            } else {
+                navigate('/login/');
+            }
         } catch (err) {
             setError('Ошибка регистрации. Попробуйте другое имя пользователя.');
         }
@@ -58,7 +68,7 @@ function RegisterPage() {
                 </button>
             </form>
             <p style={{ marginTop: '15px', textAlign: 'center' }}>
-                Уже есть аккаунт? <Link to="/login/">Войти</Link>
+                Уже есть аккаунт? <Link to={withNext('/login/', next)}>Войти</Link>
             </p>
         </div>
     );

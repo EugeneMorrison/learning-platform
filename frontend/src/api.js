@@ -75,12 +75,16 @@ const AUTH_BASE = import.meta.env.DEV
     ? 'http://127.0.0.1:8000/api/auth'
     : '/api/auth';
 
-export const login = async (username, password) => {
-    const response = await axios.post(`${AUTH_BASE}/login/`, { username, password });
-    const { access, refresh } = response.data.tokens;
+// Save a token pair from /auth/login/ or /auth/register/ and use it right away.
+export const storeTokens = ({ access, refresh }) => {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
     currentToken = access; // Immediately available for the next request
+};
+
+export const login = async (username, password) => {
+    const response = await axios.post(`${AUTH_BASE}/login/`, { username, password });
+    storeTokens(response.data.tokens);
     return response;
 };
 

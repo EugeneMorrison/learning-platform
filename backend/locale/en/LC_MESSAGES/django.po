@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-06 22:46+0300\n"
-"PO-Revision-Date: 2026-10-06 22:50+0300\n"
+"POT-Creation-Date: 2026-10-07 00:26+0300\n"
+"PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
 "Language: en\n"
@@ -15,6 +15,19 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: .\api\views.py:750
+msgid "Записаться на курс может только учащийся."
+msgstr "Only students can enroll in a course."
+
+#: .\api\views.py:756
+msgid "Курс не найден."
+msgstr "Course not found."
+
+#: .\api\views.py:761
+msgid ""
+"Это платный курс: самостоятельно записаться можно только на бесплатные курсы."
+msgstr "This is a paid course: you can only enroll yourself in free courses."
 
 #: .\backend\templates\public\base.html:6
 #: .\backend\templates\public\base.html:19
