@@ -1,0 +1,11 @@
+{% load i18n %}{# "Бесплатно", or the price with old_price struck through when greater. Expects: course with price labels (backend/pricing.py). #}
+<span class="course-price">
+  {% if course.is_free %}
+    {% translate "Бесплатно" %}
+  {% else %}
+    {% if course.old_price_label %}
+      <s class="course-price__old"><span class="visually-hidden">{% translate "Старая цена:" %} </span>{{ course.old_price_label }}</s>
+    {% endif %}
+    {{ course.price_label }}
+  {% endif %}
+</span>

@@ -1,36 +1,24 @@
 """
-Server-rendered public pages (landing now; course and legal pages later).
+Server-rendered public pages (landing and course pages; legal pages later).
 
 Templates live in backend/templates/public/, styles in backend/static/public/.
 The React app is served separately by spa_view / lesson_view in backend/urls.py.
 """
 
-from decimal import Decimal
-
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, render
 
 from api.models import Course
 
-NBSP = ' '
+from .pricing import add_price_labels
 
-
-def format_rub(value):
-    """Format a ruble amount as "1 990 ₽" (non-breaking spaces).
-
-    price/old_price are DecimalField(decimal_places=2). Whole amounts drop the
-    kopecks; non-integer amounts show them with a decimal comma ("1 990,50 ₽")
-    rather than being rounded, so the card never misstates what is charged.
-
-    Done here rather than with intcomma so the price reads the same on / and /en/,
-    and because backend/ is not an installed app (no templatetags).
-    """
-    value = Decimal(value).quantize(Decimal('0.01'))
-    rubles, kopecks = divmod(value, 1)
-    text = f'{int(rubles):,}'.replace(',', NBSP)
-    if kopecks:
-        text += ',' + f'{kopecks:.2f}'[2:]
-    return f'{text}{NBSP}₽'
+# Block types counted on the course page, as (Block.type, annotation name).
+BLOCK_COUNTS = [
+    ('TEXT', 'text_count'),
+    ('QUIZ', 'quiz_count'),
+    ('CODE', 'code_count'),
+    ('FILL', 'fill_count'),
+]
 
 
 def landing_view(request):
@@ -43,16 +31,31 @@ def landing_view(request):
         .order_by('sort_order', 'title')
     )
     for course in courses:
-        course.price_label = format_rub(course.price)
-        course.old_price_label = (
-            format_rub(course.old_price)
-            if course.old_price is not None and course.old_price > course.price
-            else ''
-        )
+        add_price_labels(course)
     return render(request, 'public/landing.html', {'courses': courses})
 
 
 def course_detail_view(request, slug):
-    """Course page. Placeholder template for now; step 4 replaces it (keep URL name)."""
-    course = get_object_or_404(Course, slug=slug, is_published=True)
-    return render(request, 'public/course_detail.html', {'course': course})
+    """Course sales page with the open syllabus. 404 for unpublished or missing courses."""
+    course = add_price_labels(get_object_or_404(Course, slug=slug, is_published=True))
+
+    # One query for the whole syllabus. values() keeps the context to titles and
+    # integer counts: block content (answers, solutions, tests) never reaches the
+    # template.
+    lessons = list(
+        course.lessons.order_by('order_index')
+        .annotate(**{
+            name: Count('blocks', filter=Q(blocks__type=block_type))
+            for block_type, name in BLOCK_COUNTS
+        })
+        .values('title', *(name for _, name in BLOCK_COUNTS))
+    )
+    totals = {
+        name: sum(lesson[name] for lesson in lessons) for _, name in BLOCK_COUNTS
+    }
+
+    return render(request, 'public/course_detail.html', {
+        'course': course,
+        'lessons': lessons,
+        'totals': totals,
+    })

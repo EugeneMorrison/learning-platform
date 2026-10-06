@@ -1,0 +1,6 @@
+{% load i18n %}{# Block counts by type as labels, only for types with count > 0. Expects: counts (text_count, quiz_count, code_count, fill_count). #}
+{# Label form, not blocktranslate count: Russian msgids would get English plural rules. #}
+{% if counts.text_count %}<span class="pill">{% translate "Теория:" %} {{ counts.text_count }}</span>{% endif %}
+{% if counts.quiz_count %}<span class="pill">{% translate "Тесты:" %} {{ counts.quiz_count }}</span>{% endif %}
+{% if counts.code_count %}<span class="pill">{% translate "Задачи:" %} {{ counts.code_count }}</span>{% endif %}
+{% if counts.fill_count %}<span class="pill">{% translate "Пропуски:" %} {{ counts.fill_count }}</span>{% endif %}

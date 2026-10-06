@@ -38,19 +38,10 @@
           {% for course in courses %}
             <li>
               <a class="course-card" href="{% url 'course_detail' slug=course.slug %}">
-                <div class="course-card__media">
-                  {% if course.cover %}
-                    {# Fixed 16:9 box; width/height reserve space so the grid doesn't shift. #}
-                    <img class="course-card__cover" src="{{ course.cover.url }}"
-                         alt="{% blocktranslate with title=course.title %}Обложка курса «{{ title }}»{% endblocktranslate %}"
-                         width="640" height="360" loading="lazy">
-                  {% else %}
-                    <div class="course-card__fallback" aria-hidden="true">{{ course.title|first|upper }}</div>
-                  {% endif %}
-                </div>
+                {% include "public/includes/course_cover.html" with lazy=True %}
 
                 <div class="course-card__body">
-                  <span class="course-card__step">{{ forloop.counter|stringformat:"02d" }}</span>
+                  <span class="step-badge">{{ forloop.counter|stringformat:"02d" }}</span>
                   <h3 class="course-card__title">{{ course.title }}</h3>
                   {% if course.tagline %}
                     <p class="course-card__tagline">{{ course.tagline }}</p>
@@ -59,16 +50,7 @@
                   <div class="course-card__meta">
                     {# Not blocktranslate count: Russian msgids would get English plural rules. #}
                     <span class="pill">{% translate "Уроков:" %} {{ course.lesson_count }}</span>
-                    <span class="course-card__price">
-                      {% if course.is_free %}
-                        {% translate "Бесплатно" %}
-                      {% else %}
-                        {% if course.old_price_label %}
-                          <s class="course-card__old-price"><span class="visually-hidden">{% translate "Старая цена:" %} </span>{{ course.old_price_label }}</s>
-                        {% endif %}
-                        {{ course.price_label }}
-                      {% endif %}
-                    </span>
+                    {% include "public/includes/course_price.html" %}
                   </div>
                 </div>
               </a>

@@ -9,8 +9,9 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import translation
 
-from api.models import Course, Lesson, User
+from api.models import Block, Course, Lesson, User
 
 NBSP = ' '
 
@@ -19,6 +20,12 @@ class PublicPagesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+
+    def setUp(self):
+        # A request to /en/ leaves English active on the thread, which would make
+        # reverse() in the next test build /en/... URLs. Start each test in Russian.
+        translation.activate('ru')
+        self.addCleanup(translation.deactivate)
 
     def make_course(self, title, **kwargs):
         kwargs.setdefault('is_published', True)
@@ -61,7 +68,7 @@ class LandingCatalogTests(PublicPagesTestCase):
 
         self.assertContains(response, f'1{NBSP}990{NBSP}₽')
         self.assertNotContains(response, 'Бесплатно')
-        self.assertNotContains(response, 'course-card__old-price')
+        self.assertNotContains(response, 'course-price__old')
 
     def test_non_integer_price_shows_kopecks(self):
         self.make_course('Kopecks', price=Decimal('1990.50'), old_price=Decimal('2490.05'))
@@ -129,29 +136,175 @@ class LandingCatalogTests(PublicPagesTestCase):
 
 
 class CourseDetailTests(PublicPagesTestCase):
-    def test_published_course_returns_200(self):
+    def make_lesson(self, course, title, order_index, block_types=()):
+        lesson = Lesson.objects.create(course=course, title=title, order_index=order_index)
+        for i, block_type in enumerate(block_types, start=1):
+            Block.objects.create(lesson=lesson, type=block_type, order_index=i, content={})
+        return lesson
+
+    def lesson_titles(self, response):
+        return re.findall(r'class="syllabus__title">([^<]*)<', response.content.decode())
+
+    def test_published_course_returns_200_under_ru_and_en(self):
         course = self.make_course('Python basics')
 
-        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+        for prefix, lang in [('', 'ru'), ('/en', 'en')]:
+            response = self.client.get(f'{prefix}/course/{course.slug}/')
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, f'<html lang="{lang}">')
+            self.assertContains(response, '<title>Python basics — ')
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Python basics')
-        self.assertContains(response, 'Страница курса скоро появится')
-
-    def test_english_course_page(self):
-        course = self.make_course('Python basics')
-
-        response = self.client.get(f'/en/course/{course.slug}/')
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '<html lang="en">')
-
-    def test_unpublished_course_returns_404(self):
+    def test_unpublished_or_missing_course_returns_404_under_ru_and_en(self):
         course = self.make_course('Draft', is_published=False)
 
+        for prefix in ['', '/en']:
+            for slug in [course.slug, 'no-such-course']:
+                response = self.client.get(f'{prefix}/course/{slug}/')
+                self.assertEqual(response.status_code, 404, f'{prefix}/course/{slug}/')
+
+    def test_lessons_in_order_index_order(self):
+        course = self.make_course('Ordered')
+        self.make_lesson(course, 'Third', 30)
+        self.make_lesson(course, 'First', 10)
+        self.make_lesson(course, 'Second', 20)
+
         response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.lesson_titles(response), ['First', 'Second', 'Third'])
+        self.assertContains(response, 'class="step-badge">03<')
+
+    def test_block_counts_per_type_and_zero_types_hidden(self):
+        course = self.make_course('Counts')
+        self.make_lesson(course, 'Mixed', 1, ['TEXT', 'TEXT', 'QUIZ', 'CODE', 'CODE', 'CODE'])
+        self.make_lesson(course, 'Theory only', 2, ['TEXT'])
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+        html = response.content.decode()
+        mixed = html[html.index('>Mixed<'):html.index('>Theory only<')]
+        theory = html[html.index('>Theory only<'):html.index('</ol>')]
+
+        self.assertIn('Теория: 2', mixed)
+        self.assertIn('Тесты: 1', mixed)
+        self.assertIn('Задачи: 3', mixed)
+        self.assertNotIn('Пропуски:', mixed)
+        self.assertIn('Теория: 1', theory)
+        self.assertNotIn('Тесты:', theory)
+        self.assertNotIn('Задачи:', theory)
+        # Summary line: totals across lessons.
+        summary = html[html.index('syllabus-summary'):html.index('syllabus-lock-note')]
+        for label in ['Уроков: 2', 'Теория: 3', 'Тесты: 1', 'Задачи: 3']:
+            self.assertIn(label, summary)
+        self.assertNotIn('Пропуски:', summary)
+
+    def test_block_content_never_reaches_the_page(self):
+        marker = 'SECRET-MARKER-7f3c'
+        course = self.make_course('Secrets')
+        lesson = self.make_lesson(course, 'Lesson', 1)
+        Block.objects.create(lesson=lesson, type='CODE', order_index=1, content={
+            'prompt': f'{marker}-prompt',
+            'starter_code': f'{marker}-starter',
+            'solution': f'{marker}-solution',
+            'tests': [{'input': f'{marker}-in', 'expected': f'{marker}-out'}],
+        })
+        Block.objects.create(lesson=lesson, type='QUIZ', order_index=2, content={
+            'question': f'{marker}-q', 'options': [f'{marker}-a'], 'correct_answer': 0,
+        })
+        Block.objects.create(lesson=lesson, type='TEXT', order_index=3,
+                             content={'html': f'<p>{marker}-text</p>'})
+
+        for url in [f'/course/{course.slug}/', f'/en/course/{course.slug}/']:
+            response = self.client.get(url)
+            self.assertNotContains(response, marker)
+            # The context itself holds only titles and integer counts.
+            for row in response.context['lessons']:
+                self.assertEqual(
+                    set(row), {'title', 'text_count', 'quiz_count', 'code_count', 'fill_count'})
+
+    def test_description_is_escaped(self):
+        course = self.make_course(
+            'Escaped', description='Intro <script>alert("x")</script>\n\nSecond paragraph')
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+
+        self.assertNotContains(response, '<script>alert')
+        self.assertContains(response, '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;')
+        self.assertContains(response, '<p>Second paragraph</p>')
+
+    def test_empty_description_section_is_omitted(self):
+        course = self.make_course('No description')
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+
+        self.assertNotContains(response, 'course-description')
+
+    def test_free_course_cta_goes_to_register(self):
+        course = self.make_course('Free', price=0, stepik_id=111)
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+
+        self.assertContains(response, 'href="/register/">Начать бесплатно</a>')
+        self.assertNotContains(response, 'stepik.org')
+
+    def test_priced_course_with_stepik_id_links_to_stepik(self):
+        course = self.make_course('On Stepik', price=Decimal('1990'), stepik_id=123456)
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+
+        self.assertContains(response, 'href="https://stepik.org/course/123456/promo"')
+        self.assertContains(response, 'Доступен на Stepik')
+        self.assertContains(response, f'1{NBSP}990{NBSP}₽')
+        self.assertNotContains(response, 'Начать бесплатно')
+
+    def test_priced_course_without_stepik_id_shows_coming_soon(self):
+        course = self.make_course(
+            'Coming', price=Decimal('1990'), old_price=Decimal('2990'))
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+
+        self.assertContains(response, 'class="course-offer__note">Скоро на этой платформе</p>')
+        self.assertNotContains(response, 'stepik.org')
+        self.assertNotContains(response, 'Начать бесплатно')
+        struck = re.findall(r'</span>([^<]*)</s>', response.content.decode())
+        self.assertEqual(struck, [f'2{NBSP}990{NBSP}₽'])
+
+    def test_query_count_does_not_grow_with_lessons(self):
+        course = self.make_course('Queries')
+        url = reverse('course_detail', kwargs={'slug': course.slug})
+        self.make_lesson(course, 'Lesson 1', 1, ['TEXT', 'QUIZ', 'CODE', 'FILL'])
+
+        with self.assertNumQueries(2):
+            self.client.get(url)
+
+        for n in range(2, 7):
+            self.make_lesson(course, f'Lesson {n}', n, ['TEXT', 'QUIZ', 'CODE', 'FILL'])
+        with self.assertNumQueries(2):
+            response = self.client.get(url)
+        self.assertEqual(len(self.lesson_titles(response)), 6)
+
+    def test_empty_syllabus_state(self):
+        course = self.make_course('No lessons yet')
+
+        response = self.client.get(reverse('course_detail', kwargs={'slug': course.slug}))
+
+        self.assertContains(response, 'Программа скоро появится')
+        self.assertNotContains(response, 'class="syllabus"')
+
+    def test_ru_and_en_labels(self):
+        course = self.make_course('Labels')
+        self.make_lesson(course, 'All types', 1, ['TEXT', 'QUIZ', 'CODE', 'FILL'])
+
+        ru = self.client.get(f'/course/{course.slug}/')
+        en = self.client.get(f'/en/course/{course.slug}/')
+
+        for label in ['Программа курса', 'Уроков: 1', 'Теория: 1', 'Тесты: 1', 'Задачи: 1',
+                      'Пропуски: 1', 'Уроки откроются после записи на курс.', 'Все курсы',
+                      'Начать бесплатно']:
+            self.assertContains(ru, label)
+        for label in ['Course syllabus', 'Lessons: 1', 'Theory: 1', 'Quizzes: 1', 'Exercises: 1',
+                      'Fill-ins: 1', 'Lessons unlock after you enroll in the course.',
+                      'All courses', 'Start for free']:
+            self.assertContains(en, label)
+        self.assertContains(en, 'href="/en/#catalog">← All courses<')
 
     def test_header_courses_link_returns_to_landing_catalog(self):
         course = self.make_course('Python basics')

@@ -1,0 +1,11 @@
+{% load i18n %}{# Course cover in a fixed 16:9 box, or the cobalt fallback with the course initial. Expects: course; optional: lazy. #}
+<div class="course-cover">
+  {% if course.cover %}
+    {# width/height reserve the 16:9 space so the layout doesn't shift. #}
+    <img class="course-cover__img" src="{{ course.cover.url }}"
+         alt="{% blocktranslate with title=course.title %}Обложка курса «{{ title }}»{% endblocktranslate %}"
+         width="640" height="360"{% if lazy %} loading="lazy"{% endif %}>
+  {% else %}
+    <div class="course-cover__fallback" aria-hidden="true">{{ course.title|first|upper }}</div>
+  {% endif %}
+</div>

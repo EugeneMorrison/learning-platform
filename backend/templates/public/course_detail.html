@@ -1,12 +1,91 @@
 {% extends "public/base.html" %}
-{% load i18n %}
+{% load i18n static %}
 
-{# Placeholder: step 4 replaces this template. Keep the view and the course_detail URL name. #}
+{% block title %}{{ course.title }} — {{ block.super }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/course.css' %}">
+{% endblock %}
+
 {% block content %}
-  <section class="page-section">
-    <div class="container">
-      <h1>{{ course.title }}</h1>
-      <p>{% translate "Страница курса скоро появится" %}</p>
+  <div class="container">
+    <a class="back-link" href="{% url 'landing' %}#catalog">← {% translate "Все курсы" %}</a>
+  </div>
+
+  {# Course header #}
+  <section class="course-header" aria-labelledby="course-title">
+    <div class="container course-header__inner">
+      <div class="course-header__media">
+        {% include "public/includes/course_cover.html" %}
+      </div>
+
+      <div class="course-header__text">
+        <h1 id="course-title" class="course-header__title">{{ course.title }}</h1>
+        {% if course.tagline %}
+          <p class="course-header__tagline">{{ course.tagline }}</p>
+        {% endif %}
+
+        <div class="course-offer">
+          <p class="course-offer__price">{% include "public/includes/course_price.html" %}</p>
+          {# No checkout yet: payments don't exist. #}
+          {% if course.is_free %}
+            {# React registration page (client-side route served by spa_view). #}
+            <a class="btn btn-primary" href="/register/">{% translate "Начать бесплатно" %}</a>
+          {% elif course.stepik_id %}
+            <a class="btn btn-primary" href="https://stepik.org/course/{{ course.stepik_id }}/promo" rel="noopener">{% translate "Доступен на Stepik" %}</a>
+          {% else %}
+            <p class="course-offer__note">{% translate "Скоро на этой платформе" %}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if course.description %}
+    <section class="course-section" aria-labelledby="about-title">
+      <div class="container course-section__inner">
+        <h2 id="about-title">{% translate "О курсе" %}</h2>
+        {# Escaped (autoescape) and split into paragraphs. Never |safe: authors type plain text. #}
+        <div class="course-description">{{ course.description|linebreaks }}</div>
+      </div>
+    </section>
+  {% endif %}
+
+  {# Syllabus: titles and integer counts only (see course_detail_view). #}
+  <section class="course-section" aria-labelledby="syllabus-title">
+    <div class="container course-section__inner">
+      <h2 id="syllabus-title">{% translate "Программа курса" %}</h2>
+
+      {% if lessons %}
+        <div class="syllabus-summary pill-row">
+          <span class="pill">{% translate "Уроков:" %} {{ lessons|length }}</span>
+          {% include "public/includes/block_counts.html" with counts=totals %}
+        </div>
+
+        <p class="syllabus-lock-note">
+          <svg class="lock-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none"/></svg>
+          {% translate "Уроки откроются после записи на курс." %}
+        </p>
+
+        <ol class="syllabus">
+          {% for lesson in lessons %}
+            <li class="syllabus__step">
+              <span class="step-badge">{{ forloop.counter|stringformat:"02d" }}</span>
+              <div class="syllabus__body">
+                <h3 class="syllabus__title">{{ lesson.title }}</h3>
+                {% if lesson.text_count or lesson.quiz_count or lesson.code_count or lesson.fill_count %}
+                  <div class="pill-row syllabus__counts">
+                    {% include "public/includes/block_counts.html" with counts=lesson %}
+                  </div>
+                {% endif %}
+              </div>
+              <svg class="lock-icon syllabus__lock" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none"/></svg>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="syllabus-empty">{% translate "Программа скоро появится" %}</p>
+      {% endif %}
     </div>
   </section>
 {% endblock %}
