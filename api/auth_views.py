@@ -27,7 +27,9 @@ User = get_user_model()
 @permission_classes([AllowAny])  # Anyone can register
 def register_view(request):
     """
-    Register a new user.
+    Register a new user. Public registration always creates a STUDENT:
+    any "role" in the body is ignored. Authors and admins are created
+    only in the Django admin.
 
     POST /api/auth/register/
 
@@ -35,8 +37,7 @@ def register_view(request):
     {
         "username": "alice",
         "email": "alice@example.com",
-        "password": "password123",
-        "role": "STUDENT"  # or "AUTHOR"
+        "password": "password123"
     }
 
     Returns:
@@ -52,7 +53,6 @@ def register_view(request):
     username = request.data.get('username')
     email = request.data.get('email')
     password = request.data.get('password')
-    role = request.data.get('role', 'STUDENT')  # Default to STUDENT
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
 
@@ -83,20 +83,12 @@ def register_view(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Validate role
-    valid_roles = ['STUDENT', 'AUTHOR', 'ADMIN']
-    if role not in valid_roles:
-        return Response(
-            {'error': f'Role must be one of: {valid_roles}'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
-    # Create user
+    # Create user. Role is fixed: never taken from the request.
     user = User.objects.create_user(
         username=username,
         email=email,
         password=password,  # Django automatically hashes password
-        role=role,
+        role='STUDENT',
         first_name=first_name,
         last_name=last_name
     )

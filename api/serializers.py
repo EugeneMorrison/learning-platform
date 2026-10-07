@@ -41,7 +41,9 @@ class UserSerializer(serializers.ModelSerializer):
             'date_joined',
             'course_count'  # How many courses this user authored
         ]
-        read_only_fields = ['id', 'date_joined']
+        # role is read-only: users never set their own role through the API
+        # (public registration creates students; authors/admins come from the admin).
+        read_only_fields = ['id', 'date_joined', 'role']
         extra_kwargs = {
             'password': {'write_only': True}  # Never return password in API!
         }

@@ -6,7 +6,6 @@ import { safeNext, withNext } from '../lib/safeNext';
 function RegisterPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState('STUDENT');
     const [error, setError] = useState('');
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -16,7 +15,8 @@ function RegisterPage() {
         e.preventDefault();
         setError('');
         try {
-            const response = await api.post('/auth/register/', { username, password, role });
+            // No role: public registration always creates a student (set by the server).
+            const response = await api.post('/auth/register/', { username, password });
             if (next) {
                 // Register returns tokens: sign in right away so the user lands on
                 // `next` (e.g. /enroll/<id>/) instead of a second login form.
@@ -52,16 +52,6 @@ function RegisterPage() {
                         onChange={e => setPassword(e.target.value)}
                         style={{ width: '100%', padding: '8px' }}
                     />
-                </div>
-                <div style={{ marginBottom: '15px' }}>
-                    <select
-                        value={role}
-                        onChange={e => setRole(e.target.value)}
-                        style={{ width: '100%', padding: '8px' }}
-                    >
-                        <option value="STUDENT">Учащийся</option>
-                        <option value="AUTHOR">Автор</option>
-                    </select>
                 </div>
                 <button type="submit" style={{ width: '100%', padding: '10px' }}>
                     Зарегистрироваться

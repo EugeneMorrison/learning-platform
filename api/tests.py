@@ -1,6 +1,6 @@
 """
-API tests: student self-enrolment (POST /api/enrollments/) and the teacher's
-enroll_student action.
+API tests: public registration (always STUDENT), student self-enrolment
+(POST /api/enrollments/) and the teacher's enroll_student action.
 
 Run with: python manage.py test api
 """
@@ -10,6 +10,70 @@ from decimal import Decimal
 from rest_framework.test import APITestCase
 
 from .models import Course, Enrollment, User
+from .serializers import UserSerializer
+
+REGISTER_URL = '/api/auth/register/'
+
+
+class RegistrationRoleTests(APITestCase):
+    def register(self, username, **extra):
+        return self.client.post(
+            REGISTER_URL, {'username': username, 'password': 'Sup3r-secret-pass', **extra},
+            format='json')
+
+    def test_client_supplied_role_is_ignored(self):
+        for username, role in [('wants_author', 'AUTHOR'), ('wants_admin', 'ADMIN'),
+                               ('bogus_role', 'SUPERUSER')]:
+            response = self.register(username, role=role)
+
+            self.assertEqual(response.status_code, 201, role)
+            self.assertEqual(response.data['user']['role'], 'STUDENT', role)
+            user = User.objects.get(username=username)
+            self.assertEqual(user.role, 'STUDENT', role)
+            self.assertFalse(user.is_staff or user.is_superuser, role)
+
+    def test_no_role_registers_student(self):
+        response = self.register('plain')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['user']['role'], 'STUDENT')
+        self.assertEqual(User.objects.get(username='plain').role, 'STUDENT')
+
+
+class StudentCannotChangeOwnRoleTests(APITestCase):
+    """There is no self-update endpoint; these pin that down and guard the serializer."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+
+    def test_me_endpoint_is_read_only(self):
+        self.client.force_authenticate(self.student)
+
+        for method in ['put', 'patch', 'post']:
+            response = getattr(self.client, method)(
+                '/api/auth/me/', {'role': 'AUTHOR'}, format='json')
+            self.assertEqual(response.status_code, 405, method)
+
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.role, 'STUDENT')
+
+    def test_registering_again_while_logged_in_does_not_change_role(self):
+        self.client.force_authenticate(self.student)
+
+        self.client.post(REGISTER_URL, {'username': 'student', 'password': 'y', 'role': 'AUTHOR'},
+                         format='json')
+
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.role, 'STUDENT')
+
+    def test_user_serializer_role_is_read_only(self):
+        serializer = UserSerializer(self.student, data={'role': 'ADMIN'}, partial=True)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.role, 'STUDENT')
 
 ENROL_URL = '/api/enrollments/'
 
