@@ -17,7 +17,7 @@ function LoginPage() {
         try {
             await login(username, password);
             navigate(next || '/dashboard/');
-        } catch (err) {
+        } catch {
             setError('Неверный логин или пароль');
         }
     }

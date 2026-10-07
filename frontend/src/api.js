@@ -57,7 +57,7 @@ api.interceptors.response.use(
                 currentToken = newAccess;
                 originalRequest.headers.Authorization = `Bearer ${newAccess}`;
                 return api(originalRequest);
-            } catch (refreshErr) {
+            } catch {
                 // refresh token also expired/invalid — fall through to clear+retry
             }
         }

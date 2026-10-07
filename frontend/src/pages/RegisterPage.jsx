@@ -25,7 +25,7 @@ function RegisterPage() {
             } else {
                 navigate('/login/');
             }
-        } catch (err) {
+        } catch {
             setError('Ошибка регистрации. Попробуйте другое имя пользователя.');
         }
     }
