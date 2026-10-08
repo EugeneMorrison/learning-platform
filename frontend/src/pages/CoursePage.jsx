@@ -31,32 +31,33 @@ function CoursePage() {
     const [studentError, setStudentError] = useState('');
 
     useEffect(() => {
+        // Defined inside the effect so courseId is its only dependency
+        // (a component-level function would change every render and refetch in a loop).
+        async function fetchAll() {
+            try {
+                const userRes = await api.get('/auth/me/');
+                setUser(userRes.data);
+
+                const [courseRes, lessonsRes] = await Promise.all([
+                    api.get(`/courses/${courseId}/`),
+                    api.get(`/lessons/?course=${courseId}`),
+                ]);
+                setCourse(courseRes.data);
+                setLessons(lessonsRes.data);
+
+                // Only fetch enrollments for authors
+                if (userRes.data.role === 'AUTHOR') {
+                    const enrollmentsRes = await api.get(`/courses/${courseId}/enrollments/`);
+                    setEnrollments(enrollmentsRes.data);
+                }
+            } catch (err) {
+                console.error('Failed to load course:', err);
+            } finally {
+                setLoading(false);
+            }
+        }
         fetchAll();
     }, [courseId]);
-
-    async function fetchAll() {
-        try {
-            const userRes = await api.get('/auth/me/');
-            setUser(userRes.data);
-
-            const [courseRes, lessonsRes] = await Promise.all([
-                api.get(`/courses/${courseId}/`),
-                api.get(`/lessons/?course=${courseId}`),
-            ]);
-            setCourse(courseRes.data);
-            setLessons(lessonsRes.data);
-
-            // Only fetch enrollments for authors
-            if (userRes.data.role === 'AUTHOR') {
-                const enrollmentsRes = await api.get(`/courses/${courseId}/enrollments/`);
-                setEnrollments(enrollmentsRes.data);
-            }
-        } catch (err) {
-            console.error('Failed to load course:', err);
-        } finally {
-            setLoading(false);
-        }
-    }
 
     async function handleAddLesson(e) {
         e.preventDefault();
@@ -109,7 +110,7 @@ function CoursePage() {
             setShowStudentForm(false);
             const res = await api.get(`/courses/${courseId}/enrollments/`);
             setEnrollments(res.data);
-        } catch (err) {
+        } catch {
             setStudentError('Студент не найден или уже записан на курс.');
         } finally {
             setAddingStudent(false);

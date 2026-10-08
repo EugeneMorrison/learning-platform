@@ -12,14 +12,16 @@ function DashboardPage() {
             try {
                 const response = await api.get('/auth/me/');
                 setUser(response.data);
-            } catch (err) {
+            } catch {
                 navigate('/login/');
             } finally {
                 setLoading(false);
             }
         }
         fetchUser();
-    }, []);
+        // navigate is stable while this page is mounted (it only changes with the
+        // location, and the only navigation here unmounts the page), so no refetch loop.
+    }, [navigate]);
 
     function handleLogout() {
         logout();
