@@ -6,46 +6,60 @@ import { parseTemplate } from '../lib/fillTemplate';
 /**
  * "Fill in the blanks" task (Stepik-style). The author writes a code/text
  * template with blanks as {{answer}} (or {{a|b}} for alternatives). Students
- * type into each blank; we grade client-side for instant feedback and also
- * POST to the backend, which re-grades and records the attempt.
+ * receive the template with empty gaps ({{}}) — never the answers — type into
+ * each gap, and the backend grades: is_correct, which gaps are right
+ * (feedback.blanks_correct) and, when correct, the explanation.
  */
 
-function matches(value, answers, caseSensitive) {
-    const v = (value || '').trim();
-    return answers.some(a => (caseSensitive ? a === v : a.toLowerCase() === v.toLowerCase()));
+// Server verdict → component state.
+function toResult(isCorrect, feedback) {
+    return {
+        isCorrect: isCorrect === true,
+        blanksCorrect: feedback?.blanks_correct || [],
+        explanation: feedback?.explanation || '',
+    };
 }
 
 function FillBlock({ content, blockId, savedProgress, number }) {
     const segments = parseTemplate(content.template);
     const blanks = segments.filter(s => s.type === 'blank');
-    const caseSensitive = !!content.case_sensitive;
 
     const savedBlanks = savedProgress?.answer?.blanks;
     const hasAttempt = Array.isArray(savedBlanks);
     const [values, setValues] = useState(
         hasAttempt ? blanks.map((_, i) => savedBlanks[i] ?? '') : blanks.map(() => '')
     );
-    const [submitted, setSubmitted] = useState(hasAttempt);
+    // Restored on page load from the student's own saved progress.
+    const [result, setResult] = useState(
+        hasAttempt ? toResult(savedProgress.is_correct, savedProgress.feedback) : null
+    );
+    const [checking, setChecking] = useState(false);
+    const [checkError, setCheckError] = useState('');
 
-    const perBlankCorrect = blanks.map((b, i) => matches(values[i], b.answers, caseSensitive));
-    const allCorrect = perBlankCorrect.every(Boolean);
-    const isCorrect = submitted && allCorrect;
+    const submitted = result !== null;
+    const perBlankCorrect = blanks.map((_, i) => result?.blanksCorrect[i] === true);
+    const isCorrect = result?.isCorrect === true;
 
     async function handleSubmit() {
-        if (values.some(v => !v.trim())) return; // require all blanks filled
-        setSubmitted(true);
+        if (values.some(v => !v.trim()) || checking) return; // require all blanks filled
+        setChecking(true);
+        setCheckError('');
         try {
-            await api.post('/progress/submit/', {
+            const res = await api.post('/progress/submit/', {
                 block: blockId,
                 answer: { blanks: values },
             });
+            setResult(toResult(res.data.is_correct, res.data.feedback));
         } catch (err) {
-            console.error('Failed to save progress:', err);
+            console.error('Failed to check answer:', err);
+            setCheckError(err.response?.data?.detail || 'Не удалось проверить ответ. Попробуйте ещё раз.');
+        } finally {
+            setChecking(false);
         }
     }
 
     function handleReset() {
-        setSubmitted(false);
+        setResult(null);
     }
 
     function setBlank(i, val) {
@@ -114,7 +128,7 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                             type="text"
                             value={values[i]}
                             disabled={isCorrect}
-                            onChange={e => { setBlank(i, e.target.value); if (submitted) setSubmitted(false); }}
+                            onChange={e => { setBlank(i, e.target.value); if (submitted) setResult(null); }}
                             style={{
                                 fontFamily: "'JetBrains Mono', Consolas, monospace",
                                 fontSize: '14px',
@@ -136,20 +150,24 @@ function FillBlock({ content, blockId, savedProgress, number }) {
             {!submitted && (
                 <button
                     onClick={handleSubmit}
-                    disabled={!allFilled}
+                    disabled={!allFilled || checking}
                     style={{
                         marginTop: '16px',
                         padding: '10px 24px',
-                        background: allFilled ? '#c2410c' : '#94a3b8',
+                        background: allFilled && !checking ? '#c2410c' : '#94a3b8',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
-                        cursor: allFilled ? 'pointer' : 'not-allowed',
+                        cursor: allFilled && !checking ? 'pointer' : 'not-allowed',
                         fontWeight: '600',
                     }}
                 >
-                    Проверить
+                    {checking ? 'Проверяем…' : 'Проверить'}
                 </button>
+            )}
+
+            {checkError && (
+                <div style={{ marginTop: '12px', color: '#dc2626' }}>{checkError}</div>
             )}
 
             {submitted && (
@@ -162,7 +180,7 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                     fontWeight: '600',
                 }}>
                     {isCorrect
-                        ? ('✅ Верно!' + (content.explanation ? ' ' + content.explanation : ''))
+                        ? ('✅ Верно!' + (result.explanation ? ' ' + result.explanation : ''))
                         : '❌ Неверно! Проверьте заполнение и попробуйте ещё раз.'}
                 </div>
             )}

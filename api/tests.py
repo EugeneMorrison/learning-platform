@@ -14,14 +14,15 @@ from django.core.cache import cache
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
 
-from .models import Block, Course, Enrollment, Lesson, Progress, User
+from .models import Attempt, Block, Course, Enrollment, Lesson, Progress, User
 from .serializers import UserSerializer
 
 
 class ReadAccessMatrixTests(APITestCase):
     """
-    Who can read what (step 4e, Coursera-style):
-    - course detail: published → everyone; unpublished → its author only;
+    Who can read what (step 4e, Coursera-style; 4f Part 0):
+    - course detail: published → everyone; unpublished → its author and its
+      enrolled students;
     - lessons and blocks (list and detail): own courses (author) ∪ enrolled
       courses (student); anonymous → nothing. Outside access: list omits it,
       detail is 404.
@@ -59,7 +60,7 @@ class ReadAccessMatrixTests(APITestCase):
     COURSE_ACCESS = {
         'anonymous': {'free', 'paid'},
         'outsider': {'free', 'paid'},
-        'enrolled': {'free', 'paid'},
+        'enrolled': {'free', 'paid', 'unpublished'},  # 4f Part 0
         'author': {'free', 'paid', 'unpublished'},
         'other_author': {'free', 'paid'},
     }
@@ -110,6 +111,25 @@ class ReadAccessMatrixTests(APITestCase):
 
         self.assertEqual(anon, {'free course', 'paid course'})
         self.assertEqual(author, {'free course', 'paid course', 'unpublished course'})
+
+    def test_enrolled_student_sees_unpublished_course_they_are_enrolled_in(self):
+        # 4f Part 0: a teacher may enrol students before publishing; they can
+        # then open the course (list, detail) and its lessons like any other.
+        course, lesson, _ = self.courses['unpublished']
+        self.login_as('enrolled')
+
+        titles = [c['title'] for c in self.client.get('/api/courses/').data]
+        self.assertEqual(sorted(titles), ['free course', 'paid course', 'unpublished course'])
+        self.assertEqual(self.client.get(f'/api/courses/{course.id}/').status_code, 200)
+        self.assertEqual(self.client.get(f'/api/lessons/{lesson.id}/').status_code, 200)
+
+    def test_outsider_does_not_see_unpublished_course(self):
+        course, _, _ = self.courses['unpublished']
+        self.login_as('outsider')
+
+        titles = {c['title'] for c in self.client.get('/api/courses/').data}
+        self.assertNotIn('unpublished course', titles)
+        self.assertEqual(self.client.get(f'/api/courses/{course.id}/').status_code, 404)
 
     def test_lesson_404_carries_slug_only_for_published_courses(self):
         self.login_as('anonymous')
@@ -239,6 +259,271 @@ def fake_run(stdout='2\n', returncode=0, stderr=''):
         return_value=subprocess.CompletedProcess(
             args=[], returncode=returncode, stdout=stdout, stderr=stderr),
     )
+
+
+def fake_program(outputs, errors=None):
+    """subprocess.run stand-in that answers by stdin: outputs[stdin] is printed;
+    stdin in `errors` exits with that stderr. Unknown stdin prints nothing."""
+    errors = errors or {}
+
+    def run(args, input='', **kwargs):
+        if input in errors:
+            return subprocess.CompletedProcess(args, 1, stdout='', stderr=errors[input])
+        return subprocess.CompletedProcess(args, 0, stdout=outputs.get(input, '') + '\n', stderr='')
+
+    return mock.patch('api.views.subprocess.run', side_effect=run)
+
+
+class StudentContentAndGradingTests(APITestCase):
+    """Step 4f: students never receive answers; all grading on the server."""
+
+    # Markers planted in every answer-bearing field.
+    SOLUTION = 'MARK-SOLUTION'
+    HIDDEN_IN = 'MARK-HIDDEN-IN'
+    HIDDEN_OUT = 'MARK-HIDDEN-OUT'
+    QUIZ_EXPL = 'MARK-QUIZ-EXPLANATION'
+    FILL_ANSWER = 'MARK-FILL-ANSWER'
+    FILL_ALT = 'mark-fill-alt'
+    FILL_EXPL = 'MARK-FILL-EXPLANATION'
+    ALL_MARKERS = [SOLUTION, HIDDEN_IN, HIDDEN_OUT, QUIZ_EXPL, FILL_ANSWER, FILL_ALT, FILL_EXPL]
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=cls.course, title='Lesson', order_index=1)
+        # No visible flags → default rule: first 2 visible, the 3rd hidden.
+        cls.code = Block.objects.create(lesson=cls.lesson, type='CODE', order_index=1, content={
+            'prompt': 'p', 'starter_code': '', 'solution': cls.SOLUTION,
+            'tests': [{'input': 'in1', 'expected': 'out1'},
+                      {'input': 'in2', 'expected': 'out2'},
+                      {'input': cls.HIDDEN_IN, 'expected': cls.HIDDEN_OUT}]})
+        cls.quiz = Block.objects.create(lesson=cls.lesson, type='QUIZ', order_index=2, content={
+            'question': 'q', 'options': ['a', 'b', 'c'], 'correct_answer': 2,
+            'explanation': cls.QUIZ_EXPL})
+        cls.fill = Block.objects.create(lesson=cls.lesson, type='FILL', order_index=3, content={
+            'prompt': 'p', 'template': f'x = {{{{{cls.FILL_ANSWER}|{cls.FILL_ALT}}}}}\nprint({{{{x}}}})',
+            'case_sensitive': False, 'explanation': cls.FILL_EXPL})
+        Enrollment.objects.create(student=cls.student, course=cls.course)
+
+    def setUp(self):
+        cache.clear()  # runner throttle counters
+
+    def as_user(self, user):
+        self.client.force_authenticate(user)
+
+    # --- what students and authors receive ---------------------------------
+
+    def block_responses(self):
+        yield self.client.get(f'/api/blocks/?lesson={self.lesson.id}')
+        for block in [self.code, self.quiz, self.fill]:
+            yield self.client.get(f'/api/blocks/{block.id}/')
+
+    def test_student_never_receives_answer_markers(self):
+        self.as_user(self.student)
+        for response in self.block_responses():
+            self.assertEqual(response.status_code, 200)
+            body = response.content.decode()
+            for marker in self.ALL_MARKERS:
+                self.assertNotIn(marker, body, response.request['PATH_INFO'])
+
+        by_type = {b['type']: b['content'] for b in
+                   self.client.get(f'/api/blocks/?lesson={self.lesson.id}').data}
+        self.assertNotIn('solution', by_type['CODE'])
+        self.assertNotIn('correct_answer', by_type['QUIZ'])
+        self.assertNotIn('explanation', by_type['QUIZ'])
+        self.assertNotIn('explanation', by_type['FILL'])
+        # FILL: same gaps, no answers.
+        self.assertEqual(by_type['FILL']['template'], 'x = {{}}\nprint({{}})')
+
+    def test_author_receives_full_content(self):
+        self.as_user(self.author)
+        body = ''.join(r.content.decode() for r in self.block_responses())
+        for marker in self.ALL_MARKERS:
+            self.assertIn(marker, body)
+        quiz = self.client.get(f'/api/blocks/{self.quiz.id}/').data['content']
+        self.assertEqual(quiz['correct_answer'], 2)
+
+    def test_default_rule_first_two_tests_visible(self):
+        self.as_user(self.student)
+        content = self.client.get(f'/api/blocks/{self.code.id}/').data['content']
+
+        self.assertEqual(content['tests'], [{'input': 'in1', 'expected': 'out1'},
+                                            {'input': 'in2', 'expected': 'out2'}])
+        self.assertEqual(content['hidden_test_count'], 1)
+
+    def test_explicit_visible_flags(self):
+        self.code.content['tests'] = [
+            {'input': 'in1', 'expected': 'out1', 'visible': False},
+            {'input': 'in2', 'expected': 'out2', 'visible': True},
+            {'input': self.HIDDEN_IN, 'expected': self.HIDDEN_OUT},  # no flag → hidden
+        ]
+        self.code.save()
+        self.as_user(self.student)
+
+        content = self.client.get(f'/api/blocks/{self.code.id}/').data['content']
+
+        self.assertEqual([t['input'] for t in content['tests']], ['in2'])
+        self.assertEqual(content['hidden_test_count'], 2)
+
+    def test_visible_flag_is_validated(self):
+        self.as_user(self.author)
+        base = {'lesson': str(self.lesson.id), 'type': 'CODE', 'order_index': 9}
+        ok = dict(base, content={'prompt': 'p', 'starter_code': '',
+                                 'tests': [{'input': '', 'expected': '1', 'visible': True}]})
+        bad = dict(base, order_index=10, content={'prompt': 'p', 'starter_code': '',
+                                                  'tests': [{'input': '', 'expected': '1', 'visible': 'yes'}]})
+
+        self.assertEqual(self.client.post('/api/blocks/', ok, format='json').status_code, 201)
+        self.assertEqual(self.client.post('/api/blocks/', bad, format='json').status_code, 400)
+
+    # --- CODE: run-tests grades with the stored tests ----------------------
+
+    def run_tests(self, code='print(1)', **extra):
+        return self.client.post(RUN_TESTS_URL, {'block_id': str(self.code.id), 'code': code,
+                                                'version': 'Python 3.12', **extra}, format='json')
+
+    def test_run_tests_ignores_browser_tests_and_records_success(self):
+        self.as_user(self.student)
+        outputs = {'in1': 'out1', 'in2': 'out2', self.HIDDEN_IN: self.HIDDEN_OUT}
+        with fake_program(outputs) as run:
+            response = self.run_tests(tests=[{'input': 'evil', 'expected': 'anything'}],
+                                      is_correct=False)
+
+        self.assertEqual([c.kwargs['input'] for c in run.call_args_list],
+                         ['in1', 'in2', self.HIDDEN_IN])
+        self.assertEqual(response.data['status'], 'success')
+        self.assertTrue(response.data['is_correct'])
+        self.assertTrue(response.data['recorded'])
+        self.assertEqual(response.data['total'], 3)
+        # Hidden test: passed / not passed only.
+        self.assertEqual(response.data['results'][2], {'test_number': 3, 'passed': True, 'hidden': True})
+        for marker in [self.HIDDEN_IN, self.HIDDEN_OUT]:
+            self.assertNotIn(marker, response.content.decode())
+
+        progress = Progress.objects.get(student=self.student, block=self.code)
+        self.assertTrue(progress.is_correct)
+        self.assertEqual(progress.answer, {'code': 'print(1)'})
+        self.assertEqual(Attempt.objects.filter(student=self.student, block=self.code).count(), 1)
+
+    def test_failing_hidden_test_reveals_nothing(self):
+        self.as_user(self.student)
+        with fake_program({'in1': 'out1', 'in2': 'out2', self.HIDDEN_IN: 'MARK-ACTUAL'}):
+            response = self.run_tests()
+
+        self.assertEqual(response.data['status'], 'wrong_answer')
+        self.assertEqual((response.data['test_number'], response.data['hidden']), (3, True))
+        for key in ['input', 'expected', 'actual', 'stderr']:
+            self.assertNotIn(key, response.data)
+        for marker in [self.HIDDEN_IN, self.HIDDEN_OUT, 'MARK-ACTUAL']:
+            self.assertNotIn(marker, response.content.decode())
+        self.assertFalse(response.data['is_correct'])
+        self.assertFalse(Progress.objects.get(student=self.student, block=self.code).is_correct)
+        self.assertFalse(Attempt.objects.get(student=self.student, block=self.code).is_correct)
+
+    def test_error_on_hidden_test_hides_stderr(self):
+        self.as_user(self.student)
+        with fake_program({'in1': 'out1', 'in2': 'out2'}, errors={self.HIDDEN_IN: 'MARK-STDERR'}):
+            response = self.run_tests()
+
+        self.assertEqual((response.data['status'], response.data['hidden']), ('error', True))
+        self.assertNotIn('MARK-STDERR', response.content.decode())
+
+    def test_failing_visible_test_shows_details(self):
+        self.as_user(self.student)
+        with fake_program({'in1': 'wrong'}):
+            response = self.run_tests()
+
+        self.assertEqual(response.data['status'], 'wrong_answer')
+        self.assertEqual(
+            (response.data['test_number'], response.data['hidden'], response.data['input'],
+             response.data['expected'], response.data['actual']),
+            (1, False, 'in1', 'out1', 'wrong'))
+
+    def test_solved_code_block_stays_solved(self):
+        self.as_user(self.student)
+        with fake_program({'in1': 'out1', 'in2': 'out2', self.HIDDEN_IN: self.HIDDEN_OUT}):
+            self.run_tests()
+        with fake_program({}):
+            again = self.run_tests(code='print("broken")')
+
+        self.assertFalse(again.data['is_correct'])
+        self.assertFalse(again.data['recorded'])
+        progress = Progress.objects.get(student=self.student, block=self.code)
+        self.assertTrue(progress.is_correct)
+        self.assertEqual(progress.answer, {'code': 'print(1)'})
+        self.assertEqual(Attempt.objects.filter(block=self.code).count(), 1)
+
+    def test_code_via_progress_submit_is_rejected(self):
+        self.as_user(self.student)
+        response = self.client.post('/api/progress/submit/', {
+            'block': str(self.code.id), 'answer': {'code': 'x'}, 'is_correct': True}, format='json')
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Progress.objects.filter(block=self.code).exists())
+
+    # --- QUIZ / FILL: server grading and explanations ----------------------
+
+    def submit(self, block, answer, **extra):
+        return self.client.post('/api/progress/submit/',
+                                {'block': str(block.id), 'answer': answer, **extra}, format='json')
+
+    def test_client_is_correct_is_ignored(self):
+        self.as_user(self.student)
+        response = self.submit(self.quiz, {'selected': 0}, is_correct=True)
+
+        self.assertFalse(response.data['is_correct'])
+        self.assertFalse(Progress.objects.get(student=self.student, block=self.quiz).is_correct)
+
+    def test_quiz_explanation_only_after_correct_answer(self):
+        self.as_user(self.student)
+        wrong = self.submit(self.quiz, {'selected': 0})
+        right = self.submit(self.quiz, {'selected': 2})
+
+        self.assertEqual((wrong.data['is_correct'], wrong.data['feedback']), (False, {}))
+        self.assertNotIn(self.QUIZ_EXPL, wrong.content.decode())
+        self.assertTrue(right.data['is_correct'])
+        self.assertEqual(right.data['feedback'], {'explanation': self.QUIZ_EXPL})
+        self.assertEqual(Attempt.objects.filter(block=self.quiz).count(), 2)
+
+    def test_fill_gap_results_and_explanation_only_when_correct(self):
+        self.as_user(self.student)
+        partial = self.submit(self.fill, {'blanks': [self.FILL_ALT.upper(), 'nope']})
+        right = self.submit(self.fill, {'blanks': [self.FILL_ANSWER, 'x']})
+
+        self.assertFalse(partial.data['is_correct'])
+        self.assertEqual(partial.data['feedback'], {'blanks_correct': [True, False]})
+        self.assertTrue(right.data['is_correct'])
+        self.assertEqual(right.data['feedback'],
+                         {'blanks_correct': [True, True], 'explanation': self.FILL_EXPL})
+
+    def test_resolving_a_solved_block_is_graded_but_not_recorded(self):
+        self.as_user(self.student)
+        self.submit(self.quiz, {'selected': 2})
+        practice = self.submit(self.quiz, {'selected': 1})
+
+        self.assertEqual(practice.status_code, 200)
+        self.assertFalse(practice.data['is_correct'])
+        self.assertFalse(practice.data['recorded'])
+        progress = Progress.objects.get(student=self.student, block=self.quiz)
+        self.assertTrue(progress.is_correct)
+        self.assertEqual(progress.answer, {'selected': 2})
+        self.assertEqual(Attempt.objects.filter(block=self.quiz).count(), 1)
+
+    def test_restore_on_page_load_uses_own_saved_answers(self):
+        self.as_user(self.student)
+        self.submit(self.quiz, {'selected': 2})                      # solved
+        self.submit(self.fill, {'blanks': [self.FILL_ANSWER, 'no']})  # not solved
+
+        restored = {p['block_type']: p for p in
+                    self.client.get(f'/api/progress/course/{self.course.id}/').data}
+
+        self.assertTrue(restored['QUIZ']['is_correct'])
+        self.assertEqual(restored['QUIZ']['answer'], {'selected': 2})
+        self.assertEqual(restored['QUIZ']['feedback'], {'explanation': self.QUIZ_EXPL})
+        self.assertFalse(restored['FILL']['is_correct'])
+        self.assertEqual(restored['FILL']['feedback'], {'blanks_correct': [True, False]})
 
 
 class CodeRunnerAccessTests(APITestCase):

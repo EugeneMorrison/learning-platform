@@ -21,17 +21,24 @@ from slugify import slugify
 #
 # Coursera-style: the course page and syllabus are public (Django pages);
 # lesson CONTENT is not.
-# - Course metadata: published courses for everyone; unpublished only for their author.
+# - Course metadata: published courses for everyone; unpublished only for their
+#   author and enrolled students.
 # - Lessons and blocks: own courses (author) ∪ enrolled courses (student).
 #   Anonymous users get nothing, free or paid.
 # Views must return 404 (not 403) for anything outside these querysets.
 
 class CourseQuerySet(models.QuerySet):
     def visible_to(self, user):
-        """Courses whose metadata (title, description, price) the user may read."""
+        """Courses whose metadata (title, description, price) the user may read:
+        published ∪ own (author) ∪ enrolled (a teacher may enrol students before
+        publishing)."""
         if not user.is_authenticated:
             return self.filter(is_published=True)
-        return self.filter(models.Q(is_published=True) | models.Q(author=user))
+        return self.filter(
+            models.Q(is_published=True)
+            | models.Q(author=user)
+            | models.Q(enrollments__student=user)
+        ).distinct()
 
     def with_content_access(self, user):
         """Courses whose lessons and blocks the user may read: own ∪ enrolled."""

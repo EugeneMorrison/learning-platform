@@ -15,6 +15,9 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         ? (typeof firstTest === 'object' ? firstTest.input : firstTest)
         : '';
     const hasTests = content.tests?.length > 0;
+    // Students get only the visible tests; the server says how many are hidden.
+    const hiddenTestCount = content.hidden_test_count || 0;
+    const totalTestCount = (content.tests?.length || 0) + hiddenTestCount;
 
     const [userCode, setUserCode] = useState(savedCode || content.starter_code);
     const [testsOpen, setTestsOpen] = useState(false);
@@ -23,7 +26,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
     const [runOutput, setRunOutput] = useState(null);
     const [submitResults, setSubmitResults] = useState(
         wasSolved
-            ? { status: 'success', total: content.tests?.length || 0 }
+            ? { status: 'success', total: totalTestCount }
             : null
     );
     const [isRunning, setIsRunning] = useState(false);
@@ -78,7 +81,8 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         }
     };
 
-    // "Отправить" — runs against all test cases
+    // "Отправить" — the server runs the block's stored tests (hidden ones too),
+    // decides whether it's solved and saves the progress itself.
     const handleSubmit = async () => {
         setIsSubmitting(true);
         setSubmitResults(null);
@@ -87,22 +91,9 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
             const res = await api.post('/run-tests/', {
                 block_id: blockId,
                 code: userCode,
-                tests: content.tests,
                 version: pythonVersion,
             });
             setSubmitResults(res.data);
-
-            if (blockId) {
-                try {
-                    await api.post('/progress/submit/', {
-                        block: blockId,
-                        answer: { code: userCode },
-                        is_correct: res.data.status === 'success',
-                    });
-                } catch (err) {
-                    console.error('Failed to save code progress:', err);
-                }
-            }
         } catch (err) {
             setSubmitResults({
                 status: 'error',
@@ -401,11 +392,13 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                         fontSize: '15px',
                         color: '#dc2626',
                     }}>
-                        Неверный ответ на тесте #{submitResults.test_number}
+                        Неверный ответ на {submitResults.hidden ? 'скрытом ' : ''}тесте #{submitResults.test_number}
                         <span style={{ fontWeight: '400', fontSize: '13px', marginLeft: '12px', color: '#64748b' }}>
                             ({submitResults.passed}/{submitResults.total} пройдено)
                         </span>
                     </div>
+                    {/* Hidden tests: the server sends no input/expected/actual. */}
+                    {!submitResults.hidden && (
                     <div style={{ padding: '14px 16px', background: 'white' }}>
                         <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                             <div style={{ flex: 1, minWidth: '150px' }}>
@@ -432,6 +425,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                             </div>
                         </div>
                     </div>
+                    )}
                 </div>
             )}
 
@@ -450,8 +444,12 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                         fontSize: '15px',
                         color: '#dc2626',
                     }}>
-                        Ошибка выполнения
+                        {submitResults.hidden
+                            ? `Ошибка выполнения на скрытом тесте #${submitResults.test_number}`
+                            : 'Ошибка выполнения'}
                     </div>
+                    {/* Hidden tests: the server sends no stderr (it could reveal the input). */}
+                    {!submitResults.hidden && (
                     <pre style={{
                         margin: 0,
                         padding: '14px 16px',
@@ -464,6 +462,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                     }}>
                         {submitResults.stderr}
                     </pre>
+                    )}
                 </div>
             )}
 
@@ -526,6 +525,12 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                             </table>
                         </div>
                     )}
+                </div>
+            )}
+
+            {hiddenTestCount > 0 && (
+                <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748b' }}>
+                    {hasTests ? 'Ещё скрытых тестов' : 'Скрытых тестов'}: {hiddenTestCount}. Решение проверяется на всех тестах.
                 </div>
             )}
         </div>

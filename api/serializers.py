@@ -8,6 +8,7 @@ Serializers convert between:
 """
 
 from rest_framework import serializers
+from .block_content import feedback, student_content
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message
 
 
@@ -173,10 +174,27 @@ class BlockSerializer(serializers.ModelSerializer):
     Serializer for Block model.
 
     The content field is JSONField - Django automatically handles conversion!
-    We don't need to do anything special.
+
+    Two views of `content`, chosen per block here (the one place that decides):
+    - the course's author gets the full content (editor, importer round-trips);
+    - everyone else gets block_content.student_content(): no solution, no
+      hidden tests, no correct answers, no explanations.
+    Without a request in the serializer context the student view is used.
     """
 
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self._is_course_author(instance):
+            data['content'] = student_content(instance.type, instance.content)
+        return data
+
+    def _is_course_author(self, block):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        return bool(user and user.is_authenticated
+                    and block.lesson.course.author_id == user.id)
 
     class Meta:
         model = Block
@@ -221,6 +239,12 @@ class BlockSerializer(serializers.ModelSerializer):
                 if field not in value:
                     raise serializers.ValidationError(
                         f"CODE blocks must have '{field}' field in content"
+                    )
+            # Optional per-test flag: shown to students or hidden.
+            for test in value.get('tests') or []:
+                if isinstance(test, dict) and 'visible' in test and not isinstance(test['visible'], bool):
+                    raise serializers.ValidationError(
+                        "CODE test 'visible' must be true or false"
                     )
 
         elif block_type == 'FILL':
@@ -281,6 +305,12 @@ class ProgressSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.username', read_only=True)
     lesson_title = serializers.CharField(source='lesson.title', read_only=True)
     block_type = serializers.CharField(source='block.type', read_only=True)
+    # Server-side feedback on the student's own saved answer (see
+    # block_content.feedback): explanation only when correct; FILL gap results.
+    feedback = serializers.SerializerMethodField()
+
+    def get_feedback(self, obj):
+        return feedback(obj.block.type, obj.block.content, obj.answer, obj.is_correct)
 
     class Meta:
         model = Progress
@@ -295,6 +325,7 @@ class ProgressSerializer(serializers.ModelSerializer):
             'completed',
             'answer',  # Student's answer (JSON)
             'is_correct',
+            'feedback',  # Extra: explanation (when correct), FILL gap results
             'completed_at',
             'created_at',
             'updated_at'

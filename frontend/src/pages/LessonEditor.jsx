@@ -22,12 +22,28 @@ function defaultContent(type) {
         case 'QUIZ':
             return { question: '', options: ['', ''], correct_answer: 0, explanation: '' };
         case 'CODE':
-            return { prompt: '', starter_code: '# Ваш код здесь\n', solution: '', tests: [{ input: '', expected: '' }] };
+            return { prompt: '', starter_code: '# Ваш код здесь\n', solution: '', tests: [{ input: '', expected: '', visible: true }] };
         case 'FILL':
             return { prompt: '', template: '', case_sensitive: false, explanation: '' };
         default:
             return {};
     }
+}
+
+// Same default as the server (api/block_content.py): when no test has a
+// `visible` flag, the first DEFAULT_VISIBLE_TESTS are shown to students.
+const DEFAULT_VISIBLE_TESTS = 2;
+
+// Give every dict test an explicit `visible` flag so the "Показывать ученику"
+// checkboxes show what students see now; saving then stores explicit flags.
+function withVisibleFlags(content) {
+    const tests = content.tests || [];
+    if (tests.some(t => typeof t === 'object' && t !== null && 'visible' in t)) return content;
+    return {
+        ...content,
+        tests: tests.map((t, i) =>
+            typeof t === 'object' && t !== null ? { ...t, visible: i < DEFAULT_VISIBLE_TESTS } : t),
+    };
 }
 
 function stripHtml(html) {
@@ -94,7 +110,9 @@ function LessonEditor() {
     function startEdit(block) {
         setFormError('');
         // Deep-ish clone so editing doesn't mutate state until save.
-        setDraft({ id: block.id, type: block.type, content: JSON.parse(JSON.stringify(block.content)) });
+        let content = JSON.parse(JSON.stringify(block.content));
+        if (block.type === 'CODE') content = withVisibleFlags(content);
+        setDraft({ id: block.id, type: block.type, content });
     }
 
     function cancelDraft() {
@@ -455,7 +473,7 @@ function CodeFields({ content, setContent }) {
                 </div>
             </Field>
 
-            <Field label="Тесты" hint="Ввод подаётся в stdin, ожидаемый вывод сравнивается со stdout. Пустые тесты игнорируются.">
+            <Field label="Тесты" hint="Ввод подаётся в stdin, ожидаемый вывод сравнивается со stdout. Пустые тесты игнорируются. Решение проверяется на всех тестах; ученик видит только отмеченные «Показывать ученику», об остальных — лишь «пройден / не пройден».">
                 {(content.tests || []).map((test, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start' }}>
                         <textarea
@@ -478,6 +496,21 @@ function CodeFields({ content, setContent }) {
                             style={{ ...input, flex: 1, minHeight: 48, fontFamily: "'JetBrains Mono', Consolas, monospace" }}
                             placeholder="Ожидаемый вывод (stdout)"
                         />
+                        <label
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#475569', whiteSpace: 'nowrap', paddingTop: 12 }}
+                            title="Видимые тесты ученик видит целиком; скрытые — только «пройден / не пройден»"
+                        >
+                            <input
+                                type="checkbox"
+                                checked={test.visible === true}
+                                onChange={e => setContent(c => {
+                                    const tests = [...c.tests];
+                                    tests[i] = { ...tests[i], visible: e.target.checked };
+                                    return { ...c, tests };
+                                })}
+                            />
+                            Показывать ученику
+                        </label>
                         <button
                             type="button"
                             onClick={() => setContent(c => ({ ...c, tests: c.tests.filter((_, idx) => idx !== i) }))}
@@ -488,7 +521,11 @@ function CodeFields({ content, setContent }) {
                 ))}
                 <button
                     type="button"
-                    onClick={() => setContent(c => ({ ...c, tests: [...(c.tests || []), { input: '', expected: '' }] }))}
+                    onClick={() => setContent(c => ({
+                        ...c,
+                        // New tests follow the default: the first two are shown to students.
+                        tests: [...(c.tests || []), { input: '', expected: '', visible: (c.tests || []).length < DEFAULT_VISIBLE_TESTS }],
+                    }))}
                     style={{ ...ghostBtn, padding: '6px 12px' }}
                 >+ Тест</button>
             </Field>

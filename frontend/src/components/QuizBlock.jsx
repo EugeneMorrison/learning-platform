@@ -17,9 +17,17 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
     const savedSelected = savedProgress?.answer?.selected;
     const hasAttempt = typeof savedSelected === 'number';
     const [selected, setSelected] = useState(hasAttempt ? savedSelected : null);
-    const [submitted, setSubmitted] = useState(hasAttempt);
+    // The server's verdict on `selected` (students never receive correct_answer).
+    // Restored on page load from the student's own saved progress.
+    const [result, setResult] = useState(hasAttempt ? {
+        isCorrect: savedProgress.is_correct === true,
+        explanation: savedProgress.feedback?.explanation || '',
+    } : null);
+    const [checking, setChecking] = useState(false);
+    const [checkError, setCheckError] = useState('');
 
-    const isCorrect = submitted && selected === content.correct_answer;
+    const submitted = result !== null;
+    const isCorrect = result?.isCorrect === true;
 
     const htmlQuestion = isHtmlQuestion(content.question);
 
@@ -33,28 +41,36 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
         : '';
 
     async function handleSubmit() {
-        if (selected === null) return;
-        setSubmitted(true);
+        if (selected === null || checking) return;
+        setChecking(true);
+        setCheckError('');
         try {
-            await api.post('/progress/submit/', {
+            const res = await api.post('/progress/submit/', {
                 block: blockId,
                 answer: { selected },
             });
+            setResult({
+                isCorrect: res.data.is_correct === true,
+                explanation: res.data.feedback?.explanation || '',
+            });
         } catch (err) {
-            console.error('Failed to save progress:', err);
+            console.error('Failed to check answer:', err);
+            setCheckError(err.response?.data?.detail || 'Не удалось проверить ответ. Попробуйте ещё раз.');
+        } finally {
+            setChecking(false);
         }
     }
 
     function handleReset() {
         setSelected(null);
-        setSubmitted(false);
+        setResult(null);
     }
 
     function handleOptionClick(index) {
         // Only allow clicking if correct answer not yet found
         if (isCorrect) return;
         setSelected(index);
-        setSubmitted(false);
+        setResult(null);
     }
 
     return (
@@ -127,8 +143,8 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
                             border: '2px solid',
                             cursor: isCorrect ? 'default' : 'pointer',
                             textAlign: 'left',
-                            background: getOptionBackground(index, selected, submitted, content.correct_answer),
-                            borderColor: getOptionBorder(index, selected, submitted, content.correct_answer),
+                            background: getOptionBackground(index, selected, submitted, isCorrect),
+                            borderColor: getOptionBorder(index, selected, submitted, isCorrect),
                             fontWeight: index === selected ? '600' : 'normal',
                             fontFamily: "'JetBrains Mono', Consolas, monospace",
                             fontSize: '14px',
@@ -142,20 +158,24 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
             {!submitted && (
                 <button
                     onClick={handleSubmit}
-                    disabled={selected === null}
+                    disabled={selected === null || checking}
                     style={{
                         marginTop: '16px',
                         padding: '10px 24px',
-                        background: selected === null ? '#94a3b8' : '#2563eb',
+                        background: selected === null || checking ? '#94a3b8' : '#2563eb',
                         color: 'white',
                         border: 'none',
                         borderRadius: '6px',
-                        cursor: selected === null ? 'not-allowed' : 'pointer',
+                        cursor: selected === null || checking ? 'not-allowed' : 'pointer',
                         fontWeight: '600',
                     }}
                 >
-                    Проверить ответ
+                    {checking ? 'Проверяем…' : 'Проверить ответ'}
                 </button>
+            )}
+
+            {checkError && (
+                <div style={{ marginTop: '12px', color: '#dc2626' }}>{checkError}</div>
             )}
 
             {/* Feedback — always appears before the retry/solve button */}
@@ -168,7 +188,9 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
                     color: isCorrect ? '#16a34a' : '#dc2626',
                     fontWeight: '600',
                 }}>
-                    {isCorrect ? '✅ Верно! ' + content.explanation : '❌ Неверно! Попробуйте еще раз!'}
+                    {isCorrect
+                        ? '✅ Верно!' + (result.explanation ? ' ' + result.explanation : '')
+                        : '❌ Неверно! Попробуйте еще раз!'}
                 </div>
             )}
 
@@ -211,16 +233,16 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
     );
 }
 
-function getOptionBackground(index, selected, submitted, correct) {
-    if (submitted && index === correct && index === selected) return '#dcfce7';
-    if (submitted && index === selected && index !== correct) return '#fee2e2';
+// Only the selected option is coloured after checking (green if the server said
+// correct, red otherwise); the correct option is never revealed.
+function getOptionBackground(index, selected, submitted, isCorrect) {
+    if (submitted && index === selected) return isCorrect ? '#dcfce7' : '#fee2e2';
     if (index === selected) return '#eff6ff';
     return 'white';
 }
 
-function getOptionBorder(index, selected, submitted, correct) {
-    if (submitted && index === correct && index === selected) return '#16a34a';
-    if (submitted && index === selected && index !== correct) return '#dc2626';
+function getOptionBorder(index, selected, submitted, isCorrect) {
+    if (submitted && index === selected) return isCorrect ? '#16a34a' : '#dc2626';
     if (index === selected) return '#2563eb';
     return '#e2e8f0';
 }

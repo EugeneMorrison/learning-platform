@@ -35,6 +35,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 
 from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
+from .block_content import grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
     LessonSerializer,
@@ -108,6 +109,36 @@ def get_accessible_block(user, block_id, missing_message, forbidden_message):
     return block
 
 
+def record_answer(user, block, answer, is_correct):
+    """
+    Save a server-graded submission: Progress (attempts +1) and, for task
+    blocks, an Attempt. Returns the Progress, or None when the block was
+    already solved: a solved block stays solved, and re-solving it is practice
+    that is graded but not recorded (as before, when such submissions got 400).
+    """
+    existing = Progress.objects.filter(student=user, block=block).first()
+    if existing and existing.is_correct:
+        return None
+
+    progress, _ = Progress.objects.get_or_create(
+        student=user,
+        block=block,
+        defaults={'lesson': block.lesson, 'attempts': 0},
+    )
+    progress.lesson = block.lesson
+    progress.completed = True
+    progress.answer = answer
+    progress.is_correct = is_correct
+    progress.attempts = (progress.attempts or 0) + 1
+    progress.completed_at = timezone.now()
+    progress.save()
+
+    # Attempt history (TEXT blocks carry no meaningful answer).
+    if block.type in ('QUIZ', 'CODE', 'FILL'):
+        Attempt.objects.create(student=user, block=block, answer=answer, is_correct=is_correct)
+    return progress
+
+
 class CodeRunnerAccessMixin:
     """
     Access rules shared by /api/run-code/ and /api/run-tests/.
@@ -125,7 +156,7 @@ class CodeRunnerAccessMixin:
     throttle_scope = 'code_run'
 
     def check_block_access(self, request):
-        """Raises a DRF error unless the user may run code for this block."""
+        """The CODE block to run code for; raises a DRF error otherwise."""
         block = get_accessible_block(
             request.user,
             request.data.get('block_id'),
@@ -134,6 +165,7 @@ class CodeRunnerAccessMixin:
         )
         if block.type != 'CODE':
             raise ParseError(gettext('Код можно запускать только в блоке с задачей.'))
+        return block
 
 
 class RunCodeView(CodeRunnerAccessMixin, APIView):
@@ -185,13 +217,25 @@ class RunCodeView(CodeRunnerAccessMixin, APIView):
 
 
 class RunTestsView(CodeRunnerAccessMixin, APIView):
-    """Run code against multiple test cases (body: block_id, code, tests, version)"""
+    """
+    Grade code against the BLOCK'S stored tests (body: block_id, code, version).
+
+    Any `tests` sent by the browser are ignored. All stored tests run, hidden
+    ones included, stopping at the first failure (as before). The server decides
+    is_correct and records Progress + Attempt (see record_answer).
+
+    Results reveal input / expected / actual output (or stderr) only for tests
+    visible to students (block_content.test_visibility); hidden tests report only
+    passed / not passed. Response: status (success | wrong_answer | error),
+    test_number + hidden for the failing test, results, passed, total,
+    is_correct, recorded.
+    """
 
     def post(self, request):
-        self.check_block_access(request)
+        block = self.check_block_access(request)
         code = request.data.get('code', '')
-        tests = request.data.get('tests', [])
         version = request.data.get('version', '')
+        tests = block.content.get('tests') or []
         if not code.strip():
             return Response({'error': 'No code provided'}, status=400)
         if not tests:
@@ -204,69 +248,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
             ) as f:
                 f.write(code)
                 tmp_path = f.name
-
-            results = []
-            for i, test in enumerate(tests):
-                stdin = test.get('input', '') if isinstance(test, dict) else ''
-                expected = test.get('expected', '') if isinstance(test, dict) else test
-                try:
-                    run_env = os.environ.copy()
-                    run_env['PYTHONUTF8'] = '1'
-                    proc = subprocess.run(
-                        [resolve_python(version), tmp_path],
-                        input=stdin,
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                        encoding='utf-8',
-                        errors='replace',
-                        env=run_env,
-                    )
-                    # Code error — return immediately with traceback
-                    if proc.returncode != 0:
-                        return Response({
-                            'status': 'error',
-                            'test_number': i + 1,
-                            'input': stdin,
-                            'stderr': proc.stderr,
-                        })
-
-                    actual = proc.stdout.strip()
-                    passed = actual == expected.strip()
-                    results.append({
-                        'input': stdin,
-                        'expected': expected.strip(),
-                        'actual': actual,
-                        'passed': passed,
-                    })
-
-                    # Wrong answer — stop and show details
-                    if not passed:
-                        return Response({
-                            'status': 'wrong_answer',
-                            'test_number': i + 1,
-                            'input': stdin,
-                            'expected': expected.strip(),
-                            'actual': actual,
-                            'results': results,
-                            'passed': sum(1 for r in results if r['passed']),
-                            'total': len(tests),
-                        })
-
-                except subprocess.TimeoutExpired:
-                    return Response({
-                        'status': 'error',
-                        'test_number': i + 1,
-                        'input': stdin,
-                        'stderr': 'Time limit exceeded (5s)',
-                    })
-
-            return Response({
-                'status': 'success',
-                'results': results,
-                'passed': len(results),
-                'total': len(results),
-            })
+            outcome = self.run_all(tmp_path, version, tests)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
         finally:
@@ -275,6 +257,68 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
                     os.unlink(tmp_path)
                 except OSError:
                     pass
+
+        is_correct = outcome['status'] == 'success'
+        progress = record_answer(request.user, block, {'code': code}, is_correct)
+        outcome['is_correct'] = is_correct
+        outcome['recorded'] = progress is not None
+        return Response(outcome)
+
+    @staticmethod
+    def run_all(tmp_path, version, tests):
+        visible = test_visibility(tests)
+        total = len(tests)
+        results = []
+
+        def stop(status_, i, **details):
+            """Failing test i: details only when the test is visible."""
+            body = {
+                'status': status_,
+                'test_number': i + 1,
+                'hidden': not visible[i],
+                'results': results,
+                'passed': sum(1 for r in results if r['passed']),
+                'total': total,
+            }
+            if visible[i]:
+                body.update(details)
+            return body
+
+        for i, test in enumerate(tests):
+            stdin, expected = normalize_test(test)
+            try:
+                run_env = os.environ.copy()
+                run_env['PYTHONUTF8'] = '1'
+                proc = subprocess.run(
+                    [resolve_python(version), tmp_path],
+                    input=stdin,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    encoding='utf-8',
+                    errors='replace',
+                    env=run_env,
+                )
+            except subprocess.TimeoutExpired:
+                return stop('error', i, input=stdin, stderr='Time limit exceeded (5s)')
+
+            # Code error — stop with the traceback (visible tests only)
+            if proc.returncode != 0:
+                return stop('error', i, input=stdin, stderr=proc.stderr)
+
+            actual = proc.stdout.strip()
+            passed = actual == expected.strip()
+            result = {'test_number': i + 1, 'passed': passed, 'hidden': not visible[i]}
+            if visible[i]:
+                result.update(input=stdin, expected=expected.strip(), actual=actual)
+            results.append(result)
+
+            # Wrong answer — stop and show details (visible tests only)
+            if not passed:
+                return stop('wrong_answer', i, input=stdin,
+                            expected=expected.strip(), actual=actual)
+
+        return {'status': 'success', 'results': results, 'passed': total, 'total': total}
 
 
 class UploadImageView(APIView):
@@ -665,6 +709,8 @@ class BlockViewSet(viewsets.ModelViewSet):
             queryset = Block.objects.visible_to(user)
         else:
             queryset = Block.objects.filter(lesson__course__author=user)
+        # BlockSerializer picks the author/student view per block from the course.
+        queryset = queryset.select_related('lesson__course')
 
         # Filter by lesson if provided
         lesson_id = self.request.query_params.get('lesson', None)
@@ -775,113 +821,55 @@ class CourseEnrollmentsView(generics.ListAPIView):
         )
 
 
-def grade_fill(content, answer):
-    """
-    Grade a FILL (fill-in-the-blanks) submission server-side.
-
-    Template holds blanks as {{answer}} or {{ans1|ans2}} (alternatives via |).
-    The student submits answer = {'blanks': ['...', ...]} in template order.
-    Each blank is correct if its trimmed value matches one accepted answer
-    (case-insensitively unless content['case_sensitive'] is true).
-    """
-    import re
-    template = content.get('template', '') or ''
-    case_sensitive = content.get('case_sensitive', False)
-    blanks = re.findall(r'\{\{(.*?)\}\}', template)
-    submitted = (answer or {}).get('blanks', []) or []
-    if len(submitted) != len(blanks) or not blanks:
-        return False
-    for raw, sub in zip(blanks, submitted):
-        accepted = [a.strip() for a in raw.split('|') if a.strip()]
-        value = (sub or '').strip()
-        if not case_sensitive:
-            value = value.lower()
-            accepted = [a.lower() for a in accepted]
-        if value not in accepted:
-            return False
-    return True
-
-
 class ProgressSubmitView(generics.CreateAPIView):
     """
-    POST /api/progress/submit/
-    Student submits a block completion or answer.
+    POST /api/progress/submit/   Body: {"block": "<uuid>", "answer": {...}}
+    Student submits an answer to a TEXT, QUIZ or FILL block.
 
     Access: anonymous → 401; missing block → 400; unknown block → 404;
     not enrolled in the block's course and not its author → 403.
 
-    For TEXT blocks: just marks as completed.
-    For QUIZ blocks: checks answer against correct_answer in block content.
-    For CODE blocks: marks as completed (code execution comes later in frontend).
+    Grading is server-side only; a client-sent is_correct is ignored.
+    - TEXT: marks as completed (is_correct stays None).
+    - QUIZ: answer {"selected": <option index>} vs correct_answer.
+    - FILL: answer {"blanks": [...]} vs the template's {{answer}} gaps.
+    - CODE: 400 — code is graded only by POST /api/run-tests/.
+
+    Response: the progress record (ProgressSerializer, incl. is_correct and
+    feedback: explanation when correct, FILL gap results) plus "recorded".
+    Re-solving an already solved block is graded but not recorded.
     """
     serializer_class = ProgressSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        answer = request.data.get('answer')
-
         block = get_accessible_block(
             request.user,
             request.data.get('block'),
             missing_message=gettext('Не указан блок.'),
             forbidden_message=gettext('Отвечать могут только записанные на курс учащиеся и автор курса.'),
         )
+        if block.type == 'CODE':
+            raise ParseError(gettext('Задачи с кодом проверяются запуском тестов.'))
 
-        # Check if progress record already exists
-        existing = Progress.objects.filter(
-            student=request.user,
-            block=block
-        ).first()
-
-        if existing and existing.is_correct:
-            return Response(
-                {'detail': 'This block is already solved.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Calculate is_correct based on block type
-        is_correct = None
+        answer = request.data.get('answer')
         if block.type == 'QUIZ':
-            correct_answer = block.content.get('correct_answer')
-            selected = answer.get('selected') if answer else None
-            is_correct = (selected == correct_answer)
-        elif block.type == 'TEXT':
-            is_correct = None  # Not applicable
-        elif block.type == 'CODE':
-            # Frontend already ran /run-tests/ and knows the outcome.
-            # Trust its is_correct flag (passed in the request body).
-            is_correct = request.data.get('is_correct')
+            is_correct = grade_quiz(block.content, answer)
         elif block.type == 'FILL':
-            # Graded server-side against the template's {{answer}} markers.
             is_correct = grade_fill(block.content, answer)
+        else:
+            is_correct = None  # TEXT: not applicable
 
-        # Create or fetch the record, then increment attempts on every submission.
-        # update_or_create can't easily increment, so we do it manually.
-        progress, _ = Progress.objects.get_or_create(
-            student=request.user,
-            block=block,
-            defaults={'lesson': block.lesson, 'attempts': 0},
-        )
-        progress.lesson = block.lesson
-        progress.completed = True
-        progress.answer = answer
-        progress.is_correct = is_correct
-        progress.attempts = (progress.attempts or 0) + 1
-        progress.completed_at = timezone.now()
-        progress.save()
+        progress = record_answer(request.user, block, answer, is_correct)
+        recorded = progress is not None
+        if not recorded:
+            # Already solved: report this attempt's result, keep the stored record.
+            progress = Progress(student=request.user, block=block, lesson=block.lesson,
+                                answer=answer, is_correct=is_correct, completed=True)
 
-        # Record this individual submission in the attempt history (skip TEXT
-        # blocks — they don't carry a meaningful answer payload).
-        if block.type in ('QUIZ', 'CODE', 'FILL'):
-            Attempt.objects.create(
-                student=request.user,
-                block=block,
-                answer=answer,
-                is_correct=is_correct,
-            )
-
-        serializer = self.get_serializer(progress)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = dict(self.get_serializer(progress).data)
+        data['recorded'] = recorded
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ProgressCourseView(generics.ListAPIView):
@@ -895,10 +883,11 @@ class ProgressCourseView(generics.ListAPIView):
 
     def get_queryset(self):
         course_id = self.kwargs['course_id']
+        # select_related: ProgressSerializer.feedback reads each record's block.
         return Progress.objects.filter(
             student=self.request.user,
             lesson__course_id=course_id
-        )
+        ).select_related('block', 'lesson', 'student')
 
 
 class ProgressStatsView(APIView):
