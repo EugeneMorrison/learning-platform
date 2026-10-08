@@ -16,6 +16,45 @@ from slugify import slugify
 
 
 # =============================================================================
+# READ-ACCESS RULES (one place; every view that reads courses/lessons/blocks uses these)
+# =============================================================================
+#
+# Coursera-style: the course page and syllabus are public (Django pages);
+# lesson CONTENT is not.
+# - Course metadata: published courses for everyone; unpublished only for their author.
+# - Lessons and blocks: own courses (author) ∪ enrolled courses (student).
+#   Anonymous users get nothing, free or paid.
+# Views must return 404 (not 403) for anything outside these querysets.
+
+class CourseQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """Courses whose metadata (title, description, price) the user may read."""
+        if not user.is_authenticated:
+            return self.filter(is_published=True)
+        return self.filter(models.Q(is_published=True) | models.Q(author=user))
+
+    def with_content_access(self, user):
+        """Courses whose lessons and blocks the user may read: own ∪ enrolled."""
+        if not user.is_authenticated:
+            return self.none()
+        return self.filter(
+            models.Q(author=user) | models.Q(enrollments__student=user)
+        ).distinct()
+
+
+class LessonQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        return self.filter(
+            course__in=Course.objects.with_content_access(user).values('pk'))
+
+
+class BlockQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        return self.filter(
+            lesson__course__in=Course.objects.with_content_access(user).values('pk'))
+
+
+# =============================================================================
 # USER MODEL (Extended Authentication)
 # =============================================================================
 
@@ -151,6 +190,8 @@ class Course(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)  # Set once on creation
     updated_at = models.DateTimeField(auto_now=True)  # Updates on every save
 
+    objects = CourseQuerySet.as_manager()
+
     class Meta:
         db_table = 'courses'
         ordering = ['sort_order', '-created_at']  # Manual order first, then newest
@@ -222,6 +263,8 @@ class Lesson(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = LessonQuerySet.as_manager()
+
     class Meta:
         db_table = 'lessons'
         ordering = ['order_index']  # Always ordered by position
@@ -283,6 +326,8 @@ class Block(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    objects = BlockQuerySet.as_manager()
 
     class Meta:
         db_table = 'blocks'

@@ -12,11 +12,13 @@ ViewSets provide automatic CRUD operations:
 
 from rest_framework import generics, permissions, viewsets, status, filters, views
 from rest_framework.decorators import action, api_view
+from rest_framework.exceptions import NotFound, ParseError, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
+from django.http import Http404
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import models
@@ -87,6 +89,25 @@ def resolve_python(version_str):
     return sys.executable
 
 
+def get_accessible_block(user, block_id, missing_message, forbidden_message):
+    """
+    The block a user may work on (run code, submit answers), else a DRF error.
+
+    Order: missing id → 400, unknown or malformed id → 404, block outside the
+    user's content access (BlockQuerySet.visible_to: own ∪ enrolled) → 403.
+    Errors render as {"detail": ...}.
+    """
+    if not block_id:
+        raise ParseError(missing_message)
+    try:
+        block = Block.objects.select_related('lesson__course').get(pk=uuid.UUID(str(block_id)))
+    except (ValueError, Block.DoesNotExist):
+        raise NotFound(gettext('Блок не найден.'))
+    if not Block.objects.visible_to(user).filter(pk=block.pk).exists():
+        raise PermissionDenied(forbidden_message)
+    return block
+
+
 class CodeRunnerAccessMixin:
     """
     Access rules shared by /api/run-code/ and /api/run-tests/.
@@ -104,36 +125,22 @@ class CodeRunnerAccessMixin:
     throttle_scope = 'code_run'
 
     def check_block_access(self, request):
-        """None when the user may run code for this block, else an error Response."""
-        block_id = request.data.get('block_id')
-        if not block_id:
-            return Response({'error': gettext('Не указан block_id.')}, status=400)
-        try:
-            block = Block.objects.select_related('lesson__course').get(pk=uuid.UUID(str(block_id)))
-        except (ValueError, Block.DoesNotExist):
-            return Response({'error': gettext('Блок не найден.')}, status=404)
-
-        course = block.lesson.course
-        user = request.user
-        if course.author_id != user.id and not Enrollment.objects.filter(
-            student=user, course=course
-        ).exists():
-            return Response(
-                {'error': gettext('Запускать код могут только записанные на курс учащиеся и автор курса.')},
-                status=403,
-            )
+        """Raises a DRF error unless the user may run code for this block."""
+        block = get_accessible_block(
+            request.user,
+            request.data.get('block_id'),
+            missing_message=gettext('Не указан block_id.'),
+            forbidden_message=gettext('Запускать код могут только записанные на курс учащиеся и автор курса.'),
+        )
         if block.type != 'CODE':
-            return Response({'error': gettext('Код можно запускать только в блоке с задачей.')}, status=400)
-        return None
+            raise ParseError(gettext('Код можно запускать только в блоке с задачей.'))
 
 
 class RunCodeView(CodeRunnerAccessMixin, APIView):
     """Execute Python code and return stdout/stderr (body: block_id, code, stdin, version)"""
 
     def post(self, request):
-        denied = self.check_block_access(request)
-        if denied:
-            return denied
+        self.check_block_access(request)
         code = request.data.get('code', '')
         stdin = request.data.get('stdin', '')
         version = request.data.get('version', '')
@@ -181,9 +188,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
     """Run code against multiple test cases (body: block_id, code, tests, version)"""
 
     def post(self, request):
-        denied = self.check_block_access(request)
-        if denied:
-            return denied
+        self.check_block_access(request)
         code = request.data.get('code', '')
         tests = request.data.get('tests', [])
         version = request.data.get('version', '')
@@ -375,20 +380,12 @@ class CourseViewSet(viewsets.ModelViewSet):
         Returns:
             QuerySet of courses filtered by permissions
         """
-        user = self.request.user
+        # list and retrieve: one rule (published for everyone, unpublished only for
+        # their author; see CourseQuerySet.visible_to). Others get 404 on detail.
+        if self.action in ('list', 'retrieve'):
+            return Course.objects.visible_to(self.request.user)
 
-        # For list view
-        if self.action == 'list':
-            if user.is_authenticated and hasattr(user, 'role') and user.role == 'AUTHOR':
-                # Authors see: published courses + their own unpublished courses
-                return Course.objects.filter(
-                    models.Q(is_published=True) | models.Q(author=user)
-                ).distinct()
-            else:
-                # Everyone else sees only published courses
-                return Course.objects.filter(is_published=True)
-
-        # For detail view (retrieve)
+        # Write actions: unchanged. Ownership is enforced by IsOwnerOrReadOnly.
         return Course.objects.all()
 
     def perform_create(self, serializer):
@@ -496,13 +493,10 @@ class LessonViewSet(viewsets.ModelViewSet):
     CRUD operations for lessons.
 
     Permissions:
-    - Anyone can view lessons in published courses (for embeddable viewer)
+    - Read: the course's author and its enrolled students only
+      (LessonQuerySet.visible_to). list/retrieve stay AllowAny so anonymous
+      requests get an empty list / 404 rather than 401.
     - Authors can create/edit lessons in THEIR courses only
-
-    FIX: Changed from IsAuthenticated to AllowAny for list/retrieve
-    so that the lesson_viewer.html works without JWT token.
-    This is correct for an embeddable platform — published content
-    should be publicly readable, just like on Stepik.
     """
 
     queryset = Lesson.objects.all()
@@ -511,8 +505,7 @@ class LessonViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Set permissions based on action"""
         if self.action in ['list', 'retrieve']:
-            # FIX: Allow public read access for published courses
-            # This makes the embeddable lesson viewer work without login
+            # AllowAny: get_queryset() restricts reads (anonymous → empty / 404)
             permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated, IsAuthor, IsOwnerOrReadOnly]
@@ -527,31 +520,45 @@ class LessonViewSet(viewsets.ModelViewSet):
         - /api/lessons/ → All lessons user has access to
         - /api/lessons/?course={id} → Lessons for specific course
 
-        FIX: Handle anonymous users (no role attribute).
-        Anonymous users see lessons from published courses only.
+        Reads (list/retrieve) follow LessonQuerySet.visible_to: own courses
+        (author) ∪ enrolled courses (student); anonymous users get nothing.
+        Writes keep the author's own courses (IsAuthor + IsOwnerOrReadOnly).
         """
         user = self.request.user
-        queryset = Lesson.objects.all()
+        if self.action in ('list', 'retrieve'):
+            queryset = Lesson.objects.visible_to(user)
+        else:
+            queryset = Lesson.objects.filter(course__author=user)
 
         # Filter by course if provided
         course_id = self.request.query_params.get('course', None)
         if course_id:
             queryset = queryset.filter(course_id=course_id)
 
-        # FIX: Check if user is authenticated before accessing .role
-        # Anonymous users (from lesson_viewer.html) have no role attribute
-        if user.is_authenticated and hasattr(user, 'role') and user.role == 'AUTHOR':
-            # Authors see lessons from their courses
-            queryset = queryset.filter(course__author=user)
-        elif user.is_authenticated:
-            # Authenticated students see lessons from enrolled courses
-            enrolled_courses = Enrollment.objects.filter(student=user).values_list('course_id', flat=True)
-            queryset = queryset.filter(course_id__in=enrolled_courses)
-        else:
-            # Anonymous users see lessons from published courses only
-            queryset = queryset.filter(course__is_published=True)
-
         return queryset
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        A lesson outside the user's access is a 404. When the lesson belongs to
+        a PUBLISHED course, the body carries course_slug so the viewer can link
+        to the public course page (whose page and syllabus are public anyway).
+        Lessons of unpublished courses and unknown ids get a plain 404.
+        """
+        try:
+            return super().retrieve(request, *args, **kwargs)
+        except Http404:
+            course_slug = None
+            try:
+                course_slug = (
+                    Course.objects.filter(is_published=True, lessons__pk=uuid.UUID(str(kwargs.get('pk'))))
+                    .values_list('slug', flat=True).first()
+                )
+            except ValueError:
+                pass
+            body = {'detail': gettext('Урок недоступен.')}
+            if course_slug:
+                body['course_slug'] = course_slug
+            return Response(body, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAuthor, IsOwnerOrReadOnly])
     def reorder(self, request, pk=None):
@@ -624,10 +631,9 @@ class BlockViewSet(viewsets.ModelViewSet):
     CRUD operations for blocks.
 
     Permissions:
-    - Anyone can view blocks in published courses (for embeddable viewer)
+    - Read: the course's author and its enrolled students only
+      (BlockQuerySet.visible_to); anonymous requests get an empty list / 404.
     - Authors can create/edit blocks in THEIR courses only
-
-    FIX: Changed from IsAuthenticated to AllowAny for list/retrieve
     """
 
     queryset = Block.objects.all()
@@ -636,7 +642,7 @@ class BlockViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         """Set permissions based on action"""
         if self.action in ['list', 'retrieve']:
-            # FIX: Allow public read access for published courses
+            # AllowAny: get_queryset() restricts reads (anonymous → empty / 404)
             permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated, IsAuthor, IsOwnerOrReadOnly]
@@ -650,112 +656,22 @@ class BlockViewSet(viewsets.ModelViewSet):
         URL patterns:
         - /api/blocks/?lesson={id} → Blocks for specific lesson
 
-        FIX: Handle anonymous users (no role attribute).
-        Anonymous users see blocks from published courses only.
+        Reads (list/retrieve) follow BlockQuerySet.visible_to: own courses
+        (author) ∪ enrolled courses (student); anonymous users get nothing.
+        Writes keep the author's own courses (IsAuthor + IsOwnerOrReadOnly).
         """
         user = self.request.user
-        queryset = Block.objects.all()
+        if self.action in ('list', 'retrieve'):
+            queryset = Block.objects.visible_to(user)
+        else:
+            queryset = Block.objects.filter(lesson__course__author=user)
 
         # Filter by lesson if provided
         lesson_id = self.request.query_params.get('lesson', None)
         if lesson_id:
             queryset = queryset.filter(lesson_id=lesson_id)
 
-        # FIX: Check if user is authenticated before accessing .role
-        if user.is_authenticated and hasattr(user, 'role') and user.role == 'AUTHOR':
-            # Authors see blocks from their courses
-            queryset = queryset.filter(lesson__course__author=user)
-        elif user.is_authenticated:
-            # Authenticated students see blocks from enrolled courses
-            enrolled_courses = Enrollment.objects.filter(student=user).values_list('course_id', flat=True)
-            queryset = queryset.filter(lesson__course_id__in=enrolled_courses)
-        else:
-            # Anonymous users see blocks from published courses only
-            queryset = queryset.filter(lesson__course__is_published=True)
-
         return queryset
-
-
-# =============================================================================
-# PROGRESS VIEWSET
-# =============================================================================
-
-class ProgressViewSet(viewsets.ModelViewSet):
-    """
-    Track student progress.
-
-    Endpoints:
-    - GET /api/progress/ → My progress
-    - POST /api/progress/ → Submit block completion
-    """
-
-    queryset = Progress.objects.all()
-    serializer_class = ProgressSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """Students see only their own progress"""
-        user = self.request.user
-
-        if user.role == 'AUTHOR':
-            # Authors can see progress of students in their courses
-            return Progress.objects.filter(lesson__course__author=user)
-        else:
-            # Students see only their progress
-            return Progress.objects.filter(student=user)
-
-    def perform_create(self, serializer):
-        """Automatically set student when creating progress"""
-        serializer.save(student=self.request.user)
-
-    @action(detail=False, methods=['post'])
-    def submit(self, request):
-        """
-        Submit block completion/answer.
-
-        POST /api/progress/submit/
-        Body: {
-            "block": "block-uuid",
-            "completed": true,
-            "answer": {...},  # Optional
-            "is_correct": true  # Optional
-        }
-        """
-        block_id = request.data.get('block')
-
-        if not block_id:
-            return Response(
-                {'error': 'Block ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        block = get_object_or_404(Block, id=block_id)
-
-        # Get or create progress record
-        progress, created = Progress.objects.get_or_create(
-            student=request.user,
-            block=block,
-            lesson=block.lesson,
-            defaults={
-                'completed': request.data.get('completed', False),
-                'answer': request.data.get('answer'),
-                'is_correct': request.data.get('is_correct')
-            }
-        )
-
-        # Update if already exists
-        if not created:
-            progress.completed = request.data.get('completed', progress.completed)
-            progress.answer = request.data.get('answer', progress.answer)
-            progress.is_correct = request.data.get('is_correct', progress.is_correct)
-
-            if progress.completed:
-                progress.completed_at = datetime.now()
-
-            progress.save()
-
-        serializer = self.get_serializer(progress)
-        return Response(serializer.data)
 
 
 def lesson_viewer(request):
@@ -891,6 +807,9 @@ class ProgressSubmitView(generics.CreateAPIView):
     POST /api/progress/submit/
     Student submits a block completion or answer.
 
+    Access: anonymous → 401; missing block → 400; unknown block → 404;
+    not enrolled in the block's course and not its author → 403.
+
     For TEXT blocks: just marks as completed.
     For QUIZ blocks: checks answer against correct_answer in block content.
     For CODE blocks: marks as completed (code execution comes later in frontend).
@@ -899,11 +818,14 @@ class ProgressSubmitView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
-        block_id = request.data.get('block')
         answer = request.data.get('answer')
 
-        # Get the block
-        block = generics.get_object_or_404(Block, id=block_id)
+        block = get_accessible_block(
+            request.user,
+            request.data.get('block'),
+            missing_message=gettext('Не указан блок.'),
+            forbidden_message=gettext('Отвечать могут только записанные на курс учащиеся и автор курса.'),
+        )
 
         # Check if progress record already exists
         existing = Progress.objects.filter(
@@ -1057,7 +979,9 @@ class StudentProgressView(APIView):
         is_author = request.user.role == 'AUTHOR'
 
         if is_self:
-            course = get_object_or_404(Course, id=course_id)
+            # Own progress, but only for courses whose content the user can read
+            # (enrolled or own): this response lists the course's lessons and blocks.
+            course = get_object_or_404(Course.objects.with_content_access(request.user), id=course_id)
         elif is_author:
             course = get_object_or_404(Course, id=course_id, author=request.user)
         else:

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-08 23:04+0300\n"
+"POT-Creation-Date: 2026-10-09 00:19+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -16,34 +16,48 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\api\views.py:110
-msgid "Не указан block_id."
-msgstr "block_id is required."
-
-#: .\api\views.py:114
+#: .\api\views.py:105
 msgid "Блок не найден."
 msgstr "Block not found."
 
-#: .\api\views.py:122
-msgid "Запускать код могут только записанные на курс учащиеся и автор курса."
-msgstr "Only students enrolled in the course and the course author can run code."
+#: .\api\views.py:132
+msgid "Не указан block_id."
+msgstr "block_id is required."
 
-#: .\api\views.py:126
+#: .\api\views.py:133
+msgid "Запускать код могут только записанные на курс учащиеся и автор курса."
+msgstr ""
+"Only students enrolled in the course and the course author can run code."
+
+#: .\api\views.py:136
 msgid "Код можно запускать только в блоке с задачей."
 msgstr "Code can only be run in an exercise block."
 
-#: .\api\views.py:795
+#: .\api\views.py:558
+msgid "Урок недоступен."
+msgstr "This lesson is not available."
+
+#: .\api\views.py:711
 msgid "Записаться на курс может только учащийся."
 msgstr "Only students can enroll in a course."
 
-#: .\api\views.py:801
+#: .\api\views.py:717
 msgid "Курс не найден."
 msgstr "Course not found."
 
-#: .\api\views.py:806
+#: .\api\views.py:722
 msgid ""
 "Это платный курс: самостоятельно записаться можно только на бесплатные курсы."
 msgstr "This is a paid course: you can only enroll yourself in free courses."
+
+#: .\api\views.py:826
+msgid "Не указан блок."
+msgstr "block is required."
+
+#: .\api\views.py:827
+msgid "Отвечать могут только записанные на курс учащиеся и автор курса."
+msgstr ""
+"Only students enrolled in the course and the course author can submit answers."
 
 #: .\backend\templates\public\base.html:6
 #: .\backend\templates\public\base.html:19

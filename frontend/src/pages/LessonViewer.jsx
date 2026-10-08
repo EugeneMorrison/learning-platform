@@ -58,7 +58,7 @@ function LessonViewer() {
         try {
             const lessonId = getLessonIdFromUrl();
             if (!lessonId) {
-                setError('Lesson ID not found in URL.');
+                setError({ message: 'Lesson ID not found in URL.' });
                 setLoading(false);
                 return;
             }
@@ -83,7 +83,27 @@ function LessonViewer() {
                 setProgress([]);
             }
         } catch (err) {
-            setError('Failed to load lesson. Check console for details.');
+            const status = err.response?.status;
+            if (status === 401 || status === 404) {
+                // No access (anonymous, or not enrolled) — lessons open only after enrolment.
+                // The API adds course_slug only when the lesson's course is published.
+                const slug = err.response?.data?.course_slug;
+                // Read the token now: api.js clears it if the session had expired.
+                const loggedIn = Boolean(localStorage.getItem('access_token'));
+                setError(slug ? {
+                    message: loggedIn
+                        ? 'Запишитесь на курс, чтобы открыть урок'
+                        : 'Чтобы открыть урок, войдите и запишитесь на курс',
+                    href: `/course/${slug}/`,
+                    linkLabel: 'Перейти к курсу',
+                } : {
+                    message: err.response?.data?.detail || 'Урок недоступен.',
+                    href: '/#catalog',
+                    linkLabel: 'Все курсы',
+                });
+            } else {
+                setError({ message: 'Failed to load lesson. Check console for details.' });
+            }
             console.error(err);
         } finally {
             setLoading(false);
@@ -206,7 +226,14 @@ function LessonViewer() {
 
     if (error) return (
         <div style={{ padding: '40px', textAlign: 'center', color: '#dc2626' }}>
-            {error}
+            <p>{error.message}</p>
+            {error.href && (
+                // Public Django pages: plain link. In an embed, open our site in a new tab
+                // instead of navigating inside the host page's iframe.
+                <a href={error.href} {...(isInIframe ? { target: '_blank', rel: 'noopener' } : {})}>
+                    {error.linkLabel}
+                </a>
+            )}
         </div>
     );
 

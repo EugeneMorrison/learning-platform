@@ -19,7 +19,6 @@ router = DefaultRouter()
 router.register(r'courses', views.CourseViewSet, basename='course')
 router.register(r'lessons', views.LessonViewSet, basename='lesson')
 router.register(r'blocks', views.BlockViewSet, basename='block')
-router.register(r'progress', views.ProgressViewSet, basename='progress')
 
 urlpatterns = [
     # Simple test endpoints
@@ -77,6 +76,8 @@ ENROLLMENTS:
 - POST   /api/courses/{id}/enroll_student/ → Teacher enrols a student by username
 
 PROGRESS:
-- GET    /api/progress/             → My progress
-- POST   /api/progress/submit/      → Submit block completion
+- POST   /api/progress/submit/                       → Submit a block answer (enrolled students / course author)
+- GET    /api/progress/course/{course_id}/           → My progress in a course
+- GET    /api/progress/stats/                        → My stats across enrolled courses
+- GET    /api/progress/student/{id}/course/{id}/     → A student's progress (self or course author)
 """
