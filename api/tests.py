@@ -1,18 +1,132 @@
 """
 API tests: public registration (always STUDENT), student self-enrolment
-(POST /api/enrollments/) and the teacher's enroll_student action.
+(POST /api/enrollments/), the teacher's enroll_student action, and access to
+the code runner (/api/run-code/, /api/run-tests/).
 
 Run with: python manage.py test api
 """
 
+import subprocess
 from decimal import Decimal
+from unittest import mock
 
+from django.core.cache import cache
 from rest_framework.test import APITestCase
+from rest_framework.throttling import ScopedRateThrottle
 
-from .models import Course, Enrollment, User
+from .models import Block, Course, Enrollment, Lesson, User
 from .serializers import UserSerializer
 
 REGISTER_URL = '/api/auth/register/'
+RUN_CODE_URL = '/api/run-code/'
+RUN_TESTS_URL = '/api/run-tests/'
+
+
+def fake_run(stdout='2\n', returncode=0, stderr=''):
+    """Stand-in for subprocess.run: the tests never start a real interpreter."""
+    return mock.patch(
+        'api.views.subprocess.run',
+        return_value=subprocess.CompletedProcess(
+            args=[], returncode=returncode, stdout=stdout, stderr=stderr),
+    )
+
+
+class CodeRunnerAccessTests(APITestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='teacher', password='x', role='AUTHOR')
+        cls.other_author = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.enrolled = User.objects.create_user(username='enrolled', password='x', role='STUDENT')
+        cls.outsider = User.objects.create_user(username='outsider', password='x', role='STUDENT')
+        course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        lesson = Lesson.objects.create(course=course, title='Lesson', order_index=1)
+        cls.code_block = Block.objects.create(lesson=lesson, type='CODE', order_index=1, content={
+            'prompt': 'p', 'starter_code': '', 'tests': [{'input': '1', 'expected': '2'}]})
+        cls.text_block = Block.objects.create(
+            lesson=lesson, type='TEXT', order_index=2, content={'html': '<p>x</p>'})
+        Enrollment.objects.create(student=cls.enrolled, course=course)
+
+    def setUp(self):
+        cache.clear()  # throttle counters live in the default cache
+
+    def run_code(self, user, block_id, url=RUN_CODE_URL):
+        if user:
+            self.client.force_authenticate(user)
+        body = {'code': 'print(2)', 'stdin': '1', 'version': 'Python 3.12',
+                'tests': [{'input': '1', 'expected': '2'}]}
+        if block_id is not None:
+            body['block_id'] = str(block_id)
+        return self.client.post(url, body, format='json')
+
+    def test_anonymous_gets_401(self):
+        with fake_run() as run:
+            for url in [RUN_CODE_URL, RUN_TESTS_URL]:
+                self.assertEqual(self.run_code(None, self.code_block.id, url).status_code, 401, url)
+        run.assert_not_called()
+
+    def test_not_enrolled_student_gets_403(self):
+        with fake_run() as run:
+            for url in [RUN_CODE_URL, RUN_TESTS_URL]:
+                self.assertEqual(self.run_code(self.outsider, self.code_block.id, url).status_code, 403, url)
+        run.assert_not_called()
+
+    def test_other_author_gets_403(self):
+        with fake_run() as run:
+            response = self.run_code(self.other_author, self.code_block.id)
+        self.assertEqual(response.status_code, 403)
+        run.assert_not_called()
+
+    def test_enrolled_student_can_run_code_and_tests(self):
+        with fake_run() as run:
+            code = self.run_code(self.enrolled, self.code_block.id, RUN_CODE_URL)
+            tests = self.run_code(self.enrolled, self.code_block.id, RUN_TESTS_URL)
+
+        self.assertEqual(code.status_code, 200)
+        self.assertEqual(code.data['stdout'], '2\n')
+        self.assertEqual(tests.status_code, 200)
+        self.assertEqual(tests.data['status'], 'success')
+        self.assertEqual(run.call_count, 2)
+
+    def test_course_author_can_run_code(self):
+        with fake_run() as run:
+            response = self.run_code(self.author, self.code_block.id)
+        self.assertEqual(response.status_code, 200)
+        run.assert_called_once()
+
+    def test_unknown_or_malformed_block_gets_404(self):
+        with fake_run() as run:
+            for block_id in ['3fa85f64-5717-4562-b3fc-2c963f66afa6', 'not-a-uuid']:
+                for url in [RUN_CODE_URL, RUN_TESTS_URL]:
+                    response = self.run_code(self.enrolled, block_id, url)
+                    self.assertEqual(response.status_code, 404, (block_id, url))
+        run.assert_not_called()
+
+    def test_missing_block_id_gets_400(self):
+        with fake_run() as run:
+            response = self.run_code(self.enrolled, None)
+        self.assertEqual(response.status_code, 400)
+        run.assert_not_called()
+
+    def test_non_code_block_gets_400(self):
+        with fake_run() as run:
+            for url in [RUN_CODE_URL, RUN_TESTS_URL]:
+                self.assertEqual(self.run_code(self.enrolled, self.text_block.id, url).status_code, 400, url)
+        run.assert_not_called()
+
+    def test_throttle_returns_429_when_exceeded(self):
+        # The rate is read per request from this dict, so patching it overrides settings.
+        with mock.patch.dict(ScopedRateThrottle.THROTTLE_RATES, {'code_run': '3/min'}), fake_run():
+            statuses = [self.run_code(self.enrolled, self.code_block.id, url).status_code
+                        for url in [RUN_CODE_URL, RUN_TESTS_URL, RUN_CODE_URL, RUN_TESTS_URL]]
+        # One shared budget for both endpoints: the 4th call in a minute is refused.
+        self.assertEqual(statuses, [200, 200, 200, 429])
+
+    def test_throttle_is_per_user(self):
+        with mock.patch.dict(ScopedRateThrottle.THROTTLE_RATES, {'code_run': '1/min'}), fake_run():
+            first = self.run_code(self.enrolled, self.code_block.id).status_code
+            second = self.run_code(self.enrolled, self.code_block.id).status_code
+            author = self.run_code(self.author, self.code_block.id).status_code
+        self.assertEqual((first, second, author), (200, 429, 200))
 
 
 class RegistrationRoleTests(APITestCase):

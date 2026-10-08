@@ -14,6 +14,7 @@ from rest_framework import generics, permissions, viewsets, status, filters, vie
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django.conf import settings
@@ -86,11 +87,53 @@ def resolve_python(version_str):
     return sys.executable
 
 
-class RunCodeView(APIView):
-    """Execute Python code and return stdout/stderr"""
-    permission_classes = [AllowAny]
+class CodeRunnerAccessMixin:
+    """
+    Access rules shared by /api/run-code/ and /api/run-tests/.
+
+    - not authenticated → 401 (permission class)
+    - more than 30 runs/min per user (both endpoints together) → 429
+      (ScopedRateThrottle, scope 'code_run', rate in settings.REST_FRAMEWORK)
+    - body must carry block_id of a CODE block:
+      missing → 400, unknown → 404, user not enrolled in the block's course
+      and not its author → 403, block not CODE → 400.
+    Execution itself (subprocess, timeout, interpreters) is unchanged.
+    """
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'code_run'
+
+    def check_block_access(self, request):
+        """None when the user may run code for this block, else an error Response."""
+        block_id = request.data.get('block_id')
+        if not block_id:
+            return Response({'error': gettext('Не указан block_id.')}, status=400)
+        try:
+            block = Block.objects.select_related('lesson__course').get(pk=uuid.UUID(str(block_id)))
+        except (ValueError, Block.DoesNotExist):
+            return Response({'error': gettext('Блок не найден.')}, status=404)
+
+        course = block.lesson.course
+        user = request.user
+        if course.author_id != user.id and not Enrollment.objects.filter(
+            student=user, course=course
+        ).exists():
+            return Response(
+                {'error': gettext('Запускать код могут только записанные на курс учащиеся и автор курса.')},
+                status=403,
+            )
+        if block.type != 'CODE':
+            return Response({'error': gettext('Код можно запускать только в блоке с задачей.')}, status=400)
+        return None
+
+
+class RunCodeView(CodeRunnerAccessMixin, APIView):
+    """Execute Python code and return stdout/stderr (body: block_id, code, stdin, version)"""
 
     def post(self, request):
+        denied = self.check_block_access(request)
+        if denied:
+            return denied
         code = request.data.get('code', '')
         stdin = request.data.get('stdin', '')
         version = request.data.get('version', '')
@@ -134,11 +177,13 @@ class RunCodeView(APIView):
                     pass
 
 
-class RunTestsView(APIView):
-    """Run code against multiple test cases"""
-    permission_classes = [AllowAny]
+class RunTestsView(CodeRunnerAccessMixin, APIView):
+    """Run code against multiple test cases (body: block_id, code, tests, version)"""
 
     def post(self, request):
+        denied = self.check_block_access(request)
+        if denied:
+            return denied
         code = request.data.get('code', '')
         tests = request.data.get('tests', [])
         version = request.data.get('version', '')

@@ -189,6 +189,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
+    # Per-user limits for views that set throttle_scope (ScopedRateThrottle).
+    # Counters live in the default cache (no CACHES setting → per-process LocMemCache).
+    'DEFAULT_THROTTLE_RATES': {
+        'code_run': '30/min',  # /api/run-code/ and /api/run-tests/ together
+    },
 }
 
 # Custom user model

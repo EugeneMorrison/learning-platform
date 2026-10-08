@@ -61,6 +61,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         setRunOutput(null);
         try {
             const res = await api.post('/run-code/', {
+                block_id: blockId,
                 code: userCode,
                 stdin: testInput,
                 version: pythonVersion,
@@ -69,7 +70,8 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         } catch (err) {
             setRunOutput({
                 stdout: '',
-                stderr: err.response?.data?.error || err.message || 'Ошибка соединения',
+                // runner errors use "error"; DRF's 401/429 use "detail"
+                stderr: err.response?.data?.error || err.response?.data?.detail || err.message || 'Ошибка соединения',
             });
         } finally {
             setIsRunning(false);
@@ -83,6 +85,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         setHasSubmitted(true);
         try {
             const res = await api.post('/run-tests/', {
+                block_id: blockId,
                 code: userCode,
                 tests: content.tests,
                 version: pythonVersion,
@@ -103,7 +106,8 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         } catch (err) {
             setSubmitResults({
                 status: 'error',
-                stderr: err.response?.data?.error || err.message || 'Ошибка соединения',
+                // runner errors use "error"; DRF's 401/429 use "detail"
+                stderr: err.response?.data?.error || err.response?.data?.detail || err.message || 'Ошибка соединения',
             });
         } finally {
             setIsSubmitting(false);

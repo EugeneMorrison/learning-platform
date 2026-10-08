@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-07 00:26+0300\n"
+"POT-Creation-Date: 2026-10-08 23:04+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -16,15 +16,31 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\api\views.py:750
+#: .\api\views.py:110
+msgid "Не указан block_id."
+msgstr "block_id is required."
+
+#: .\api\views.py:114
+msgid "Блок не найден."
+msgstr "Block not found."
+
+#: .\api\views.py:122
+msgid "Запускать код могут только записанные на курс учащиеся и автор курса."
+msgstr "Only students enrolled in the course and the course author can run code."
+
+#: .\api\views.py:126
+msgid "Код можно запускать только в блоке с задачей."
+msgstr "Code can only be run in an exercise block."
+
+#: .\api\views.py:795
 msgid "Записаться на курс может только учащийся."
 msgstr "Only students can enroll in a course."
 
-#: .\api\views.py:756
+#: .\api\views.py:801
 msgid "Курс не найден."
 msgstr "Course not found."
 
-#: .\api\views.py:761
+#: .\api\views.py:806
 msgid ""
 "Это платный курс: самостоятельно записаться можно только на бесплатные курсы."
 msgstr "This is a paid course: you can only enroll yourself in free courses."
