@@ -454,3 +454,30 @@ class HeroCodeCardTests(PublicPagesTestCase):
         # The font ships with its licence alongside.
         self.assertIsNotNone(finders.find('public/fonts/JetBrainsMono-Regular.woff2'))
         self.assertIsNotNone(finders.find('public/fonts/JetBrainsMono-OFL.txt'))
+
+    def test_card_stylesheet_is_linked_and_styles_every_card_class(self):
+        # Regression guard for "card renders as plain text": the landing page must
+        # link a stylesheet that exists in the static files and has a rule for
+        # every class used inside the card.
+        from django.contrib.staticfiles import finders
+
+        for url in ['/', '/en/']:
+            html = self.client.get(url).content.decode()
+            hrefs = re.findall(r'<link rel="stylesheet" href="/static/([^"]+)"', html)
+            css = {}
+            for href in hrefs:
+                path = finders.find(href)
+                self.assertIsNotNone(path, f'{url}: linked {href} is not a static file')
+                css[href] = open(path, encoding='utf-8').read()
+
+            card_css = [href for href, text in css.items() if '.code-card {' in text]
+            self.assertEqual(card_css, ['public/css/landing.css'], url)
+            # Loaded after the tokens it uses.
+            self.assertLess(hrefs.index('public/css/tokens.css'), hrefs.index('public/css/landing.css'))
+
+            start = html.index('<div class="hero__code">')
+            card = html[start:html.index('</section>', start)]
+            classes = {c for attr in re.findall(r'class="([^"]+)"', card) for c in attr.split()}
+            all_css = '\n'.join(css.values())
+            missing = sorted(c for c in classes if not re.search(rf'\.{re.escape(c)}\b', all_css))
+            self.assertEqual(missing, [], f'{url}: card classes without a CSS rule')
