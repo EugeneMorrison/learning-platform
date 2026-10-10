@@ -1,3 +1,26 @@
+/*
+ * JetBrains Mono (code), self-hosted: official v2.304 webfonts from
+ * github.com/JetBrains/JetBrainsMono, SIL Open Font License 1.1 (licence and
+ * copyright notice next to the files: public/fonts/jetbrains-mono/JetBrainsMono-OFL.txt).
+ * Only the weights the app uses: 400 and 600 (bold in code resolves to 600, as it
+ * did with Google Fonts). Italic stays synthesised, as before.
+ */
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/fonts/jetbrains-mono/JetBrainsMono-SemiBold.woff2') format('woff2');
+}
+
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
