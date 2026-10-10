@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 17:57+0300\n"
+"POT-Creation-Date: 2026-10-10 19:24+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -79,7 +79,7 @@ msgid "Основная навигация"
 msgstr "Main navigation"
 
 #: .\backend\templates\public\base.html:23
-#: .\backend\templates\public\landing.html:35
+#: .\backend\templates\public\landing.html:53
 msgid "Курсы"
 msgstr "Courses"
 
@@ -149,7 +149,7 @@ msgid "Программа курса"
 msgstr "Course syllabus"
 
 #: .\backend\templates\public\course_detail.html:61
-#: .\backend\templates\public\landing.html:53
+#: .\backend\templates\public\landing.html:71
 msgid "Уроков:"
 msgstr "Lessons:"
 
@@ -191,8 +191,8 @@ msgid "Старая цена:"
 msgstr "Old price:"
 
 #: .\backend\templates\public\landing.html:13
-msgid "Учитесь программированию шаг за шагом"
-msgstr "Learn to code step by step"
+msgid "Учитесь Python шаг за шагом"
+msgstr "Learn Python step by step"
 
 #: .\backend\templates\public\landing.html:15
 msgid ""
@@ -209,6 +209,34 @@ msgstr "Browse courses"
 msgid "Войти в аккаунт"
 msgstr "Log in to your account"
 
-#: .\backend\templates\public\landing.html:62
+#: .\backend\templates\public\landing.html:26
+msgid "Привет"
+msgstr "Hello"
+
+#: .\backend\templates\public\landing.html:26
+msgid "Мир"
+msgstr "World"
+
+#: .\backend\templates\public\landing.html:28
+msgid ""
+"Пример задачи: функция на Python возвращает приветствие, программа его "
+"выводит, и все тесты пройдены."
+msgstr ""
+"Example task: a Python function returns a greeting, the program prints it, "
+"and all tests pass."
+
+#: .\backend\templates\public\landing.html:36
+msgid "Урок 1: функции"
+msgstr "Lesson 1: functions"
+
+#: .\backend\templates\public\landing.html:42
+msgid "Вывод"
+msgstr "Output"
+
+#: .\backend\templates\public\landing.html:45
+msgid "Все тесты пройдены"
+msgstr "All tests passed"
+
+#: .\backend\templates\public\landing.html:80
 msgid "Курсы скоро появятся. Загляните позже."
 msgstr "Courses are coming soon. Check back later."

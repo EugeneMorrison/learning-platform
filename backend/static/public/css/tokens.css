@@ -12,9 +12,19 @@
   --color-accent: #2340D6;     /* links, primary buttons */
   --color-highlight: #FFD23F;  /* marker highlights, badges */
 
+  /* Code card (dark editor). Contrast on --color-ink: text 14.8:1, highlight
+     12.5:1, accent-on-dark 7.5:1, code-muted 7.6:1, success 10.4:1.
+     Plain --color-accent is only 2.4:1 on dark, hence the lighter tint. */
+  --color-code-bar: #1E2130;        /* editor title bar */
+  --color-code-text: #E6E8F2;       /* default code text */
+  --color-accent-on-dark: #8EA2FF;  /* cobalt tint for function names */
+  --color-code-muted: #A0A8C0;      /* strings, comments, output label */
+  --color-success: #4ADE80;         /* "tests passed" */
+
   /* Fonts (see fonts.css for @font-face) */
   --font-heading: "Unbounded", system-ui, sans-serif;
   --font-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-code: "JetBrains Mono", Consolas, "Courier New", monospace;
 
   --weight-regular: 400;
   --weight-medium: 500;

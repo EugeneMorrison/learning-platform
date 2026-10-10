@@ -113,7 +113,7 @@ class LandingCatalogTests(PublicPagesTestCase):
         response = self.client.get('/en/')
 
         self.assertContains(response, '<html lang="en">')
-        self.assertContains(response, 'Learn to code step by step')
+        self.assertContains(response, 'Learn Python step by step')
         self.assertContains(response, 'Lessons: 0')
         self.assertContains(response, 'Free')
         # Database content stays as entered (no model translations yet).
@@ -402,3 +402,55 @@ class HeaderAuthLinkTests(PublicPagesTestCase):
 
         self.assertEqual(expired.status_code, 401)
         self.assertEqual(anonymous.status_code, 401)
+
+
+class HeroCodeCardTests(PublicPagesTestCase):
+    """Hero shows Python through a decorative code card (no logos), translated."""
+
+    CASES = [
+        ('/', 'ru', ['>Учитесь Python шаг за шагом<', '# Урок 1: функции',
+                     'f"Привет, {name}!"', '"Мир"', 'Вывод', 'Привет, Мир!',
+                     '✓ Все тесты пройдены (3/3)',
+                     'Пример задачи: функция на Python возвращает приветствие']),
+        ('/en/', 'en', ['>Learn Python step by step<', '# Lesson 1: functions',
+                        'f"Hello, {name}!"', '"World"', 'Output', 'Hello, World!',
+                        '✓ All tests passed (3/3)',
+                        'Example task: a Python function returns a greeting']),
+    ]
+
+    def test_card_renders_translated(self):
+        for url, lang, expected in self.CASES:
+            html = self.client.get(url).content.decode()
+            with self.subTest(lang=lang):
+                self.assertIn('lesson_01.py', html)
+                for text in expected:
+                    self.assertIn(text, html)
+
+    def test_card_is_decorative_with_a_text_alternative(self):
+        html = self.client.get('/').content.decode()
+        card = re.search(r'<div class="code-card"([^>]*)>', html)
+        self.assertIsNotNone(card)
+        self.assertIn('aria-hidden="true"', card.group(1))
+        # The sentence for screen readers sits outside the hidden card.
+        sentence_at = html.index('<p class="visually-hidden">Пример задачи')
+        self.assertLess(sentence_at, card.start())
+        # Old decorative path is gone from the hero; cards keep their step badges.
+        self.assertNotIn('hero-path', html)
+
+    def test_no_remote_font_hosts(self):
+        from django.contrib.staticfiles import finders
+
+        for url in ['/', '/en/']:
+            html = self.client.get(url).content.decode()
+            for host in ['fonts.googleapis.com', 'fonts.gstatic.com']:
+                self.assertNotIn(host, html, url)
+            # Every stylesheet / script the page loads is our own (/static/...).
+            for ref in re.findall(r'<(?:link|script)[^>]+(?:href|src)="([^"]+)"', html):
+                self.assertTrue(ref.startswith('/'), f'{url}: {ref}')
+
+        css = open(finders.find('public/css/fonts.css'), encoding='utf-8').read()
+        self.assertNotIn('http', css)
+        self.assertIn('url("../fonts/JetBrainsMono-Regular.woff2")', css)
+        # The font ships with its licence alongside.
+        self.assertIsNotNone(finders.find('public/fonts/JetBrainsMono-Regular.woff2'))
+        self.assertIsNotNone(finders.find('public/fonts/JetBrainsMono-OFL.txt'))

@@ -16,6 +16,7 @@ All fonts are self-hosted; the site makes no requests to remote font services.
 | Unbounded | 500, 700 (cyrillic, latin, latin-ext subsets) | `backend/static/public/fonts/` — public Django pages, headings | SIL Open Font License 1.1 — Copyright 2022 The Unbounded Project Authors (https://github.com/googlefonts/unbounded) | `backend/static/public/fonts/Unbounded-OFL.txt` |
 | Golos Text | 400, 500, 700 (cyrillic, latin, latin-ext subsets) | `backend/static/public/fonts/` — public Django pages, body text | SIL Open Font License 1.1 — Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text) | `backend/static/public/fonts/GolosText-OFL.txt` |
 | JetBrains Mono | 400, 600 (official v2.304 webfonts) | `frontend/public/fonts/jetbrains-mono/` — code in the React app | SIL Open Font License 1.1 — Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) | `frontend/public/fonts/jetbrains-mono/JetBrainsMono-OFL.txt` |
+| JetBrains Mono | 400 (same official file) | `backend/static/public/fonts/` — code card in the landing hero | SIL Open Font License 1.1 — as above | `backend/static/public/fonts/JetBrainsMono-OFL.txt` |
 
 None of these fonts declares a Reserved Font Name. The Unbounded and Golos Text
 files are per-script subsets (from the Fontsource packages); JetBrains Mono files

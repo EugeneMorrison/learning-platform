@@ -5,7 +5,21 @@
  * the SIL Open Font License 1.1 (see ../fonts/*-OFL.txt). Files come from the
  * Fontsource packages, split by subset: unicode-range makes the browser fetch
  * only the subsets a page actually uses (latin-ext carries the ruble sign).
+ *
+ * JetBrains Mono (code card in the landing hero, 400): the official v2.304
+ * webfont from github.com/JetBrains/JetBrainsMono, SIL OFL 1.1
+ * (../fonts/JetBrainsMono-OFL.txt). Same file the React app ships.
  */
+
+/* JetBrains Mono */
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+}
 
 /* Unbounded */
 

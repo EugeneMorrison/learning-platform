@@ -1,6 +1,6 @@
 /*
- * Landing page: hero with the numbered path motif (direction C) and the course
- * catalog. Uses only the variables from tokens.css.
+ * Landing page: hero with a decorative Python code card, and the course catalog
+ * (numbered-path motif on the cards). Uses only the variables from tokens.css.
  */
 
 /* Hero */
@@ -38,49 +38,79 @@
   gap: var(--space-3);
 }
 
-/* Decorative path: 01 → 02 → 03 on a dashed line, the goal step in yellow. */
-.hero-path {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-6);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+/* Decorative Python code card: a small dark editor window (pure HTML/CSS). */
+.hero__code {
+  flex: 1 1 calc(var(--container-width) / 3);
+  min-width: 0;
+  max-width: calc(var(--container-width) / 2.25);
 }
 
-.hero-path::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: var(--space-6);
-  right: var(--space-6);
-  border-top: calc(var(--border-width) * 2) dashed var(--color-accent);
+.code-card {
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-ink);
+  color: var(--color-code-text);
+  font-family: var(--font-code);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
 }
 
-.hero-path__step {
-  position: relative;
+.code-card__bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: var(--space-8);
-  height: var(--space-8);
-  border: calc(var(--border-width) * 2) solid var(--color-accent);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-code-bar);
+}
+
+.code-card__dot {
+  flex-shrink: 0;
+  width: var(--space-3);
+  height: var(--space-3);
   border-radius: var(--radius-pill);
-  background: var(--color-ground);
-  color: var(--color-accent);
-  font-family: var(--font-heading);
-  font-weight: var(--weight-bold);
 }
 
-.hero-path__step:nth-child(2) {
-  transform: translateY(calc(var(--space-5) * -1));
+.code-card__dot--accent { background: var(--color-accent); }
+.code-card__dot--highlight { background: var(--color-highlight); }
+.code-card__dot--muted { background: var(--color-code-muted); }
+
+.code-card__file {
+  margin-left: var(--space-2);
+  overflow: hidden;
+  color: var(--color-code-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hero-path__step--goal {
-  border-color: var(--color-ink);
-  background: var(--color-highlight);
-  color: var(--color-ink);
+/* Long lines scroll inside the card only, never the page. */
+.code-card__code {
+  margin: 0;
+  padding: var(--space-5);
+  overflow-x: auto;
+  font: inherit;
+  white-space: pre;
+}
+
+.tok-keyword { color: var(--color-highlight); }
+.tok-function { color: var(--color-accent-on-dark); }
+.tok-string,
+.tok-comment { color: var(--color-code-muted); }
+
+.code-card__output {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: var(--border-width) solid var(--color-code-bar);
+}
+
+.code-card__label {
+  color: var(--color-code-muted);
+}
+
+.code-card__result {
+  padding: 0 var(--space-5) var(--space-4);
+  color: var(--color-success);
 }
 
 /* Catalog */
@@ -168,7 +198,9 @@
     padding-top: var(--space-6);
   }
 
-  .hero-path {
-    width: 100%;
+  /* Code card goes under the text, full width. */
+  .hero__code {
+    flex-basis: 100%;
+    max-width: none;
   }
 }

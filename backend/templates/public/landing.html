@@ -10,7 +10,7 @@
     <div class="container hero__inner">
       <div class="hero__text">
         {# TODO: copy from Lyudmila #}
-        <h1 id="hero-title" class="hero__title">{% translate "Учитесь программированию шаг за шагом" %}</h1>
+        <h1 id="hero-title" class="hero__title">{% translate "Учитесь Python шаг за шагом" %}</h1>
         {# TODO: copy from Lyudmila #}
         <p class="hero__lead">{% translate "Короткие уроки и практика прямо в браузере: каждый шаг ведёт к следующему." %}</p>
         <div class="hero__actions">
@@ -21,12 +21,30 @@
         </div>
       </div>
 
-      {# Decorative learning path, direction C. #}
-      <ol class="hero-path" aria-hidden="true">
-        <li class="hero-path__step">01</li>
-        <li class="hero-path__step">02</li>
-        <li class="hero-path__step hero-path__step--goal">03</li>
-      </ol>
+      {# Decorative Python "editor card": pure HTML/CSS, no logos. Screen readers get #}
+      {# the visually hidden sentence instead of the card.                           #}
+      {% translate "Привет" as code_hello %}{% translate "Мир" as code_world %}
+      <div class="hero__code">
+        <p class="visually-hidden">{% translate "Пример задачи: функция на Python возвращает приветствие, программа его выводит, и все тесты пройдены." %}</p>
+        <div class="code-card" aria-hidden="true">
+          <div class="code-card__bar">
+            <span class="code-card__dot code-card__dot--accent"></span>
+            <span class="code-card__dot code-card__dot--highlight"></span>
+            <span class="code-card__dot code-card__dot--muted"></span>
+            <span class="code-card__file">lesson_01.py</span>
+          </div>
+<pre class="code-card__code"><code><span class="tok-comment"># {% translate "Урок 1: функции" %}</span>
+<span class="tok-keyword">def</span> <span class="tok-function">greet</span>(name):
+    <span class="tok-keyword">return</span> <span class="tok-string">f"{{ code_hello }}, {name}!"</span>
+
+<span class="tok-function">print</span>(<span class="tok-function">greet</span>(<span class="tok-string">"{{ code_world }}"</span>))</code></pre>
+          <div class="code-card__output">
+            <span class="code-card__label">{% translate "Вывод" %}</span>
+            <span>{{ code_hello }}, {{ code_world }}!</span>
+          </div>
+          <div class="code-card__result">✓ {% translate "Все тесты пройдены" %} (3/3)</div>
+        </div>
+      </div>
     </div>
   </section>
 
