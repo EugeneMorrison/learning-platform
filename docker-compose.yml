@@ -4,8 +4,12 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"        # host:container — access at http://localhost:8000
+    # Settings come from .env (optional; see .env.example). Without it Django
+    # defaults to DEBUG=False and the built-in ALLOWED_HOSTS.
+    env_file:
+      - path: .env
+        required: false     # needs Docker Compose 2.24+
     environment:
-      - DEBUG=False
       - ALLOWED_HOSTS=186.246.9.251
     volumes:
       - db-data:/app/db          # persist SQLite database between restarts

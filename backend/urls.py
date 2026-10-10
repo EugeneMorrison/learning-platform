@@ -44,6 +44,7 @@ urlpatterns = [
     path('lesson/<uuid:lesson_id>/', lesson_view, name='lesson-viewer'),  # React SPA
     # Serve author-uploaded media (lesson images). Explicit serve() works under
     # Daphne regardless of DEBUG; must come before the SPA catch-all below.
+    # TEMPORARY: Django serving media is a stopgap until Caddy serves /media/.
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     path('i18n/', include('django.conf.urls.i18n')),  # set_language for the RU/EN switch
 ]

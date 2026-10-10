@@ -11,10 +11,31 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _load_dotenv(path):
+    """Minimal .env reader: KEY=VALUE lines, '#' comments, optional quotes.
+    Variables already set in the real environment win (setdefault), so Docker's
+    env_file / environment and shell exports override the file."""
+    try:
+        lines = path.read_text(encoding='utf-8').splitlines()
+    except FileNotFoundError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+# Local development: put DEBUG=True in .env (see .env.example).
+_load_dotenv(BASE_DIR / '.env')
 
 
 # Quick-start development settings - unsuitable for production
@@ -27,11 +48,12 @@ SECRET_KEY = os.environ.get(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+# Production-safe default: DEBUG is off unless the environment / .env turns it on.
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-# In Docker: set ALLOWED_HOSTS=localhost,127.0.0.1 via environment variable
-# Locally: empty list works fine with DEBUG=True
-ALLOWED_HOSTS = [
+# Always allowed: the production IP and local access. ALLOWED_HOSTS in the
+# environment (comma-separated) adds more hosts, it never removes these.
+ALLOWED_HOSTS = ['186.246.9.251', 'localhost', '127.0.0.1'] + [
     h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()
 ]
 
@@ -229,6 +251,22 @@ STATICFILES_DIRS = [
     BASE_DIR / 'backend' / 'static',  # public pages: /static/public/...
     BASE_DIR / 'frontend' / 'dist',  # React build output: /static/assets/...
 ]
+
+# collectstatic writes content-hashed copies (landing.4f2c9a.css) plus a manifest,
+# and {% static %} emits the hashed names when DEBUG is off, so new HTML can never
+# be paired with an old stylesheet. WhiteNoise serves them (compressed, long cache)
+# and keeps the unhashed originals too, which the React build's index.html
+# references directly (/static/assets/index-<vite hash>.js).
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
+
+# The test runner renders templates without running collectstatic, where the
+# manifest storage would fail on every {% static %}. Tests use plain storage; the
+# test that checks hashed URLs overrides STORAGES and collects into a temp dir.
+if len(sys.argv) > 1 and sys.argv[1] == 'test':
+    STORAGES['staticfiles'] = {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'}
 
 # Media files (author-uploaded lesson images)
 # Served at /media/... — see backend/urls.py. In Docker, /app/media is a

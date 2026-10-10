@@ -454,3 +454,48 @@ class HeroCodeCardTests(PublicPagesTestCase):
         # The font ships with its licence alongside.
         self.assertIsNotNone(finders.find('public/fonts/JetBrainsMono-Regular.woff2'))
         self.assertIsNotNone(finders.find('public/fonts/JetBrainsMono-OFL.txt'))
+
+
+class ProductionStaticFilesTests(TestCase):
+    """DEBUG=False with the production storage: the landing page renders and links
+    content-hashed stylesheets (collected into a temporary STATIC_ROOT)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        from django.core.management import call_command
+        from django.test.utils import override_settings
+
+        cls.static_root = tempfile.mkdtemp()
+        cls.prod = override_settings(
+            DEBUG=False,
+            STATIC_ROOT=cls.static_root,
+            STORAGES={
+                'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+                'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+            },
+        )
+        cls.prod.enable()
+        call_command('collectstatic', interactive=False, verbosity=0)
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+
+        super().tearDownClass()
+        cls.prod.disable()
+        shutil.rmtree(cls.static_root, ignore_errors=True)
+
+    def test_landing_page_links_hashed_stylesheets(self):
+        import os
+
+        response = self.client.get('/')
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        landing = re.search(r'href="/static/(public/css/landing\.[0-9a-f]{12}\.css)"', html)
+        self.assertIsNotNone(landing, 'landing.css is not linked by its hashed name')
+        self.assertTrue(os.path.exists(os.path.join(self.static_root, landing.group(1))))
+        # No unhashed public stylesheet left in the page.
+        self.assertNotRegex(html, r'href="/static/public/css/[a-z]+\.css"')
