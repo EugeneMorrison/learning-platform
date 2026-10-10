@@ -37,27 +37,10 @@
           <button class="lang-switch__btn" type="submit" name="language" value="en" lang="en"
                   aria-pressed="{% if LANGUAGE_CODE == 'en' %}true{% else %}false{% endif %}">EN</button>
         </form>
-        {# React login page (client-side route served by spa_view). The script below may #}
-        {# turn it into "Мой кабинет" → /dashboard/; both labels come from Django i18n.   #}
+        {# React login page (client-side route served by spa_view). The login-aware script #}
+        {# at the end of <body> may turn it into "Мой кабинет" → /dashboard/.              #}
         <a class="btn btn-primary" id="header-auth-link" href="/login/"
            data-account-href="/dashboard/" data-account-label="{% translate "Мой кабинет" %}">{% translate "Войти" %}</a>
-        <script>
-          // Cosmetic only. If the React app's token ('access_token', see frontend/src/api.js)
-          // is in localStorage, offer "Мой кабинет" instead of "Войти". The token is never
-          // decoded or trusted: /dashboard/ checks the session itself and sends an expired
-          // one to /login/. JS off or storage blocked → the server-rendered "Войти" stays.
-          (function () {
-            try {
-              if (!window.localStorage.getItem('access_token')) return;
-            } catch (e) {
-              return;
-            }
-            var link = document.getElementById('header-auth-link');
-            if (!link) return;
-            link.setAttribute('href', link.getAttribute('data-account-href'));
-            link.textContent = link.getAttribute('data-account-label');
-          })();
-        </script>
       </div>
     </div>
   </header>
@@ -80,5 +63,26 @@
       </ul>
     </div>
   </footer>
+
+  {# Login-aware links. Any link with data-account-href / data-account-label (header,  #}
+  {# landing hero, …) is server-rendered as a login link; this one script swaps them. #}
+  <script>
+    // Cosmetic only. If the React app's token ('access_token', see frontend/src/api.js)
+    // is in localStorage, show "Мой кабинет" → /dashboard/ instead of the login link.
+    // The token is never decoded or trusted: /dashboard/ checks the session itself and
+    // sends an expired one to /login/. JS off or storage blocked → login links stay.
+    (function () {
+      try {
+        if (!window.localStorage.getItem('access_token')) return;
+      } catch (e) {
+        return;
+      }
+      var links = document.querySelectorAll('a[data-account-href]');
+      for (var i = 0; i < links.length; i++) {
+        links[i].setAttribute('href', links[i].getAttribute('data-account-href'));
+        links[i].textContent = links[i].getAttribute('data-account-label');
+      }
+    })();
+  </script>
 </body>
 </html>

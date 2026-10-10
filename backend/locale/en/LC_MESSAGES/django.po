@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 17:32+0300\n"
+"POT-Creation-Date: 2026-10-10 17:57+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -66,7 +66,7 @@ msgstr "Code tasks are checked by running the tests."
 
 #: .\backend\templates\public\base.html:6
 #: .\backend\templates\public\base.html:19
-#: .\backend\templates\public\base.html:72
+#: .\backend\templates\public\base.html:55
 msgid "[Название]"
 msgstr "[Name]"
 
@@ -79,7 +79,7 @@ msgid "Основная навигация"
 msgstr "Main navigation"
 
 #: .\backend\templates\public\base.html:23
-#: .\backend\templates\public\landing.html:34
+#: .\backend\templates\public\landing.html:35
 msgid "Курсы"
 msgstr "Courses"
 
@@ -100,6 +100,7 @@ msgid "Язык сайта"
 msgstr "Site language"
 
 #: .\backend\templates\public\base.html:43
+#: .\backend\templates\public\landing.html:20
 msgid "Мой кабинет"
 msgstr "My account"
 
@@ -107,19 +108,19 @@ msgstr "My account"
 msgid "Войти"
 msgstr "Log in"
 
-#: .\backend\templates\public\base.html:73
+#: .\backend\templates\public\base.html:56
 msgid "[Юридическое лицо, ИНН, ОГРН]"
 msgstr "[Legal entity, tax and registration numbers]"
 
-#: .\backend\templates\public\base.html:77
+#: .\backend\templates\public\base.html:60
 msgid "Публичная оферта"
 msgstr "Public offer"
 
-#: .\backend\templates\public\base.html:78
+#: .\backend\templates\public\base.html:61
 msgid "Политика обработки персональных данных"
 msgstr "Personal data processing policy"
 
-#: .\backend\templates\public\base.html:79
+#: .\backend\templates\public\base.html:62
 msgid "Контакты"
 msgstr "Contacts"
 
@@ -148,7 +149,7 @@ msgid "Программа курса"
 msgstr "Course syllabus"
 
 #: .\backend\templates\public\course_detail.html:61
-#: .\backend\templates\public\landing.html:52
+#: .\backend\templates\public\landing.html:53
 msgid "Уроков:"
 msgstr "Lessons:"
 
@@ -204,10 +205,10 @@ msgstr ""
 msgid "Смотреть курсы"
 msgstr "Browse courses"
 
-#: .\backend\templates\public\landing.html:19
+#: .\backend\templates\public\landing.html:20
 msgid "Войти в аккаунт"
 msgstr "Log in to your account"
 
-#: .\backend\templates\public\landing.html:61
+#: .\backend\templates\public\landing.html:62
 msgid "Курсы скоро появятся. Загляните позже."
 msgstr "Courses are coming soon. Check back later."

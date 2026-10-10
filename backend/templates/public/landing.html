@@ -15,8 +15,9 @@
         <p class="hero__lead">{% translate "Короткие уроки и практика прямо в браузере: каждый шаг ведёт к следующему." %}</p>
         <div class="hero__actions">
           <a class="btn btn-primary" href="#catalog">{% translate "Смотреть курсы" %}</a>
-          {# React login page (client-side route served by spa_view). #}
-          <a class="btn btn-secondary" href="/login/">{% translate "Войти в аккаунт" %}</a>
+          {# React login page; login-aware like the header (script in base.html). #}
+          <a class="btn btn-secondary" id="hero-auth-link" href="/login/"
+             data-account-href="/dashboard/" data-account-label="{% translate "Мой кабинет" %}">{% translate "Войти в аккаунт" %}</a>
         </div>
       </div>
 

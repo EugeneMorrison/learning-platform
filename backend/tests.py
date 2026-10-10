@@ -333,32 +333,54 @@ class CourseDetailTests(PublicPagesTestCase):
 
 
 class HeaderAuthLinkTests(PublicPagesTestCase):
-    """The header link is server-rendered as "Войти"; an inline script swaps it for
+    """Login links (header "Войти", hero "Войти в аккаунт") are server-rendered; one
+    inline script in base.html swaps every link carrying data-account-* for
     "Мой кабинет" when the React app's token is in localStorage (cosmetic only)."""
 
+    # (link id, url, login label, account label)
+    LINKS = [
+        ('header-auth-link', '/', 'Войти', 'Мой кабинет'),
+        ('header-auth-link', '/en/', 'Log in', 'My account'),
+        ('hero-auth-link', '/', 'Войти в аккаунт', 'Мой кабинет'),
+        ('hero-auth-link', '/en/', 'Log in to your account', 'My account'),
+    ]
+
     def test_both_labels_rendered_for_the_script(self):
-        for url, login_label, account_label in [('/', 'Войти', 'Мой кабинет'),
-                                                ('/en/', 'Log in', 'My account')]:
-            response = self.client.get(url)
-            html = response.content.decode()
-            link = re.search(r'<a [^>]*id="header-auth-link"[^>]*>([^<]*)</a>', html)
+        for link_id, url, login_label, account_label in self.LINKS:
+            with self.subTest(link=link_id, url=url):
+                html = self.client.get(url).content.decode()
+                link = re.search(rf'<a [^>]*id="{link_id}"[^>]*>([^<]*)</a>', html)
 
-            self.assertIsNotNone(link, url)
-            # Without JS (or with storage blocked) visitors get the login link.
-            self.assertEqual(link.group(1), login_label, url)
-            self.assertIn('href="/login/"', link.group(0), url)
-            # The script's replacement, translated by Django.
-            self.assertIn('data-account-href="/dashboard/"', link.group(0), url)
-            self.assertIn(f'data-account-label="{account_label}"', link.group(0), url)
+                self.assertIsNotNone(link)
+                # Without JS (or with storage blocked) visitors get the login link.
+                self.assertEqual(link.group(1), login_label)
+                self.assertIn('href="/login/"', link.group(0))
+                # The script's replacement, translated by Django.
+                self.assertIn('data-account-href="/dashboard/"', link.group(0))
+                self.assertIn(f'data-account-label="{account_label}"', link.group(0))
 
-    def test_script_checks_the_react_token_key_safely(self):
-        html = self.client.get('/').content.decode()
-        script = html[html.index('id="header-auth-link"'):html.index('</script>')]
+    def login_script(self, html):
+        scripts = re.findall(r'<script>(.*?)</script>', html, re.S)
+        matching = [s for s in scripts if 'access_token' in s]
+        self.assertEqual(len(matching), 1, 'exactly one login-aware script')
+        return matching[0]
+
+    def test_one_script_handles_every_login_link_safely(self):
+        script = self.login_script(self.client.get('/').content.decode())
 
         # Same key as frontend/src/api.js; storage access guarded by try/catch.
         self.assertIn("localStorage.getItem('access_token')", script)
         self.assertIn('try {', script)
         self.assertIn('catch (e)', script)
+        # Generic: every link with data-account-href, not one hard-coded id.
+        self.assertIn("querySelectorAll('a[data-account-href]')", script)
+
+    def test_script_runs_after_the_links(self):
+        # At the end of <body>, so the header and the hero both exist when it runs.
+        html = self.client.get('/').content.decode()
+        script_at = html.index(self.login_script(html))
+        self.assertLess(html.index('id="header-auth-link"'), script_at)
+        self.assertLess(html.index('id="hero-auth-link"'), script_at)
 
     def test_course_page_has_the_same_header_link(self):
         course = self.make_course('Header')
