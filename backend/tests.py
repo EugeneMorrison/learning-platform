@@ -330,3 +330,53 @@ class CourseDetailTests(PublicPagesTestCase):
         response = self.client.get('/')
 
         self.assertContains(response, f'href="/course/{course.slug}/"')
+
+
+class HeaderAuthLinkTests(PublicPagesTestCase):
+    """The header link is server-rendered as "Войти"; an inline script swaps it for
+    "Мой кабинет" when the React app's token is in localStorage (cosmetic only)."""
+
+    def test_both_labels_rendered_for_the_script(self):
+        for url, login_label, account_label in [('/', 'Войти', 'Мой кабинет'),
+                                                ('/en/', 'Log in', 'My account')]:
+            response = self.client.get(url)
+            html = response.content.decode()
+            link = re.search(r'<a [^>]*id="header-auth-link"[^>]*>([^<]*)</a>', html)
+
+            self.assertIsNotNone(link, url)
+            # Without JS (or with storage blocked) visitors get the login link.
+            self.assertEqual(link.group(1), login_label, url)
+            self.assertIn('href="/login/"', link.group(0), url)
+            # The script's replacement, translated by Django.
+            self.assertIn('data-account-href="/dashboard/"', link.group(0), url)
+            self.assertIn(f'data-account-label="{account_label}"', link.group(0), url)
+
+    def test_script_checks_the_react_token_key_safely(self):
+        html = self.client.get('/').content.decode()
+        script = html[html.index('id="header-auth-link"'):html.index('</script>')]
+
+        # Same key as frontend/src/api.js; storage access guarded by try/catch.
+        self.assertIn("localStorage.getItem('access_token')", script)
+        self.assertIn('try {', script)
+        self.assertIn('catch (e)', script)
+
+    def test_course_page_has_the_same_header_link(self):
+        course = self.make_course('Header')
+        response = self.client.get(f'/course/{course.slug}/')
+        self.assertContains(response, 'id="header-auth-link"')
+        self.assertContains(response, 'data-account-label="Мой кабинет"')
+
+    def test_expired_token_is_rejected_by_the_dashboard_check(self):
+        # /dashboard/ loads /api/auth/me/; a 401 there (after a failed refresh in
+        # frontend/src/api.js) sends the user to /login/.
+        from datetime import timedelta
+        from rest_framework_simplejwt.tokens import AccessToken
+
+        token = AccessToken.for_user(self.author)
+        token.set_exp(lifetime=timedelta(seconds=-1))
+
+        expired = self.client.get('/api/auth/me/', HTTP_AUTHORIZATION=f'Bearer {token}')
+        anonymous = self.client.get('/api/auth/me/')
+
+        self.assertEqual(expired.status_code, 401)
+        self.assertEqual(anonymous.status_code, 401)

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-09 00:44+0300\n"
+"POT-Creation-Date: 2026-10-10 17:32+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -66,7 +66,7 @@ msgstr "Code tasks are checked by running the tests."
 
 #: .\backend\templates\public\base.html:6
 #: .\backend\templates\public\base.html:19
-#: .\backend\templates\public\base.html:53
+#: .\backend\templates\public\base.html:72
 msgid "[Название]"
 msgstr "[Name]"
 
@@ -99,23 +99,27 @@ msgstr "FAQ"
 msgid "Язык сайта"
 msgstr "Site language"
 
-#: .\backend\templates\public\base.html:41
+#: .\backend\templates\public\base.html:43
+msgid "Мой кабинет"
+msgstr "My account"
+
+#: .\backend\templates\public\base.html:43
 msgid "Войти"
 msgstr "Log in"
 
-#: .\backend\templates\public\base.html:54
+#: .\backend\templates\public\base.html:73
 msgid "[Юридическое лицо, ИНН, ОГРН]"
 msgstr "[Legal entity, tax and registration numbers]"
 
-#: .\backend\templates\public\base.html:58
+#: .\backend\templates\public\base.html:77
 msgid "Публичная оферта"
 msgstr "Public offer"
 
-#: .\backend\templates\public\base.html:59
+#: .\backend\templates\public\base.html:78
 msgid "Политика обработки персональных данных"
 msgstr "Personal data processing policy"
 
-#: .\backend\templates\public\base.html:60
+#: .\backend\templates\public\base.html:79
 msgid "Контакты"
 msgstr "Contacts"
 
