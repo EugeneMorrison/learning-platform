@@ -8,7 +8,10 @@
  *
  * JetBrains Mono (code card in the landing hero, 400): the official v2.304
  * webfont from github.com/JetBrains/JetBrainsMono, SIL OFL 1.1
- * (../fonts/JetBrainsMono-OFL.txt). Same file the React app ships.
+ * (../fonts/JetBrainsMono-OFL.txt).
+ *
+ * The React app links this file too (see frontend/vite.config.js) and adds only
+ * JetBrains Mono 600 itself (frontend/src/index.css).
  */
 
 /* JetBrains Mono */

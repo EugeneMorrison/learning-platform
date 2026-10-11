@@ -1,10 +1,21 @@
 """Template tags for the public (Django-rendered) pages."""
 
 from django import template
+from django.utils.translation import gettext_lazy as _
 
 from api.models import Review
 
 register = template.Library()
+
+# The site name, the only place the Django templates take it from (the React app
+# has its own constant in frontend/src/brand.js). Translated like any other string.
+BRAND_NAME = _('[Название]')
+
+
+@register.simple_tag
+def brand_name():
+    """The site name for headers, footers and <title>: {% brand_name %}."""
+    return BRAND_NAME
 
 
 @register.simple_tag(takes_context=True)

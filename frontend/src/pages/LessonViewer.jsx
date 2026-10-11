@@ -6,7 +6,6 @@ import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
-import UserBadge from '../components/UserBadge';
 
 // Block types that are solvable tasks (have a pass/fail, count toward progress).
 const TASK_TYPES = new Set(['QUIZ', 'CODE', 'FILL']);
@@ -239,9 +238,6 @@ function LessonViewer() {
 
     return (
         <>
-            {/* Hidden when embedded in an iframe — external sites shouldn't show our user chrome */}
-            {!isInIframe && <UserBadge user={user} />}
-
             <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
 
                 {/* Back button — hidden when embedded in iframe (no parent SPA to go back to) */}

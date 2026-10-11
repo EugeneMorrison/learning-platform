@@ -1,6 +1,9 @@
 /*
- * Design tokens for the public pages (landing, course pages, legal pages).
+ * Design tokens for the public pages (landing, course pages, legal pages) and
+ * the React app, which loads this same file at runtime from /static/public/.
  * base.css and page styles must use only these variables, never raw values.
+ * Only ever ADD tokens: renaming or removing one breaks the React build that is
+ * already deployed (it is not rebuilt when this file changes).
  */
 :root {
   /* Colors */
@@ -20,6 +23,16 @@
   --color-accent-on-dark: #8EA2FF;  /* cobalt tint for function names */
   --color-code-muted: #A0A8C0;      /* strings, comments, output label */
   --color-success: #4ADE80;         /* "tests passed" */
+
+  /* Status colours on light surfaces (app: answers, errors, notices). Contrast:
+     text on white / on its own tint. --color-highlight (yellow) is for
+     backgrounds only, never for text on white (1.4:1). */
+  --color-danger: #B42318;          /* 6.6:1 / 6.1:1 */
+  --color-danger-soft: #FEF3F2;
+  --color-success-on-light: #067647; /* 5.7:1 / 5.4:1 */
+  --color-success-soft: #ECFDF3;
+  --color-warning: #B54708;         /* 5.4:1 / 5.2:1 */
+  --color-warning-soft: #FFFAEB;
 
   /* Fonts (see fonts.css for @font-face) */
   --font-heading: "Unbounded", system-ui, sans-serif;
@@ -55,6 +68,24 @@
   /* Radii */
   --radius-pill: 999px;        /* buttons, pills */
   --radius-card: 20px;         /* cards */
+  --radius-small: 10px;        /* inputs, menus, dense app panels */
+
+  /* Shadows (tinted with --color-ink) */
+  --shadow-sm: 0 1px 3px rgba(20, 22, 31, 0.08);
+  --shadow-md: 0 4px 16px rgba(20, 22, 31, 0.12);
+  --shadow-lg: 0 8px 32px rgba(20, 22, 31, 0.16);
+
+  /* Focus ring: cobalt, 7.6:1 against white (yellow would be 1.4:1). The landing
+     keeps its wider var(--space-1) outline; the app uses the width below. */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: var(--color-accent);
+
+  /* Stacking order (app) */
+  --z-floating: 1000;          /* "next task" and chat buttons */
+  --z-chat: 1010;              /* open chat panel */
+  --z-header: 1100;            /* sticky app header */
+  --z-badge: 1200;             /* user badge dropdown */
 
   /* Layout */
   --container-width: 72rem;

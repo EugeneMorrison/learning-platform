@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
-import UserBadge from '../components/UserBadge';
 
 function CoursePage() {
     const { courseId } = useParams();
@@ -184,7 +183,6 @@ function CoursePage() {
 
     return (
         <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
-            <UserBadge user={user} />
 
             {/* Header */}
             <button onClick={() => navigate('/dashboard/')} style={{ marginBottom: '20px' }}>

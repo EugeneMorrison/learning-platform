@@ -1,0 +1,105 @@
+/* User badge in the app header: avatar pill with a dropdown menu. */
+.user-badge {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.user-badge__pill {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-ground);
+    font-family: var(--font-body);
+    cursor: pointer;
+}
+
+.user-badge__pill:hover {
+    border-color: var(--color-accent);
+}
+
+.user-badge__avatar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: var(--space-6);
+    height: var(--space-6);
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    color: var(--color-ground);
+    font-family: var(--font-heading);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+.user-badge__text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: var(--leading-tight);
+}
+
+.user-badge__name {
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+.user-badge__role {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.user-badge__caret {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.user-badge__menu {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    z-index: var(--z-badge);
+    display: flex;
+    flex-direction: column;
+    min-width: calc(var(--space-9) * 2);
+    padding: var(--space-1);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    box-shadow: var(--shadow-md);
+}
+
+.user-badge__item {
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-small);
+    background: transparent;
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    text-align: left;
+    cursor: pointer;
+}
+
+.user-badge__item:hover {
+    background: var(--color-soft);
+}
+
+.user-badge__item--danger {
+    color: var(--color-danger);
+}
+
+.user-badge__item--danger:hover {
+    background: var(--color-danger-soft);
+}
+
+/* Phones: avatar only; the name is still in the pill's title and the menu works. */
+@media (max-width: 30rem) {
+    .user-badge__text {
+        display: none;
+    }
+}

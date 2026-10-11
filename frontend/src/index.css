@@ -1,18 +1,13 @@
 /*
- * JetBrains Mono (code), self-hosted: official v2.304 webfonts from
+ * Golos Text, Unbounded, JetBrains Mono 400 and the design tokens come from the
+ * shared /static/public/css/fonts.css and tokens.css (linked by vite.config.js).
+ *
+ * JetBrains Mono 600 is the one weight only the app uses (bold in code resolves
+ * to 600, as it did with Google Fonts): official v2.304 webfont from
  * github.com/JetBrains/JetBrainsMono, SIL Open Font License 1.1 (licence and
- * copyright notice next to the files: public/fonts/jetbrains-mono/JetBrainsMono-OFL.txt).
- * Only the weights the app uses: 400 and 600 (bold in code resolves to 600, as it
- * did with Google Fonts). Italic stays synthesised, as before.
+ * copyright notice next to the file: public/fonts/jetbrains-mono/JetBrainsMono-OFL.txt).
+ * Italic stays synthesised, as before.
  */
-@font-face {
-    font-family: 'JetBrains Mono';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('/fonts/jetbrains-mono/JetBrainsMono-Regular.woff2') format('woff2');
-}
-
 @font-face {
     font-family: 'JetBrains Mono';
     font-style: normal;
@@ -28,10 +23,10 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-    background: #f5f5f5;
-    color: #333;
-    line-height: 1.6;
+    font-family: var(--font-body);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    line-height: var(--leading-normal);
 }
 
 /* Inline code: small snippets like .startswith() */

@@ -4,7 +4,6 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import api from '../api';
-import UserBadge from '../components/UserBadge';
 
 function StudentProgressPage() {
     const { courseId, studentId } = useParams();
@@ -134,7 +133,6 @@ function StudentProgressPage() {
 
     return (
         <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
-            <UserBadge />
 
             {/* Header */}
             <button onClick={() => navigate(`/courses/${courseId}/`)} style={{ marginBottom: '20px' }}>

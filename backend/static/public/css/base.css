@@ -60,7 +60,7 @@ a {
 }
 
 :focus-visible {
-  outline: var(--space-1) solid var(--color-highlight);
+  outline: var(--space-1) solid var(--focus-ring-color);
   outline-offset: var(--space-1);
 }
 

@@ -4,7 +4,6 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
-import UserBadge from '../components/UserBadge';
 import { parseTemplate } from '../lib/fillTemplate';
 import api from '../api';
 
@@ -239,7 +238,6 @@ function LessonEditor() {
 
     return (
         <div style={{ maxWidth: 800, margin: '40px auto', padding: 20 }}>
-            <UserBadge user={user} />
             <button onClick={() => navigate(`/courses/${lesson.course}/`)} style={{ marginBottom: 20 }}>
                 ← Назад к курсу
             </button>

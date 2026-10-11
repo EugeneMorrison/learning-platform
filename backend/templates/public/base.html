@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{% translate "[Название]" %}{% endblock %}</title>
+  <title>{% block title %}{% brand_name %}{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}{% translate "Онлайн-курсы с практикой прямо в браузере." %}{% endblock %}">
   <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
   <link rel="preload" href="{% static 'public/fonts/golos-text-cyrillic-400.woff2' %}" as="font" type="font/woff2" crossorigin>
@@ -16,7 +16,7 @@
 <body>
   <header class="site-header">
     <div class="container site-header__inner">
-      <a class="site-logo" href="{% url 'landing' %}">{% translate "[Название]" %}</a>
+      <a class="site-logo" href="{% url 'landing' %}">{% brand_name %}</a>
 
       <nav class="site-nav" aria-label="{% translate "Основная навигация" %}">
         <ul class="site-nav__list">
@@ -56,7 +56,7 @@
   <footer class="site-footer">
     <div class="container site-footer__inner">
       <div>
-        <p class="site-footer__name">{% translate "[Название]" %}</p>
+        <p class="site-footer__name">{% brand_name %}</p>
         <p class="site-footer__legal">{% translate "[Юридическое лицо, ИНН, ОГРН]" %}</p>
       </div>
       <ul class="site-footer__links">
