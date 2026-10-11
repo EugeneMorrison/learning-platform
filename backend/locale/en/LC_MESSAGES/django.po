@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-10 19:24+0300\n"
+"POT-Creation-Date: 2026-10-11 15:17+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -66,7 +66,7 @@ msgstr "Code tasks are checked by running the tests."
 
 #: .\backend\templates\public\base.html:6
 #: .\backend\templates\public\base.html:19
-#: .\backend\templates\public\base.html:55
+#: .\backend\templates\public\base.html:59
 msgid "[Название]"
 msgstr "[Name]"
 
@@ -87,40 +87,41 @@ msgstr "Courses"
 msgid "Как это устроено"
 msgstr "How it works"
 
-#: .\backend\templates\public\base.html:25
+#: .\backend\templates\public\base.html:28
+#: .\backend\templates\public\landing.html:112
 msgid "Отзывы"
 msgstr "Reviews"
 
-#: .\backend\templates\public\base.html:26
+#: .\backend\templates\public\base.html:30
 msgid "Вопросы"
 msgstr "FAQ"
 
-#: .\backend\templates\public\base.html:32
+#: .\backend\templates\public\base.html:36
 msgid "Язык сайта"
 msgstr "Site language"
 
-#: .\backend\templates\public\base.html:43
+#: .\backend\templates\public\base.html:47
 #: .\backend\templates\public\landing.html:20
 msgid "Мой кабинет"
 msgstr "My account"
 
-#: .\backend\templates\public\base.html:43
+#: .\backend\templates\public\base.html:47
 msgid "Войти"
 msgstr "Log in"
 
-#: .\backend\templates\public\base.html:56
+#: .\backend\templates\public\base.html:60
 msgid "[Юридическое лицо, ИНН, ОГРН]"
 msgstr "[Legal entity, tax and registration numbers]"
 
-#: .\backend\templates\public\base.html:60
+#: .\backend\templates\public\base.html:64
 msgid "Публичная оферта"
 msgstr "Public offer"
 
-#: .\backend\templates\public\base.html:61
+#: .\backend\templates\public\base.html:65
 msgid "Политика обработки персональных данных"
 msgstr "Personal data processing policy"
 
-#: .\backend\templates\public\base.html:62
+#: .\backend\templates\public\base.html:66
 msgid "Контакты"
 msgstr "Contacts"
 
@@ -240,3 +241,11 @@ msgstr "All tests passed"
 #: .\backend\templates\public\landing.html:80
 msgid "Курсы скоро появятся. Загляните позже."
 msgstr "Courses are coming soon. Check back later."
+
+#: .\backend\templates\public\landing.html:95
+msgid "Об авторе"
+msgstr "About the author"
+
+#: .\backend\templates\public\landing.html:102
+msgid "Профиль на Stepik"
+msgstr "Stepik profile"

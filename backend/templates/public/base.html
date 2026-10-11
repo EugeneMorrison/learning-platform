@@ -1,4 +1,4 @@
-{% load i18n static %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
+{% load i18n static public_site %}{% get_current_language as LANGUAGE_CODE %}<!doctype html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
   <meta charset="utf-8">
@@ -22,7 +22,11 @@
         <ul class="site-nav__list">
           <li><a class="site-nav__link" href="{% url 'landing' %}#catalog">{% translate "Курсы" %}</a></li>
           <li><a class="site-nav__link" href="{% url 'landing' %}#how">{% translate "Как это устроено" %}</a></li>
-          <li><a class="site-nav__link" href="{% url 'landing' %}#reviews">{% translate "Отзывы" %}</a></li>
+          {# Shown only while the landing page has published reviews (api/templatetags/public_site.py). #}
+          {% reviews_published as has_reviews %}
+          {% if has_reviews %}
+            <li><a class="site-nav__link" href="{% url 'landing' %}#reviews">{% translate "Отзывы" %}</a></li>
+          {% endif %}
           <li><a class="site-nav__link" href="{% url 'landing' %}#faq">{% translate "Вопросы" %}</a></li>
         </ul>
       </nav>

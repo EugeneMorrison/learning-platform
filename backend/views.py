@@ -7,8 +7,9 @@ The React app is served separately by spa_view / lesson_view in backend/urls.py.
 
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, render
+from django.utils import translation
 
-from api.models import Course
+from api.models import AuthorProfile, Course, Review
 
 from .pricing import add_price_labels
 
@@ -32,7 +33,22 @@ def landing_view(request):
     )
     for course in courses:
         add_price_labels(course)
-    return render(request, 'public/landing.html', {'courses': courses})
+
+    # Author and reviews are edited in the Django admin. Each section is hidden
+    # while it has no content; /en/ shows the *_en text, falling back to Russian.
+    lang = translation.get_language()
+    author = AuthorProfile.objects.first()
+    if author:
+        author.bio = author.bio_for(lang)
+    reviews = list(Review.objects.filter(is_published=True).select_related('course'))
+    for review in reviews:
+        review.text = review.text_for(lang)
+
+    return render(request, 'public/landing.html', {
+        'courses': courses,
+        'author': author,
+        'reviews': reviews,
+    })
 
 
 def course_detail_view(request, slug):

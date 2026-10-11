@@ -124,13 +124,14 @@ class LandingCatalogTests(PublicPagesTestCase):
             course = self.make_course(f'Course {n}')
             Lesson.objects.create(course=course, title='Lesson', order_index=1)
 
+        # 3 = courses + author profile + published reviews (the header link reuses them).
         add_course(1)
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(3):
             self.client.get('/')
 
         for n in range(2, 7):
             add_course(n)
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(3):
             response = self.client.get('/')
         self.assertEqual(len(self.card_titles(response)), 6)
 
@@ -281,12 +282,13 @@ class CourseDetailTests(PublicPagesTestCase):
         url = reverse('course_detail', kwargs={'slug': course.slug})
         self.make_lesson(course, 'Lesson 1', 1, ['TEXT', 'QUIZ', 'CODE', 'FILL'])
 
-        with self.assertNumQueries(2):
+        # 3 = course + syllabus + the header's "reviews published?" EXISTS check.
+        with self.assertNumQueries(3):
             self.client.get(url)
 
         for n in range(2, 7):
             self.make_lesson(course, f'Lesson {n}', n, ['TEXT', 'QUIZ', 'CODE', 'FILL'])
-        with self.assertNumQueries(2):
+        with self.assertNumQueries(3):
             response = self.client.get(url)
         self.assertEqual(len(self.lesson_titles(response)), 6)
 
@@ -499,3 +501,122 @@ class ProductionStaticFilesTests(TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.static_root, landing.group(1))))
         # No unhashed public stylesheet left in the page.
         self.assertNotRegex(html, r'href="/static/public/css/[a-z]+\.css"')
+
+
+class AuthorAndReviewsSectionTests(PublicPagesTestCase):
+    """"Об авторе" and "Отзывы" come from the admin (AuthorProfile, Review); each is
+    hidden while empty, and /en/ falls back to the Russian text."""
+
+    def make_profile(self, **kwargs):
+        from api.models import AuthorProfile
+        defaults = dict(name='Людмила', bio_ru='Преподаю Python.', photo='author/me.jpg')
+        defaults.update(kwargs)
+        return AuthorProfile.objects.create(**defaults)
+
+    def make_review(self, **kwargs):
+        from api.models import Review
+        defaults = dict(student_name='Анна', text_ru='Отличный курс!', is_published=True)
+        defaults.update(kwargs)
+        return Review.objects.create(**defaults)
+
+    def test_both_sections_and_nav_link_hidden_when_empty(self):
+        self.make_review(student_name='Черновик', is_published=False)  # unpublished only
+        course = self.make_course('Course')
+
+        for url in ['/', '/en/', f'/course/{course.slug}/']:
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertNotIn('id="author"', html)
+                self.assertNotIn('id="reviews"', html)
+                self.assertNotIn('#reviews"', html)  # header link hidden
+                self.assertNotIn('Черновик', html)
+
+    def test_sections_shown_when_filled(self):
+        course = self.make_course('Python Basics')
+        draft_course = self.make_course('Secret draft', is_published=False)
+        self.make_profile(stepik_url='https://stepik.org/users/1')
+        self.make_review(student_name='Второй', order=2, source='Stepik',
+                         source_url='https://stepik.org/review/1', course=course)
+        self.make_review(student_name='Первый', order=1, course=draft_course)
+        self.make_review(student_name='Скрытый', is_published=False)
+
+        html = self.client.get('/').content.decode()
+
+        self.assertIn('id="author"', html)
+        self.assertIn('Об авторе', html)
+        self.assertIn('Людмила', html)
+        self.assertIn('<p>Преподаю Python.</p>', html)
+        self.assertIn('src="/media/author/me.jpg"', html)
+        self.assertIn('href="https://stepik.org/users/1"', html)
+
+        self.assertIn('id="reviews"', html)
+        self.assertLess(html.index('Первый'), html.index('Второй'))  # order
+        self.assertNotIn('Скрытый', html)
+        self.assertIn('href="https://stepik.org/review/1"', html)
+        self.assertIn('class="review-card__course">Python Basics<', html)
+        self.assertNotIn('Secret draft', html)  # unpublished course title not shown
+
+        # Header link to the reviews section, on the landing and on other pages.
+        self.assertIn('href="/#reviews">Отзывы<', html)
+        course_html = self.client.get(f'/course/{course.slug}/').content.decode()
+        self.assertIn('href="/#reviews">Отзывы<', course_html)
+
+    def test_author_section_without_photo_or_bio(self):
+        self.make_profile(photo='', bio_ru='')
+        html = self.client.get('/').content.decode()
+        self.assertIn('id="author"', html)
+        self.assertNotIn('author__photo', html)
+        self.assertNotIn('author__bio', html)
+
+    def test_english_falls_back_to_russian(self):
+        self.make_profile(bio_en='')
+        self.make_review(student_name='Без перевода', text_ru='Только по-русски', text_en='')
+        self.make_review(student_name='С переводом', text_ru='По-русски', text_en='In English')
+
+        html = self.client.get('/en/').content.decode()
+
+        self.assertIn('About the author', html)
+        self.assertIn('<p>Преподаю Python.</p>', html)  # bio_en empty → Russian
+        self.assertIn('Только по-русски', html)        # text_en empty → Russian
+        self.assertIn('In English', html)
+        self.assertNotIn('<p>По-русски</p>', html)
+        self.assertIn('href="/en/#reviews">Reviews<', html)
+
+    def test_english_text_used_when_filled(self):
+        self.make_profile(bio_en='I teach Python.')
+        html = self.client.get('/en/').content.decode()
+        self.assertIn('<p>I teach Python.</p>', html)
+        self.assertNotIn('Преподаю Python.', html)
+
+    def test_bio_and_review_text_are_escaped(self):
+        self.make_profile(bio_ru='<script>alert(1)</script>')
+        self.make_review(text_ru='<b>bold</b>')
+        html = self.client.get('/').content.decode()
+        self.assertNotIn('<script>alert(1)', html)
+        self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', html)
+        self.assertIn('&lt;b&gt;bold&lt;/b&gt;', html)
+
+    def test_admin_allows_a_single_author_profile(self):
+        from django.contrib.admin.sites import site
+        from django.test import RequestFactory
+        from api.models import AuthorProfile
+
+        admin_user = User.objects.create_superuser('boss', 'b@example.com', 'x')
+        request = RequestFactory().get('/admin/')
+        request.user = admin_user
+        model_admin = site._registry[AuthorProfile]
+
+        self.assertTrue(model_admin.has_add_permission(request))
+        self.make_profile()
+        self.assertFalse(model_admin.has_add_permission(request))
+
+    def test_paragraphs_kept_and_photo_has_alt_text(self):
+        self.make_profile(name='Людмила', bio_ru='Первый абзац.\n\nВторой абзац.')
+        self.make_review(text_ru='Начало отзыва.\n\nПродолжение.')
+
+        html = self.client.get('/').content.decode()
+
+        # linebreaks: escaped first, blank lines become separate paragraphs.
+        self.assertIn('<p>Первый абзац.</p>\n\n<p>Второй абзац.</p>', html)
+        self.assertIn('<p>Начало отзыва.</p>\n\n<p>Продолжение.</p>', html)
+        self.assertRegex(html, r'<img class="author__photo" src="/media/author/me\.jpg" alt="Людмила"')

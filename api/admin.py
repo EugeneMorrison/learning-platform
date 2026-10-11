@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, Course, Lesson, Block, Enrollment, Progress
+from .models import AuthorProfile, Block, Course, Enrollment, Lesson, Progress, Review, User
 
 
 # =============================================================================
@@ -77,3 +77,24 @@ class ProgressAdmin(admin.ModelAdmin):
     list_filter = ['completed', 'is_correct', 'created_at']
     search_fields = ['student__username', 'lesson__title']
     ordering = ['-updated_at']
+
+# =============================================================================
+# LANDING PAGE CONTENT
+# =============================================================================
+
+@admin.register(AuthorProfile)
+class AuthorProfileAdmin(admin.ModelAdmin):
+    """Single author profile for the landing page: adding is disabled once one exists."""
+    list_display = ['name', 'stepik_url']
+
+    def has_add_permission(self, request):
+        return super().has_add_permission(request) and not AuthorProfile.objects.exists()
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ['student_name', 'course', 'source', 'is_published', 'order']
+    list_editable = ['is_published', 'order']
+    list_filter = ['is_published', 'source', 'course']
+    search_fields = ['student_name', 'text_ru', 'text_en']
+    ordering = ['order', 'id']

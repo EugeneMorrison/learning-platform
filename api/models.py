@@ -541,3 +541,66 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender.username} → {self.receiver.username}: {self.text[:50]}"
+
+
+# =============================================================================
+# LANDING PAGE CONTENT (managed in the Django admin)
+# =============================================================================
+
+def _localized(ru, en, lang):
+    """English text on /en/ when filled in, otherwise the Russian text."""
+    if (lang or '').startswith('en') and en.strip():
+        return en
+    return ru
+
+
+class AuthorProfile(models.Model):
+    """
+    The course author shown in the landing page's "Об авторе" section.
+    Intended as a single row (the admin allows only one); the section is hidden
+    while there is none.
+    """
+    name = models.CharField(max_length=200)
+    photo = models.ImageField(upload_to='author/', blank=True)
+    bio_ru = models.TextField(blank=True, help_text="Bio in Russian (plain text; blank lines start paragraphs)")
+    bio_en = models.TextField(blank=True, help_text="Bio in English; leave empty to show the Russian text on /en/")
+    stepik_url = models.URLField(blank=True, help_text="Author's Stepik profile (optional)")
+
+    class Meta:
+        db_table = 'author_profile'
+        verbose_name = 'author profile'
+
+    def __str__(self):
+        return self.name
+
+    def bio_for(self, lang):
+        return _localized(self.bio_ru, self.bio_en, lang)
+
+
+class Review(models.Model):
+    """A student review for the landing page's "Отзывы" section (published ones only)."""
+    student_name = models.CharField(max_length=200)
+    text_ru = models.TextField(help_text="Review text in Russian")
+    text_en = models.TextField(blank=True, help_text="English translation; leave empty to show the Russian text on /en/")
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviews',
+        help_text="Course the review is about (optional)",
+    )
+    source = models.CharField(max_length=100, blank=True, help_text='Where it was posted, e.g. "Stepik"')
+    source_url = models.URLField(blank=True, help_text="Link to the original review (optional)")
+    is_published = models.BooleanField(default=False, help_text="Only published reviews appear on the site")
+    order = models.PositiveIntegerField(default=0, help_text="Order on the landing page (lower = earlier)")
+
+    class Meta:
+        db_table = 'reviews'
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return f"{self.student_name}: {self.text_ru[:50]}"
+
+    def text_for(self, lang):
+        return _localized(self.text_ru, self.text_en, lang)

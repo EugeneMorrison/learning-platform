@@ -81,4 +81,59 @@
       {% endif %}
     </div>
   </section>
+
+  {# Author and reviews: content from the Django admin (AuthorProfile, Review). #}
+  {# Each section is left out entirely while it has nothing to show.          #}
+  {% if author %}
+    <section id="author" class="author" aria-labelledby="author-title">
+      <div class="container">
+       <div class="author__inner">
+        {% if author.photo %}
+          <img class="author__photo" src="{{ author.photo.url }}" alt="{{ author.name }}"
+               width="240" height="240" loading="lazy">
+        {% endif %}
+        <div class="author__text">
+          <h2 id="author-title" class="author__title">{% translate "Об авторе" %}</h2>
+          <p class="author__name">{{ author.name }}</p>
+          {% if author.bio %}
+            {# Escaped and split into paragraphs; never |safe. #}
+            <div class="author__bio">{{ author.bio|linebreaks }}</div>
+          {% endif %}
+          {% if author.stepik_url %}
+            <a class="btn btn-secondary" href="{{ author.stepik_url }}" rel="noopener">{% translate "Профиль на Stepik" %}</a>
+          {% endif %}
+        </div>
+       </div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if reviews %}
+    <section id="reviews" class="reviews" aria-labelledby="reviews-title">
+      <div class="container">
+        <h2 id="reviews-title" class="reviews__title">{% translate "Отзывы" %}</h2>
+        <ul class="reviews__list">
+          {% for review in reviews %}
+            <li class="review-card">
+              <blockquote class="review-card__text">{{ review.text|linebreaks }}</blockquote>
+              <p class="review-card__meta">
+                <span class="review-card__name">{{ review.student_name }}</span>
+                {# Course titles only for published courses (no leaks of drafts). #}
+                {% if review.course and review.course.is_published %}
+                  <span class="review-card__course">{{ review.course.title }}</span>
+                {% endif %}
+                {% if review.source %}
+                  {% if review.source_url %}
+                    <a class="review-card__source" href="{{ review.source_url }}" rel="noopener">{{ review.source }}</a>
+                  {% else %}
+                    <span class="review-card__source">{{ review.source }}</span>
+                  {% endif %}
+                {% endif %}
+              </p>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  {% endif %}
 {% endblock %}
