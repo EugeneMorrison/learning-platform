@@ -561,6 +561,7 @@ class AuthorProfile(models.Model):
     while there is none.
     """
     name = models.CharField(max_length=200)
+    name_en = models.CharField(max_length=200, blank=True, help_text="Name in English; leave empty to show the Russian name on /en/")
     photo = models.ImageField(upload_to='author/', blank=True)
     bio_ru = models.TextField(blank=True, help_text="Bio in Russian (plain text; blank lines start paragraphs)")
     bio_en = models.TextField(blank=True, help_text="Bio in English; leave empty to show the Russian text on /en/")
@@ -572,6 +573,9 @@ class AuthorProfile(models.Model):
 
     def __str__(self):
         return self.name
+
+    def name_for(self, lang):
+        return _localized(self.name, self.name_en, lang)
 
     def bio_for(self, lang):
         return _localized(self.bio_ru, self.bio_en, lang)

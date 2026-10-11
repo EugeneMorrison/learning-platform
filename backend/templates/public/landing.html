@@ -1,5 +1,5 @@
 {% extends "public/base.html" %}
-{% load i18n static %}
+{% load i18n static public_site %}
 
 {% block extra_head %}
   <link rel="stylesheet" href="{% static 'public/css/landing.css' %}">
@@ -89,15 +89,16 @@
       <div class="container">
        <div class="author__inner">
         {% if author.photo %}
-          <img class="author__photo" src="{{ author.photo.url }}" alt="{{ author.name }}"
-               width="240" height="240" loading="lazy">
+          <img class="author__photo" src="{{ author.photo.url }}" alt="{{ author.display_name }}"
+               width="320" height="320" loading="lazy">
         {% endif %}
         <div class="author__text">
           <h2 id="author-title" class="author__title">{% translate "Об авторе" %}</h2>
-          <p class="author__name">{{ author.name }}</p>
+          <p class="author__name">{{ author.display_name }}</p>
           {% if author.bio %}
-            {# Escaped and split into paragraphs; never |safe. #}
-            <div class="author__bio">{{ author.bio|linebreaks }}</div>
+            {# Escaped; blank lines split paragraphs, a short standalone line becomes a #}
+            {# subheading (api/templatetags/public_site.py). Never |safe.               #}
+            <div class="author__bio">{{ author.bio|paragraphs_with_subheadings }}</div>
           {% endif %}
           {% if author.stepik_url %}
             <a class="btn btn-secondary" href="{{ author.stepik_url }}" rel="noopener">{% translate "Профиль на Stepik" %}</a>

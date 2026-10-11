@@ -39,6 +39,7 @@ def landing_view(request):
     lang = translation.get_language()
     author = AuthorProfile.objects.first()
     if author:
+        author.display_name = author.name_for(lang)
         author.bio = author.bio_for(lang)
     reviews = list(Review.objects.filter(is_published=True).select_related('course'))
     for review in reviews:

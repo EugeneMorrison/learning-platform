@@ -620,3 +620,60 @@ class AuthorAndReviewsSectionTests(PublicPagesTestCase):
         self.assertIn('<p>Первый абзац.</p>\n\n<p>Второй абзац.</p>', html)
         self.assertIn('<p>Начало отзыва.</p>\n\n<p>Продолжение.</p>', html)
         self.assertRegex(html, r'<img class="author__photo" src="/media/author/me\.jpg" alt="Людмила"')
+
+
+class AuthorNameAndBioFormattingTests(PublicPagesTestCase):
+    """name_en with fallback to name; bio paragraphs and safe subheadings."""
+
+    # Reuse the helper without re-running AuthorAndReviewsSectionTests' tests.
+    make_profile = AuthorAndReviewsSectionTests.make_profile
+
+    def name_in_page(self, url):
+        html = self.client.get(url).content.decode()
+        name = re.search(r'<p class="author__name">([^<]*)</p>', html).group(1)
+        alt = re.search(r'<img class="author__photo"[^>]* alt="([^"]*)"', html).group(1)
+        return name, alt
+
+    def test_english_name_used_on_en(self):
+        self.make_profile(name='Людмила Иванова', name_en='Lyudmila Ivanova')
+        self.assertEqual(self.name_in_page('/'), ('Людмила Иванова', 'Людмила Иванова'))
+        self.assertEqual(self.name_in_page('/en/'), ('Lyudmila Ivanova', 'Lyudmila Ivanova'))
+
+    def test_english_name_falls_back_to_russian(self):
+        self.make_profile(name='Людмила Иванова', name_en='')
+        self.assertEqual(self.name_in_page('/en/'), ('Людмила Иванова', 'Людмила Иванова'))
+
+    def test_whitespace_only_english_name_falls_back(self):
+        self.make_profile(name='Людмила', name_en='   ')
+        self.assertEqual(self.name_in_page('/en/')[0], 'Людмила')
+
+    def test_short_standalone_line_becomes_subheading(self):
+        self.make_profile(bio_ru='Опыт\n\nПреподаю десять лет.\nПишу курсы.\n\nЧему я учу\n\nPython с нуля.')
+        html = self.client.get('/').content.decode()
+        self.assertIn('<h3 class="author__subheading">Опыт</h3>', html)
+        self.assertIn('<p>Преподаю десять лет.<br>Пишу курсы.</p>', html)
+        self.assertIn('<h3 class="author__subheading">Чему я учу</h3>', html)
+        self.assertIn('<p>Python с нуля.</p>', html)
+
+    def test_sentences_and_last_line_stay_paragraphs(self):
+        # Ends with punctuation, too long, multi-line, or nothing after it → paragraph.
+        long_line = 'Слово ' * 15
+        self.make_profile(bio_ru=f'Привет!\n\n{long_line.strip()}\n\nДве\nстроки\n\nПоследняя строка')
+        html = self.client.get('/').content.decode()
+        self.assertNotIn('author__subheading', html)
+        self.assertIn('<p>Привет!</p>', html)
+        self.assertIn('<p>Последняя строка</p>', html)
+
+    def test_subheadings_never_render_author_html(self):
+        self.make_profile(bio_ru='<b onclick=x>Опыт</b>\n\n<script>alert(1)</script> text.')
+        html = self.client.get('/').content.decode()
+        self.assertIn('<h3 class="author__subheading">&lt;b onclick=x&gt;Опыт&lt;/b&gt;</h3>', html)
+        self.assertNotIn('<script>alert(1)', html)
+        self.assertNotIn('<b onclick', html)
+
+    def test_admin_form_shows_name_en_after_name(self):
+        from django.contrib.admin.sites import site
+        from api.models import AuthorProfile
+
+        fields = site._registry[AuthorProfile].fields
+        self.assertEqual(fields[:2], ['name', 'name_en'])

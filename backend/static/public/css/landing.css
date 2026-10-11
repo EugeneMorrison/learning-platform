@@ -198,9 +198,9 @@
   scroll-margin-top: var(--space-4);
 }
 
+/* Photo beside the text, both top-aligned; stacked on phones (see below). */
 .author__inner {
   display: flex;
-  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-7);
   padding: var(--space-6);
@@ -209,9 +209,8 @@
 }
 
 .author__photo {
-  flex-shrink: 0;
-  width: calc(var(--space-9) * 2.5);
-  max-width: 100%;
+  flex: 0 0 var(--author-photo);
+  width: var(--author-photo);
   height: auto;
   aspect-ratio: 1 / 1;
   object-fit: cover;
@@ -219,7 +218,7 @@
 }
 
 .author__text {
-  flex: 1 1 calc(var(--container-width) / 3);
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -228,16 +227,39 @@
 }
 
 .author__name {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
   font-family: var(--font-heading);
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
 }
 
+/* Long text: limited line length, a step larger, full-contrast ink. */
 .author__bio {
-  margin-bottom: var(--space-5);
-  color: var(--color-muted);
+  max-width: var(--measure);
+  margin-bottom: var(--space-6);
+  color: var(--color-ink);
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
   overflow-wrap: anywhere;
+}
+
+.author__bio p {
+  margin: 0 0 var(--space-5);
+}
+
+.author__bio > :last-child {
+  margin-bottom: 0;
+}
+
+.author__subheading {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.author__bio > .author__subheading:first-child {
+  margin-top: 0;
 }
 
 /* Reviews */
@@ -289,10 +311,36 @@
   font-weight: var(--weight-bold);
 }
 
+/* Tablets: photo stays beside the text, a little smaller. */
+@media (max-width: 64rem) {
+  .author__inner {
+    gap: var(--space-6);
+  }
+
+  .author__photo {
+    flex-basis: var(--author-photo-tablet);
+    width: var(--author-photo-tablet);
+  }
+}
+
 /* Narrow screens */
 @media (max-width: 40rem) {
   .hero {
     padding-top: var(--space-6);
+  }
+
+  /* Author: photo on top, full width up to a sensible max. */
+  .author__inner {
+    flex-direction: column;
+    align-items: stretch;  /* text takes the panel width and wraps */
+    padding: var(--space-5);
+  }
+
+  .author__photo {
+    align-self: flex-start;
+    flex-basis: auto;
+    width: 100%;
+    max-width: var(--author-photo-phone-max);
   }
 
   /* Code card goes under the text, full width. */

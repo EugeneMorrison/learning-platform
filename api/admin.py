@@ -85,7 +85,9 @@ class ProgressAdmin(admin.ModelAdmin):
 @admin.register(AuthorProfile)
 class AuthorProfileAdmin(admin.ModelAdmin):
     """Single author profile for the landing page: adding is disabled once one exists."""
-    list_display = ['name', 'stepik_url']
+    list_display = ['name', 'name_en', 'stepik_url']
+    # name_en right after name in the edit form.
+    fields = ['name', 'name_en', 'photo', 'bio_ru', 'bio_en', 'stepik_url']
 
     def has_add_permission(self, request):
         return super().has_add_permission(request) and not AuthorProfile.objects.exists()

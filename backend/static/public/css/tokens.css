@@ -58,5 +58,9 @@
 
   /* Layout */
   --container-width: 72rem;
+  --measure: 68ch;               /* comfortable line length for long text */
+  --author-photo: 20rem;         /* 320px, desktop */
+  --author-photo-tablet: 15rem;  /* 240px, beside the text on tablets */
+  --author-photo-phone-max: 22rem; /* phones: full width up to 352px */
   --border-width: 1px;
 }
