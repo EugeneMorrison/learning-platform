@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
+import './CoursePage.css';
 
 function CoursePage() {
     const { courseId } = useParams();
@@ -178,110 +179,85 @@ function CoursePage() {
     }, [selectedStudent, courseId]);
 
 
-    if (loading) return <p>Загрузка...</p>;
-    if (!course) return <p>Курс не найден.</p>;
+    if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
+    if (!course) return <div className="page"><p className="page-status">Курс не найден.</p></div>;
+
+    const isAuthor = user?.role === 'AUTHOR';
 
     return (
-        <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
+        <div className="page">
 
             {/* Header */}
-            <button onClick={() => navigate('/dashboard/')} style={{ marginBottom: '20px' }}>
+            <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate('/dashboard/')}>
                 ← Назад
             </button>
-            <h2>{course.title}</h2>
-            <p style={{ color: '#64748b' }}>{course.description}</p>
-            <hr />
+            <div className="page__header">
+                <div>
+                    <h1 className="page__title">{course.title}</h1>
+                    {course.description && <p className="page__lead">{course.description}</p>}
+                </div>
+            </div>
+
+            <div className={isAuthor ? 'course-layout course-layout--with-aside' : 'course-layout'}>
 
             {/* Lessons section */}
-            <div style={{ marginTop: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3>Уроки</h3>
-                    {user?.role === 'AUTHOR' && (
-                        <button onClick={() => setShowLessonForm(!showLessonForm)}>
+            <section className="section">
+                <div className="section__header">
+                    <h2 className="section__title">Уроки</h2>
+                    {isAuthor && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => setShowLessonForm(!showLessonForm)}>
                             {showLessonForm ? 'Отмена' : '+ Добавить урок'}
                         </button>
                     )}
                 </div>
 
-                {user?.role === 'AUTHOR' && showLessonForm && (
-                    <form onSubmit={handleAddLesson} style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        marginTop: '12px',
-                        background: '#f8fafc',
-                    }}>
+                {isAuthor && showLessonForm && (
+                    <form onSubmit={handleAddLesson} className="inline-form">
                         <input
+                            className="input"
                             type="text"
                             placeholder="Название урока"
+                            aria-label="Название урока"
                             value={newLessonTitle}
                             onChange={e => setNewLessonTitle(e.target.value)}
-                            style={{ width: '100%', padding: '8px', marginBottom: '8px' }}
                             required
                         />
-                        <button type="submit" disabled={creatingLesson}>
+                        <button type="submit" className="btn btn-primary" disabled={creatingLesson}>
                             {creatingLesson ? 'Создание...' : 'Создать урок'}
                         </button>
                     </form>
                 )}
 
                 {lessons.length === 0 ? (
-                    <p style={{ color: '#64748b' }}>Уроков пока нет.</p>
+                    <p className="muted">Уроков пока нет.</p>
                 ) : (
-                    lessons.map((lesson, index) => (
-                        <div key={lesson.id} style={{
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            padding: '16px',
-                            marginTop: '12px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            gap: '12px',
-                        }} onClick={() => navigate(`/lesson/${lesson.id}/`)}>
-                            <div>
-                                <strong>Урок {index + 1}: {lesson.title}</strong>
-                                <p style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
-                                    → Открыть урок
-                                </p>
+                    <div className="lesson-list">
+                    {lessons.map((lesson, index) => (
+                        <div
+                            key={lesson.id}
+                            className="card card-link lesson-row"
+                            onClick={() => navigate(`/lesson/${lesson.id}/`)}
+                        >
+                            <div className="lesson-row__text">
+                                <strong className="lesson-row__title">Урок {index + 1}: {lesson.title}</strong>
+                                <p className="lesson-row__hint">→ Открыть урок</p>
                             </div>
-                            {user?.role === 'AUTHOR' && (
-                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                            {isAuthor && (
+                                <div className="lesson-row__actions">
                                     <button
+                                        className="btn btn-secondary btn-sm"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             navigate(`/lesson/${lesson.id}/edit/`);
-                                        }}
-                                        style={{
-                                            padding: '6px 12px',
-                                            background: 'white',
-                                            color: '#0C4B33',
-                                            border: '1px solid #0C4B33',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontSize: '13px',
-                                            fontWeight: '500',
-                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         ✎ Редактировать
                                     </button>
                                     <button
+                                        className="btn btn-danger btn-sm"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleDeleteLesson(lesson.id);
-                                        }}
-                                        style={{
-                                            padding: '6px 12px',
-                                            background: 'white',
-                                            color: '#dc2626',
-                                            border: '1px solid #fecaca',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontSize: '13px',
-                                            fontWeight: '500',
-                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         Удалить урок
@@ -289,63 +265,60 @@ function CoursePage() {
                                 </div>
                             )}
                         </div>
-                    ))
+                    ))}
+                    </div>
                 )}
-            </div>
+            </section>
 
             {/* Students section — only for authors */}
-            {user?.role === 'AUTHOR' && (
-                <div style={{ marginTop: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3>Студенты</h3>
-                        <button onClick={() => setShowStudentForm(!showStudentForm)}>
+            {isAuthor && (
+                <section className="section course-students">
+                    <div className="section__header">
+                        <h2 className="section__title">Студенты</h2>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setShowStudentForm(!showStudentForm)}>
                             {showStudentForm ? 'Отмена' : '+ Добавить студента'}
                         </button>
                     </div>
 
                     {showStudentForm && (
-                        <form onSubmit={handleAddStudent} style={{
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '8px',
-                            padding: '16px',
-                            marginTop: '12px',
-                            background: '#f8fafc',
-                        }}>
-                            {studentError && <p style={{ color: 'red' }}>{studentError}</p>}
+                        <form onSubmit={handleAddStudent} className="inline-form">
+                            {studentError && <p className="notice notice-danger" role="alert">{studentError}</p>}
                             <input
+                                className="input"
                                 type="text"
                                 placeholder="Имя пользователя студента"
+                                aria-label="Имя пользователя студента"
                                 value={studentUsername}
                                 onChange={e => setStudentUsername(e.target.value)}
-                                style={{ width: '100%', padding: '8px', marginBottom: '8px' }}
                                 required
                             />
-                            <button type="submit" disabled={addingStudent}>
+                            <button type="submit" className="btn btn-primary" disabled={addingStudent}>
                                 {addingStudent ? 'Добавление...' : 'Добавить'}
                             </button>
                         </form>
                     )}
 
                     {enrollments.length === 0 ? (
-                        <p style={{ color: '#64748b' }}>Студентов пока нет.</p>
+                        <p className="muted">Студентов пока нет.</p>
                     ) : (
                         enrollments.map(enrollment => (
-                            <div key={enrollment.id} style={{
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '8px',
-                                padding: '16px',
-                                marginTop: '12px',
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <strong>{enrollment.student_name}</strong>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
-                                        <button onClick={() => navigate(`/courses/${courseId}/students/${enrollment.student}/`)}>
+                            <div key={enrollment.id} className="card student-row">
+                                <div className="student-row__head">
+                                    <strong className="student-row__name">{enrollment.student_name}</strong>
+                                    <div className="student-row__actions">
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => navigate(`/courses/${courseId}/students/${enrollment.student}/`)}
+                                        >
                                             Прогресс
                                         </button>
-                                        <button onClick={() => {
-                                            setSelectedStudent({ id: enrollment.student, name: enrollment.student_name });
-                                            fetchMessages(enrollment.student);
-                                        }}>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={() => {
+                                                setSelectedStudent({ id: enrollment.student, name: enrollment.student_name });
+                                                fetchMessages(enrollment.student);
+                                            }}
+                                        >
                                             💬 Чат
                                         </button>
                                     </div>
@@ -406,8 +379,9 @@ function CoursePage() {
                             </div>
                         ))
                     )}
-                </div>
+                </section>
             )}
+            </div>
         </div>
     );
 }

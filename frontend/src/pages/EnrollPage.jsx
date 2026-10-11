@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api';
+import './auth.css';
 
 // /enroll/:courseId/ — target of "Начать бесплатно" on the public course page.
 // Not logged in → register (with ?next= back here). Logged in → POST /api/enrollments/
@@ -42,22 +43,26 @@ function EnrollPage() {
     }, [courseId, navigate]);
 
     if (!error) {
-        return <p style={{ maxWidth: '400px', margin: '100px auto' }}>Записываем на курс…</p>;
+        return (
+            <div className="page page--form">
+                <p className="page-status" role="status">Записываем на курс…</p>
+            </div>
+        );
     }
 
     return (
-        <div style={{ maxWidth: '400px', margin: '100px auto', padding: '20px' }}>
-            <h2>Не получилось записаться</h2>
-            <p style={{ color: 'red' }}>{error.message}</p>
-            <p>
-                {/* Public course pages are Django-rendered, so a plain link (full page load). */}
-                {error.courseSlug
-                    ? <a href={`/course/${error.courseSlug}/`}>← Вернуться к курсу</a>
-                    : <a href="/#catalog">← Все курсы</a>}
-            </p>
-            <p>
-                <Link to="/dashboard/">Мой кабинет</Link>
-            </p>
+        <div className="page page--form">
+            <div className="card auth-card">
+                <h1 className="auth-card__title">Не получилось записаться</h1>
+                <p className="notice notice-danger" role="alert">{error.message}</p>
+                <p className="auth-card__links">
+                    {/* Public course pages are Django-rendered, so a plain link (full page load). */}
+                    {error.courseSlug
+                        ? <a href={`/course/${error.courseSlug}/`}>← Вернуться к курсу</a>
+                        : <a href="/#catalog">← Все курсы</a>}
+                    <Link to="/dashboard/">Мой кабинет</Link>
+                </p>
+            </div>
         </div>
     );
 }

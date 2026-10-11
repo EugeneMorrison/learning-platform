@@ -154,9 +154,138 @@ textarea.input {
     background: var(--color-ground);
 }
 
+/* Small label ("Уроков: 3"), same as .pill on the public pages. */
+.pill {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+/* A card that opens something on click (course, lesson). */
+.card-link {
+    cursor: pointer;
+}
+
+.card-link:hover {
+    border-color: var(--color-accent);
+}
+
+/* Responsive grid of cards: as many columns as fit, one on phones. */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min-width), 100%), 1fr));
+    gap: var(--space-4);
+}
+
+/* Page layout. Same max-width and side padding as .app-header__inner, so page
+   content lines up with the header. Variants narrow the content column and keep
+   it centred on the same axis. */
+.page {
+    width: 100%;
+    max-width: var(--container-width);
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-5) var(--space-8);
+}
+
+.page--narrow {
+    max-width: calc(var(--reading-width) + 2 * var(--space-5));
+}
+
+.page--form {
+    max-width: calc(var(--form-width) + 2 * var(--space-5));
+    padding-top: var(--space-8);
+}
+
+.page__back {
+    margin-bottom: var(--space-4);
+    margin-left: calc(-1 * var(--space-4)); /* text lines up with the content edge */
+}
+
+.page__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-5);
+    border-bottom: var(--border-width) solid var(--color-line);
+}
+
+.page__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+    overflow-wrap: anywhere;
+}
+
+.page__lead {
+    margin: var(--space-2) 0 0;
+    color: var(--color-muted);
+}
+
+/* "Загрузка...", "Курс не найден." */
+.page-status {
+    color: var(--color-muted);
+}
+
+.section + .section {
+    margin-top: var(--space-7);
+}
+
+.section__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.section__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+}
+
+/* Inline form that opens under a section header ("+ Добавить урок"). */
+.inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+}
+
+.inline-form > .input {
+    flex: 1 1 var(--card-min-width);
+}
+
+.inline-form > .notice {
+    flex-basis: 100%;
+}
+
+.muted {
+    color: var(--color-muted);
+}
+
 /* Keyboard focus for everything the app styles itself */
 .btn:focus-visible,
 .input:focus-visible,
+.card-link:focus-visible,
+.auth-card a:focus-visible,
 .app-header a:focus-visible,
 .user-badge button:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring-color);
@@ -166,5 +295,17 @@ textarea.input {
 @media (max-width: 40rem) {
     .card {
         padding: var(--space-5);
+    }
+
+    .page {
+        padding: var(--space-5) var(--space-4) var(--space-7);
+    }
+
+    .page--form {
+        padding-top: var(--space-6);
+    }
+
+    .page__title {
+        font-size: var(--text-xl);
     }
 }

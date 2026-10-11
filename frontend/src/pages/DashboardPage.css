@@ -1,0 +1,47 @@
+/* Dashboard: course cards in a grid, actions pinned to the card bottom. */
+.dash-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-5);
+}
+
+.dash-card__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+    overflow-wrap: anywhere;
+}
+
+.dash-card__meta {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* Long descriptions stay readable in a grid: three lines, then "…". */
+.dash-card__desc {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+
+.dash-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: auto;
+    padding-top: var(--space-3);
+}
+
+/* New-course form: title, then description on its own row, then submit. */
+.dash-form > textarea.input {
+    flex-basis: 100%;
+}

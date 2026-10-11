@@ -1,0 +1,30 @@
+/* Login, register and enroll: one centred card under the header. */
+.auth-card__title {
+    margin: 0 0 var(--space-5);
+    font-family: var(--font-heading);
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+}
+
+.auth-card__error {
+    margin-bottom: var(--space-4);
+}
+
+.auth-card__footer {
+    margin: var(--space-5) 0 0;
+    color: var(--color-muted);
+    text-align: center;
+}
+
+.auth-card a {
+    color: var(--color-accent);
+    font-weight: var(--weight-medium);
+}
+
+.auth-card__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-5);
+    margin: var(--space-5) 0 0;
+}

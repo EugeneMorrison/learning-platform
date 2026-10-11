@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { logout } from '../api';
+import './DashboardPage.css';
 
 function DashboardPage() {
     const [user, setUser] = useState(null);
@@ -28,16 +29,17 @@ function DashboardPage() {
         navigate('/login/');
     }
 
-    if (loading) return <p>Загрузка...</p>;
+    if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
 
     return (
-        <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2>Добро пожаловать, {user.username}!</h2>
-                <button onClick={handleLogout}>Выйти</button>
+        <div className="page">
+            <div className="page__header">
+                <div>
+                    <h1 className="page__title">Добро пожаловать, {user.username}!</h1>
+                    <p className="page__lead">Роль: {user.role === 'AUTHOR' ? 'Автор' : 'Студент'}</p>
+                </div>
+                <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Выйти</button>
             </div>
-            <p>Роль: {user.role === 'AUTHOR' ? 'Автор' : 'Студент'}</p>
-            <hr />
             {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard user={user} />}
         </div>
     );
@@ -62,55 +64,43 @@ function StudentDashboard({ user }) {
         fetchEnrollments();
     }, []);
 
-    if (loading) return <p>Загрузка курсов...</p>;
+    if (loading) return <p className="page-status">Загрузка курсов...</p>;
 
     return (
-        <div>
-            <h3>Мои курсы</h3>
+        <section className="section">
+            <div className="section__header">
+                <h2 className="section__title">Мои курсы</h2>
+            </div>
             {enrollments.length === 0 ? (
-                <p style={{ color: '#64748b' }}>Вы пока не записаны ни на один курс.</p>
+                <p className="muted">Вы пока не записаны ни на один курс.</p>
             ) : (
-                enrollments.map(enrollment => (
-                    <div key={enrollment.id} style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        marginTop: '12px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px',
-                    }} onClick={() => navigate(`/courses/${enrollment.course}/`)}>
-                        <div>
-                            <h4 style={{ margin: '0 0 8px 0' }}>{enrollment.course_title}</h4>
-                            <p style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>
+                <div className="card-grid">
+                    {enrollments.map(enrollment => (
+                        <div
+                            key={enrollment.id}
+                            className="card card-link dash-card"
+                            onClick={() => navigate(`/courses/${enrollment.course}/`)}
+                        >
+                            <h3 className="dash-card__title">{enrollment.course_title}</h3>
+                            <p className="dash-card__meta">
                                 Записан: {new Date(enrollment.enrolled_at).toLocaleDateString('ru-RU')}
                             </p>
+                            <div className="dash-card__actions">
+                                <button
+                                    className="btn btn-secondary btn-sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/courses/${enrollment.course}/students/${user.id}/`);
+                                    }}
+                                >
+                                    Прогресс
+                                </button>
+                            </div>
                         </div>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/courses/${enrollment.course}/students/${user.id}/`);
-                            }}
-                            style={{
-                                padding: '8px 16px',
-                                background: '#0C4B33',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                whiteSpace: 'nowrap',
-                            }}
-                        >
-                            Прогресс
-                        </button>
-                    </div>
-                ))
+                    ))}
+                </div>
             )}
-        </div>
+        </section>
     );
 }
 
@@ -158,72 +148,61 @@ function AuthorDashboard() {
         }
     }
 
-    if (loading) return <p>Загрузка курсов...</p>;
+    if (loading) return <p className="page-status">Загрузка курсов...</p>;
 
     return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3>Мои курсы</h3>
-                <button onClick={() => setShowForm(!showForm)}>
+        <section className="section">
+            <div className="section__header">
+                <h2 className="section__title">Мои курсы</h2>
+                <button className="btn btn-secondary btn-sm" onClick={() => setShowForm(!showForm)}>
                     {showForm ? 'Отмена' : '+ Создать курс'}
                 </button>
             </div>
 
             {showForm && (
-                <form onSubmit={handleCreateCourse} style={{
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    padding: '16px',
-                    marginTop: '12px',
-                    background: '#f8fafc',
-                }}>
-                    <div style={{ marginBottom: '12px' }}>
-                        <input
-                            type="text"
-                            placeholder="Название курса"
-                            value={newTitle}
-                            onChange={e => setNewTitle(e.target.value)}
-                            style={{ width: '100%', padding: '8px' }}
-                            required
-                        />
-                    </div>
-                    <div style={{ marginBottom: '12px' }}>
-                        <textarea
-                            placeholder="Описание курса"
-                            value={newDescription}
-                            onChange={e => setNewDescription(e.target.value)}
-                            style={{ width: '100%', padding: '8px', minHeight: '80px' }}
-                        />
-                    </div>
-                    <button type="submit" disabled={creating}>
+                <form onSubmit={handleCreateCourse} className="inline-form dash-form">
+                    <input
+                        className="input"
+                        type="text"
+                        placeholder="Название курса"
+                        aria-label="Название курса"
+                        value={newTitle}
+                        onChange={e => setNewTitle(e.target.value)}
+                        required
+                    />
+                    <textarea
+                        className="input"
+                        placeholder="Описание курса"
+                        aria-label="Описание курса"
+                        value={newDescription}
+                        onChange={e => setNewDescription(e.target.value)}
+                    />
+                    <button type="submit" className="btn btn-primary" disabled={creating}>
                         {creating ? 'Создание...' : 'Создать'}
                     </button>
                 </form>
             )}
 
             {courses.length === 0 ? (
-                <p>У вас пока нет курсов.</p>
+                <p className="muted">У вас пока нет курсов.</p>
             ) : (
-                courses.map(course => (
-                    <div key={course.id} style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        padding: '16px',
-                        marginTop: '12px',
-                        cursor: 'pointer',
-                    }} onClick={() => navigate(`/courses/${course.id}/`)}>
-
-                        <h4 style={{ margin: '0 0 8px 0' }}>{course.title}</h4>
-                        <p style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>
-                            {course.description}
-                        </p>
-                        <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
-                            Уроков: {course.lesson_count}
-                        </p>
-                    </div>
-                ))
+                <div className="card-grid">
+                    {courses.map(course => (
+                        <div
+                            key={course.id}
+                            className="card card-link dash-card"
+                            onClick={() => navigate(`/courses/${course.id}/`)}
+                        >
+                            <h3 className="dash-card__title">{course.title}</h3>
+                            <p className="dash-card__desc">{course.description}</p>
+                            <div className="dash-card__actions">
+                                <span className="pill">Уроков: {course.lesson_count}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             )}
-        </div>
+        </section>
     );
 }
 

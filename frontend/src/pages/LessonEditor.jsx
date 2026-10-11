@@ -237,8 +237,8 @@ function LessonEditor() {
     }
 
     return (
-        <div style={{ maxWidth: 800, margin: '40px auto', padding: 20 }}>
-            <button onClick={() => navigate(`/courses/${lesson.course}/`)} style={{ marginBottom: 20 }}>
+        <div className="page">
+            <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${lesson.course}/`)}>
                 ← Назад к курсу
             </button>
 

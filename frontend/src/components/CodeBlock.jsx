@@ -303,8 +303,8 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
             )}
 
             {/* Buttons row */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
                     <button
                         onClick={handleSubmit}
                         disabled={isSubmitting}

@@ -132,10 +132,10 @@ function StudentProgressPage() {
     const taskPercentage = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     return (
-        <div style={{ maxWidth: '800px', margin: '40px auto', padding: '20px' }}>
+        <div className="page">
 
             {/* Header */}
-            <button onClick={() => navigate(`/courses/${courseId}/`)} style={{ marginBottom: '20px' }}>
+            <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${courseId}/`)}>
                 ← Назад
             </button>
             <h2>Прогресс студента: {data.student_username}</h2>
