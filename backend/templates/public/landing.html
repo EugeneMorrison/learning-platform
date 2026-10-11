@@ -9,6 +9,7 @@
   <section class="hero" aria-labelledby="hero-title">
     <div class="container hero__inner">
       <div class="hero__text">
+        <p class="hero__eyebrow">{% translate "Python: от ужаса до понимания" %}</p>
         {# TODO: copy from Lyudmila #}
         <h1 id="hero-title" class="hero__title">{% translate "Учитесь Python шаг за шагом" %}</h1>
         {# TODO: copy from Lyudmila #}
@@ -44,6 +45,14 @@
           </div>
           <div class="code-card__result">✓ {% translate "Все тесты пройдены" %} (3/3)</div>
         </div>
+        {# Above the fold: no lazy loading. Transparent WebP (alpha), so it sits on any #}
+        {# background without a box. width/height reserve the 3:2 space before it loads. #}
+        <img class="hero__cat"
+             src="{% static 'public/img/cat-desk-800.webp' %}"
+             srcset="{% static 'public/img/cat-desk-800.webp' %} 800w, {% static 'public/img/cat-desk-1200.webp' %} 1200w"
+             sizes="(max-width: 40rem) 18rem, 26rem"
+             width="800" height="533"
+             alt="{% translate "Рыжий кот сидит за столом с ноутбуком" %}">
       </div>
     </div>
   </section>

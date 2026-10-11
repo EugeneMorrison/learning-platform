@@ -1,7 +1,8 @@
 {% extends "public/base.html" %}
-{% load i18n static %}
+{% load i18n static public_site %}
 
-{% block title %}{{ course.title }} — {{ block.super }}{% endblock %}
+{# Course name plus the short brand; the default title's tagline would make it too long. #}
+{% block title %}{{ course.title }} — {% brand_name %}{% endblock %}
 
 {% block extra_head %}
   <link rel="stylesheet" href="{% static 'public/css/course.css' %}">

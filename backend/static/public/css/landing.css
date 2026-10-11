@@ -11,7 +11,7 @@
 .hero__inner {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;  /* text starts at the top, level with the code card */
   justify-content: space-between;
   gap: var(--space-7);
 }
@@ -19,6 +19,16 @@
 .hero__text {
   flex: 1 1 calc(var(--container-width) / 2);
   min-width: 0;
+}
+
+/* Full course name, a small line above the hero heading. */
+.hero__eyebrow {
+  margin-bottom: var(--space-3);
+  color: var(--color-accent);
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
 }
 
 .hero__title {
@@ -43,6 +53,26 @@
   flex: 1 1 calc(var(--container-width) / 3);
   min-width: 0;
   max-width: calc(var(--container-width) / 2.25);
+}
+
+/* The cat sits under the code card, right-aligned, looking up at the code.
+   max-width matches the 26rem in the <img sizes> attribute.
+   The desk in the artwork runs to the image's bottom and left edges; two
+   intersected gradient masks fade those edges out (only the alpha of the
+   mask colour matters). The WebP files themselves are unchanged. */
+.hero__cat {
+  width: 85%;
+  max-width: 26rem;
+  height: auto;
+  margin: var(--space-4) 0 0 auto;
+  -webkit-mask-image:
+    linear-gradient(to top, transparent, var(--color-ink) 14%),
+    linear-gradient(to right, transparent, var(--color-ink) 8%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to top, transparent, var(--color-ink) 14%),
+    linear-gradient(to right, transparent, var(--color-ink) 8%);
+  mask-composite: intersect;
 }
 
 .code-card {
@@ -347,5 +377,12 @@
   .hero__code {
     flex-basis: 100%;
     max-width: none;
+  }
+
+  /* Cat under the code card, smaller and centred (matches sizes="18rem"). */
+  .hero__cat {
+    width: 100%;
+    max-width: 18rem;
+    margin: var(--space-4) auto 0;
   }
 }
