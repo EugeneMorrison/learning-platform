@@ -45,3 +45,8 @@
 .dash-form > textarea.input {
     flex-basis: 100%;
 }
+
+/* One-time "Вы успешно зарегистрированы" after sign-up. */
+.dash-notice {
+    margin-bottom: var(--space-5);
+}

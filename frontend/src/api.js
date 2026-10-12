@@ -88,6 +88,14 @@ export const login = async (username, password) => {
     return response;
 };
 
+// Sign up and log in with the returned token pair, the same way as login().
+// No role in the body: public registration always creates a student.
+export const register = async (username, password) => {
+    const response = await axios.post(`${AUTH_BASE}/register/`, { username, password });
+    storeTokens(response.data.tokens);
+    return response;
+};
+
 export const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');

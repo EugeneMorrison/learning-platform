@@ -14,6 +14,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import (
+    MinimumLengthValidator, get_default_password_validators, validate_password)
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .serializers import UserSerializer
 
 User = get_user_model()
@@ -23,13 +26,27 @@ User = get_user_model()
 # REGISTER (Sign Up)
 # =============================================================================
 
+def _min_password_length():
+    """min_length of the configured MinimumLengthValidator (None if it's not enabled)."""
+    for validator in get_default_password_validators():
+        if isinstance(validator, MinimumLengthValidator):
+            return validator.min_length
+    return None
+
+
+def _register_error(message, code, **extra):
+    """400 for the register form. `code` lets the client show its own wording."""
+    return Response({'error': message, 'code': code, **extra}, status=status.HTTP_400_BAD_REQUEST)
+
+
 @api_view(['POST'])
+@authentication_classes([])  # never authenticates: a stale token in the header can't 401 sign-up
 @permission_classes([AllowAny])  # Anyone can register
 def register_view(request):
     """
-    Register a new user. Public registration always creates a STUDENT:
-    any "role" in the body is ignored. Authors and admins are created
-    only in the Django admin.
+    Register a new user and log them in. Public registration always creates
+    a STUDENT: any "role" in the body is ignored. Authors and admins are
+    created only in the Django admin.
 
     POST /api/auth/register/
 
@@ -40,7 +57,7 @@ def register_view(request):
         "password": "password123"
     }
 
-    Returns:
+    Returns 201, same shape as login:
     {
         "user": {...},
         "tokens": {
@@ -48,40 +65,47 @@ def register_view(request):
             "refresh": "..."
         }
     }
+
+    Errors (400): {"error": "...", "code": ...}, code is one of
+    "required" (+ "fields"), "invalid_username", "username_taken",
+    "email_taken", "weak_password" (+ "codes" and "messages" from Django's
+    AUTH_PASSWORD_VALIDATORS, and "min_length" from MinimumLengthValidator).
     """
     # Get data from request
-    username = request.data.get('username')
+    username = (request.data.get('username') or '').strip()
     email = request.data.get('email')
-    password = request.data.get('password')
+    password = request.data.get('password') or ''
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
 
     # Validation
-    if not username:
-        return Response(
-            {'error': 'Username is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    missing = [name for name, value in (('username', username), ('password', password)) if not value]
+    if missing:
+        return _register_error('Username and password are required', 'required', fields=missing)
 
-    if not password:
-        return Response(
-            {'error': 'Password is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    try:
+        User.username_validator(username)
+    except DjangoValidationError:
+        return _register_error('Invalid username', 'invalid_username')
 
-    # Check if username already exists
-    if User.objects.filter(username=username).exists():
-        return Response(
-            {'error': 'Username already exists'},
-            status=status.HTTP_400_BAD_REQUEST
+    # Case-insensitive: "Alice" can't sign up next to "alice" (login stays exact).
+    if User.objects.filter(username__iexact=username).exists():
+        return _register_error('Username already exists', 'username_taken')
+
+    # The project's AUTH_PASSWORD_VALIDATORS (length, common, numeric, similar to username).
+    try:
+        validate_password(password, user=User(username=username, email=email or ''))
+    except DjangoValidationError as exc:
+        return _register_error(
+            'Password is too weak', 'weak_password',
+            codes=[e.code for e in exc.error_list],
+            messages=list(exc.messages),
+            min_length=_min_password_length(),
         )
 
     # Check if email already exists
     if email and User.objects.filter(email=email).exists():
-        return Response(
-            {'error': 'Email already exists'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return _register_error('Email already exists', 'email_taken')
 
     # Create user. Role is fixed: never taken from the request.
     user = User.objects.create_user(

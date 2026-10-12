@@ -649,6 +649,96 @@ class RegistrationRoleTests(APITestCase):
         self.assertEqual(User.objects.get(username='plain').role, 'STUDENT')
 
 
+class RegistrationFlowTests(APITestCase):
+    """Sign-up logs the user in (same token pair as login) or explains the error."""
+
+    def register(self, username='newbie', password='Sup3r-secret-pass', **extra):
+        return self.client.post(
+            REGISTER_URL, {'username': username, 'password': password, **extra}, format='json')
+
+    def test_success_returns_user_and_working_token_pair(self):
+        response = self.register()
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['user']['username'], 'newbie')
+        tokens = response.data['tokens']
+        self.assertEqual(set(tokens), {'access', 'refresh'})
+
+        # The access token logs the new user in...
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
+        me = self.client.get('/api/auth/me/')
+        self.assertEqual(me.status_code, 200)
+        self.assertEqual(me.data['username'], 'newbie')
+        # ...and the refresh token renews it, exactly as after /login/.
+        self.client.credentials()
+        refreshed = self.client.post('/api/auth/token/refresh/', {'refresh': tokens['refresh']},
+                                     format='json')
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertIn('access', refreshed.data)
+
+    def test_stale_token_in_header_does_not_block_sign_up(self):
+        self.client.credentials(HTTP_AUTHORIZATION='Bearer stale.garbage.token')
+
+        self.assertEqual(self.register().status_code, 201)
+
+    def assert_rejected(self, response, code):
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['code'], code)
+        self.assertNotIn('tokens', response.data)
+
+    def test_empty_fields(self):
+        response = self.register(username='  ', password='')
+
+        self.assert_rejected(response, 'required')
+        self.assertEqual(response.data['fields'], ['username', 'password'])
+        self.assertFalse(User.objects.exists())
+
+    def test_username_taken(self):
+        User.objects.create_user(username='newbie', password='x')
+
+        self.assert_rejected(self.register(), 'username_taken')
+        self.assertEqual(User.objects.count(), 1)
+
+    def test_username_taken_ignores_case(self):
+        User.objects.create_user(username='alice', password='Sup3r-secret-pass')
+
+        for username in ['Alice', 'ALICE', 'aLiCe']:
+            self.assert_rejected(self.register(username=username), 'username_taken')
+        self.assertEqual(User.objects.count(), 1)
+        # Login itself stays exact: only the stored spelling works.
+        login = lambda name: self.client.post(
+            '/api/auth/login/', {'username': name, 'password': 'Sup3r-secret-pass'}, format='json')
+        self.assertEqual(login('alice').status_code, 200)
+        self.assertEqual(login('Alice').status_code, 401)
+
+    def test_invalid_username(self):
+        self.assert_rejected(self.register(username='two words'), 'invalid_username')
+        self.assertFalse(User.objects.exists())
+
+    def test_weak_passwords_use_the_project_validators(self):
+        for password, expected in [('1', 'password_too_short'),
+                                   ('48261937', 'password_entirely_numeric'),
+                                   ('password', 'password_too_common'),
+                                   ('newbie123', 'password_too_similar')]:
+            response = self.register(password=password)
+
+            self.assert_rejected(response, 'weak_password')
+            self.assertIn(expected, response.data['codes'], password)
+            self.assertTrue(response.data['messages'], password)
+        self.assertFalse(User.objects.exists())
+
+    def test_weak_password_reports_the_configured_minimum_length(self):
+        self.assertEqual(self.register(password='1').data['min_length'], 8)  # Django's default
+
+        validators = [{'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+                       'OPTIONS': {'min_length': 12}}]
+        with self.settings(AUTH_PASSWORD_VALIDATORS=validators):
+            response = self.register(password='Short-pass1')  # 11 characters
+        self.assert_rejected(response, 'weak_password')
+        self.assertEqual(response.data['codes'], ['password_too_short'])
+        self.assertEqual(response.data['min_length'], 12)
+
+
 class StudentCannotChangeOwnRoleTests(APITestCase):
     """There is no self-update endpoint; these pin that down and guard the serializer."""
 

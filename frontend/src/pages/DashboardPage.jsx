@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api, { logout } from '../api';
 import './DashboardPage.css';
 
@@ -7,6 +7,18 @@ function DashboardPage() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const location = useLocation();
+    // Set by RegisterPage after a successful sign-up; shown once.
+    const [justRegistered] = useState(() => Boolean(location.state?.justRegistered));
+
+    // Clear that state from the history entry so a refresh (or Back to this
+    // entry) doesn't show the notice again. Same pathname, so navigate stays
+    // stable and the user isn't fetched twice.
+    useEffect(() => {
+        if (location.state?.justRegistered) {
+            navigate(location.pathname, { replace: true, state: null });
+        }
+    }, [location, navigate]);
 
     useEffect(() => {
         async function fetchUser() {
@@ -21,7 +33,7 @@ function DashboardPage() {
         }
         fetchUser();
         // navigate is stable while this page is mounted (it only changes with the
-        // location, and the only navigation here unmounts the page), so no refetch loop.
+        // pathname; the one same-path replace above keeps it), so no refetch loop.
     }, [navigate]);
 
     function handleLogout() {
@@ -33,6 +45,9 @@ function DashboardPage() {
 
     return (
         <div className="page">
+            {justRegistered && (
+                <p className="notice notice-success dash-notice" role="status">Вы успешно зарегистрированы</p>
+            )}
             <div className="page__header">
                 <div>
                     <h1 className="page__title">Добро пожаловать, {user.username}!</h1>
