@@ -931,3 +931,58 @@ class TeacherEnrollStudentTests(APITestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(Enrollment.objects.exists())
+
+
+class StudentProgressQuizCountTests(APITestCase):
+    """"Тестов верно" on the progress page counts quizzes on both sides.
+
+    Reproduces the reported case: a student with correct quizzes and also
+    solved CODE and FILL tasks saw more correct answers than quizzes
+    ("14/13"), because solved non-quiz tasks were counted as correct quizzes.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='teacher', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='alice', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='String methods', author=cls.author, is_published=True)
+        lesson = Lesson.objects.create(course=cls.course, title='Lesson', order_index=1)
+        Enrollment.objects.create(student=cls.student, course=cls.course)
+
+        blocks = {}
+        for order, (name, type_) in enumerate([
+                ('text', 'TEXT'), ('quiz1', 'QUIZ'), ('quiz2', 'QUIZ'), ('quiz3', 'QUIZ'),
+                ('code1', 'CODE'), ('code2', 'CODE'), ('fill', 'FILL')], start=1):
+            blocks[name] = Block.objects.create(lesson=lesson, type=type_, order_index=order, content={})
+
+        # 2 of 3 quizzes correct, 1 wrong; both code tasks and the fill task solved.
+        for name, correct in [('quiz1', True), ('quiz2', True), ('quiz3', False),
+                              ('code1', True), ('code2', True), ('fill', True)]:
+            Progress.objects.create(student=cls.student, block=blocks[name], lesson=lesson,
+                                    completed=True, is_correct=correct)
+
+    def progress(self, viewer):
+        self.client.force_authenticate(viewer)
+        response = self.client.get(
+            f'/api/progress/student/{self.student.id}/course/{self.course.id}/')
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_correct_answers_count_only_quizzes(self):
+        for viewer in [self.author, self.student]:  # the teacher's view and the student's own
+            data = self.progress(viewer)
+
+            self.assertEqual(data['total_quizzes'], 3)
+            self.assertEqual(data['correct_answers'], 2)  # not 5 (2 quizzes + 2 code + 1 fill)
+            self.assertLessEqual(data['correct_answers'], data['total_quizzes'])
+            # Solved CODE/FILL tasks still count where they belong.
+            self.assertEqual(data['completed_blocks'], 6)
+
+    def test_matches_the_stats_view(self):
+        self.client.force_authenticate(self.student)
+        stats = self.client.get('/api/progress/stats/').data
+        course_stats = next(s for s in stats if str(s['course_id']) == str(self.course.id))
+
+        data = self.progress(self.student)
+        self.assertEqual((data['correct_answers'], data['total_quizzes']),
+                         (course_stats['correct_answers'], course_stats['total_quizzes']))

@@ -991,7 +991,7 @@ class StudentProgressView(APIView):
         progress_records = Progress.objects.filter(
             student=student,
             lesson__course=course
-        )
+        ).select_related('block')  # the totals below read each record's block type
 
         # Map block_id → progress
         progress_map = {str(p.block_id): p for p in progress_records}
@@ -1036,9 +1036,12 @@ class StudentProgressView(APIView):
         # Count totals
         total_blocks = blocks.count()
         completed_blocks = sum(1 for p in progress_map.values() if p.completed)
+        # "Тестов верно": correct QUIZ answers out of the course's QUIZ blocks.
+        # Both sides count quizzes only (solved CODE/FILL tasks are in
+        # "completed_blocks"), the same as ProgressStatsView.
         correct_answers = sum(
             1 for p in progress_map.values()
-            if p.is_correct is True
+            if p.is_correct is True and p.block.type == 'QUIZ'
         )
         total_quizzes = blocks.filter(type='QUIZ').count()
 
