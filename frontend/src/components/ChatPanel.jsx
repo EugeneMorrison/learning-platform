@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { MAX_MESSAGE_LENGTH, messageLength } from '../lib/chatSocket';
 import './ChatPanel.css';
 
 // Presentational chat window shared by the lesson page (floating, student →
@@ -77,6 +78,7 @@ function ChatPanel({
     emptyHint,
     status,
     historyError,
+    sendError,
     value,
     onChange,
     onSubmit,
@@ -90,6 +92,11 @@ function ChatPanel({
     const titleId = `${id}-title`;
     const inputId = `${id}-input`;
     const connected = status === 'open';
+    const counterId = `${id}-counter`;
+    const length = messageLength(value.trim());
+    const tooLong = length > MAX_MESSAGE_LENGTH;
+    // The counter appears near the limit.
+    const showCounter = length >= MAX_MESSAGE_LENGTH * 0.9;
     const Heading = `h${headingLevel}`;
 
     useKeyboardInset(panelRef, floating);
@@ -105,7 +112,7 @@ function ChatPanel({
     useEffect(() => {
         const log = logRef.current;
         if (log) log.scrollTop = log.scrollHeight;
-    }, [messages.length, status, historyError]);
+    }, [messages.length, status, historyError, tooLong, sendError]);
 
     function handleKeyDown(e) {
         if (e.key === 'Escape') {
@@ -114,15 +121,24 @@ function ChatPanel({
         }
     }
 
-    let statusNote = null;
-    if (status === 'closed') {
-        statusNote = (
-            <p className="chat-panel__note chat-panel__note--error">
-                Нет соединения с чатом. Закройте чат и откройте снова.
-            </p>
-        );
-    } else if (status === 'connecting') {
-        statusNote = <p className="chat-panel__note">Подключение…</p>;
+    // Notes above the input, in a live region. 'reconnecting' is neutral (it
+    // fixes itself); red only for what the user has to act on.
+    const notes = [];
+    if (status === 'connecting') {
+        notes.push({ key: 'status', text: 'Подключение…' });
+    } else if (status === 'reconnecting') {
+        notes.push({ key: 'status', text: 'Связь прервалась. Переподключаемся…' });
+    } else if (status === 'forbidden') {
+        notes.push({ key: 'status', error: true, text: 'Нет доступа к этому чату.' });
+    } else if (status === 'session') {
+        notes.push({ key: 'status', error: true, text: 'Сессия истекла. Войдите снова, чтобы писать в чат.' });
+    }
+    // Static text, so the live region does not speak on every keystroke;
+    // the number is in the counter.
+    if (tooLong) {
+        notes.push({ key: 'length', error: true, text: `Сообщение слишком длинное: не больше ${MAX_MESSAGE_LENGTH} символов.` });
+    } else if (sendError) {
+        notes.push({ key: 'send', error: true, text: sendError });
     }
 
     return (
@@ -200,7 +216,13 @@ function ChatPanel({
                 )}
             </div>
 
-            <div className="chat-panel__status" role="status">{statusNote}</div>
+            <div className="chat-panel__status" role="status">
+                {notes.map(note => (
+                    <p key={note.key} className={note.error ? 'chat-panel__note chat-panel__note--error' : 'chat-panel__note'}>
+                        {note.text}
+                    </p>
+                ))}
+            </div>
 
             <form className="chat-panel__form" onSubmit={onSubmit}>
                 <label className="visually-hidden" htmlFor={inputId}>Сообщение</label>
@@ -212,11 +234,21 @@ function ChatPanel({
                     autoComplete="off"
                     value={value}
                     onChange={onChange}
+                    aria-invalid={tooLong || undefined}
+                    aria-describedby={showCounter ? counterId : undefined}
                 />
+                {showCounter && (
+                    <span
+                        id={counterId}
+                        className={tooLong ? 'chat-panel__counter chat-panel__counter--over' : 'chat-panel__counter'}
+                    >
+                        {length} / {MAX_MESSAGE_LENGTH}
+                    </span>
+                )}
                 <button
                     type="submit"
                     className="btn btn-primary chat-panel__send"
-                    disabled={sending || !connected}
+                    disabled={sending || !connected || tooLong}
                     aria-label="Отправить"
                     title="Отправить"
                 >

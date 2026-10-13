@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import ChatPanel from '../components/ChatPanel';
+import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
 import './CoursePage.css';
 
 function CoursePage() {
@@ -18,10 +19,11 @@ function CoursePage() {
     const [newMessage, setNewMessage] = useState('');
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [sendingMessage, setSendingMessage] = useState(false);
-    // UI only: what the window shows about the socket and the history fetch.
-    const [chatStatus, setChatStatus] = useState('connecting');
     const [historyError, setHistoryError] = useState(false);
-    const chatSocketRef = useRef(null);
+    const [sendError, setSendError] = useState('');
+    // The student whose chat is open, for async results (state would be stale
+    // inside them): a response for anyone else is dropped.
+    const selectedStudentIdRef = useRef(null);
     const chatButtonRefs = useRef({});
 
     // Lesson form state
@@ -123,25 +125,47 @@ function CoursePage() {
     }
 
     async function fetchMessages(studentId) {
-    try {
-        const res = await api.get(`/messages/?course=${courseId}`);
-        setMessages(res.data.filter(m =>
-            m.sender === studentId || m.receiver === studentId
-        ));
-    } catch (err) {
-        console.error('Failed to load messages:', err);
-        setHistoryError(true);
+        try {
+            const res = await api.get(`/messages/?course=${courseId}`);
+            if (selectedStudentIdRef.current !== studentId) return; // switched or closed meanwhile
+            const history = res.data.filter(m => m.sender === studentId || m.receiver === studentId);
+            // Merge: messages that arrived live while this loaded stay.
+            setMessages(prev => mergeMessages(prev, history));
+            setHistoryError(false);
+        } catch (err) {
+            console.error('Failed to load messages:', err);
+            if (selectedStudentIdRef.current === studentId) setHistoryError(true);
+        }
     }
-}
+
+    // Socket while a student's chat is open; a new one per student (the old one
+    // closes on switch, close, or leaving the page). Reconnects after a drop.
+    const { status: chatStatus, send: sendChat, pending: chatPending } = useChatSocket({
+        courseId,
+        otherUserId: selectedStudent?.id,
+        isOwn: msg => msg.sender !== selectedStudentIdRef.current,
+        enabled: Boolean(selectedStudent),
+        onMessage: msg => {
+            const id = selectedStudentIdRef.current;
+            if (msg.sender !== id && msg.receiver !== id) return;
+            setMessages(prev => mergeMessages(prev, [msg]));
+        },
+        onRejected: frame => setSendError(frame.error === 'too_long'
+            ? `Сообщение не отправлено: не больше ${frame.max_length} символов.`
+            : 'Сообщение не отправлено.'),
+        // Server saved it: clear the input, unless the user has typed on since.
+        onConfirmed: text => setNewMessage(current => (current.trim() === text ? '' : current)),
+        onReconnected: () => fetchMessages(selectedStudentIdRef.current),
+    });
 
     async function handleSendMessage(e) {
         e.preventDefault();
         const text = newMessage.trim();
-        if (!text || !chatSocketRef.current || chatSocketRef.current.readyState !== WebSocket.OPEN) return;
+        if (!text || chatStatus !== 'open' || messageLength(text) > MAX_MESSAGE_LENGTH) return;
         setSendingMessage(true);
         try {
-            chatSocketRef.current.send(JSON.stringify({ text }));
-            setNewMessage('');
+            // The input keeps the text until the server confirms it (onConfirmed).
+            if (sendChat(text)) setSendError('');
         } catch (err) {
             console.error('Failed to send message:', err);
         } finally {
@@ -149,52 +173,11 @@ function CoursePage() {
         }
     }
 
-    // Open WebSocket while a student is selected for chat. Closes when the
-    // teacher switches student or leaves the page.
-    useEffect(() => {
-        if (!selectedStudent) return;
-
-        const token = localStorage.getItem('access_token');
-        const wsBase = import.meta.env.DEV
-            ? 'ws://127.0.0.1:8000'
-            : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
-        const url = `${wsBase}/ws/chat/${courseId}/${selectedStudent.id}/?token=${encodeURIComponent(token || '')}`;
-
-        const socket = new WebSocket(url);
-        chatSocketRef.current = socket;
-
-        socket.onmessage = (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-                setMessages((prev) => [...prev, msg]);
-            } catch (err) {
-                console.error('Bad chat message payload:', err);
-            }
-        };
-
-        socket.onerror = (err) => {
-            console.error('Chat socket error:', err);
-        };
-
-        // Status for the window only; a socket replaced by a newer one is ignored.
-        socket.onopen = () => {
-            if (chatSocketRef.current === socket) setChatStatus('open');
-        };
-        socket.onclose = () => {
-            if (chatSocketRef.current === socket) setChatStatus('closed');
-        };
-
-        return () => {
-            chatSocketRef.current = null;
-            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-                socket.close();
-            }
-        };
-    }, [selectedStudent, courseId]);
-
     function openChat(student) {
-        setChatStatus('connecting');
+        selectedStudentIdRef.current = student.id;
+        setMessages([]); // never show the previous student's conversation
         setHistoryError(false);
+        setSendError('');
         setSelectedStudent(student);
         fetchMessages(student.id);
     }
@@ -203,6 +186,7 @@ function CoursePage() {
     // window closes the socket (effect cleanup), as leaving the page did.
     function closeChat() {
         const id = selectedStudent?.id;
+        selectedStudentIdRef.current = null;
         setSelectedStudent(null);
         chatButtonRefs.current[id]?.focus();
     }
@@ -362,10 +346,11 @@ function CoursePage() {
                                         emptyHint="Напишите студенту первым — ответ появится здесь."
                                         status={chatStatus}
                                         historyError={historyError}
+                                        sendError={sendError}
                                         value={newMessage}
-                                        onChange={e => setNewMessage(e.target.value)}
+                                        onChange={e => { setNewMessage(e.target.value); setSendError(''); }}
                                         onSubmit={handleSendMessage}
-                                        sending={sendingMessage}
+                                        sending={sendingMessage || chatPending}
                                         onClose={closeChat}
                                     />
                                 )}

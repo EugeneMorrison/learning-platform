@@ -1,7 +1,8 @@
 """
 API tests: public registration (always STUDENT), student self-enrolment
 (POST /api/enrollments/), the teacher's enroll_student action, and access to
-the code runner (/api/run-code/, /api/run-tests/).
+the code runner (/api/run-code/, /api/run-tests/), and the course chat
+(POST /api/messages/ and the WebSocket consumer).
 
 Run with: python manage.py test api
 """
@@ -10,11 +11,15 @@ import subprocess
 from decimal import Decimal
 from unittest import mock
 
+from asgiref.sync import async_to_sync
+from channels.testing import WebsocketCommunicator
 from django.core.cache import cache
+from django.test import TransactionTestCase
 from rest_framework.test import APITestCase
 from rest_framework.throttling import ScopedRateThrottle
 
-from .models import Attempt, Block, Course, Enrollment, Lesson, Progress, User
+from .chat import MAX_MESSAGE_LENGTH
+from .models import Attempt, Block, Course, Enrollment, Lesson, Message, Progress, User
 from .serializers import UserSerializer
 
 
@@ -986,3 +991,141 @@ class StudentProgressQuizCountTests(APITestCase):
         data = self.progress(self.student)
         self.assertEqual((data['correct_answers'], data['total_quizzes']),
                          (course_stats['correct_answers'], course_stats['total_quizzes']))
+
+
+class ChatMessageEndpointTests(APITestCase):
+    """
+    POST /api/messages/ follows the same rule as the chat WebSocket
+    (api/chat.py): only the course author ↔ an enrolled student, and messages
+    up to MAX_MESSAGE_LENGTH characters.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.classmate = User.objects.create_user(username='classmate', password='x', role='STUDENT')
+        cls.outsider = User.objects.create_user(username='outsider', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        Enrollment.objects.create(student=cls.student, course=cls.course)
+        Enrollment.objects.create(student=cls.classmate, course=cls.course)
+
+    def post(self, sender, receiver, text='Привет', course=None):
+        self.client.force_authenticate(sender)
+        return self.client.post('/api/messages/', {
+            'course': str(course or self.course.id),
+            'receiver': receiver.id if hasattr(receiver, 'id') else receiver,
+            'text': text,
+        }, format='json')
+
+    def test_student_and_author_can_write_to_each_other(self):
+        for sender, receiver in [(self.student, self.author), (self.author, self.student)]:
+            response = self.post(sender, receiver)
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(response.data['sender'], sender.id)
+            self.assertEqual(response.data['receiver'], receiver.id)
+        self.assertEqual(Message.objects.count(), 2)
+
+    def test_outsider_is_refused(self):
+        response = self.post(self.outsider, self.author)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Message.objects.count(), 0)
+
+    def test_cannot_write_to_an_outsider(self):
+        self.assertEqual(self.post(self.author, self.outsider).status_code, 403)
+        self.assertEqual(self.post(self.student, self.outsider).status_code, 403)
+        self.assertEqual(Message.objects.count(), 0)
+
+    def test_students_cannot_write_to_each_other_or_themselves(self):
+        self.assertEqual(self.post(self.student, self.classmate).status_code, 403)
+        self.assertEqual(self.post(self.author, self.author).status_code, 403)
+        self.assertEqual(Message.objects.count(), 0)
+
+    def test_unknown_or_malformed_course_is_refused(self):
+        other = Course.objects.create(title='Other', author=self.author)
+        self.assertEqual(self.post(self.student, self.author, course=other.id).status_code, 403)
+        self.assertEqual(self.post(self.student, self.author, course='not-a-uuid').status_code, 403)
+        self.assertEqual(self.post(self.student, 'abc').status_code, 403)
+        self.assertEqual(Message.objects.count(), 0)
+
+    def test_length_limit(self):
+        self.assertEqual(self.post(self.student, self.author, 'я' * MAX_MESSAGE_LENGTH).status_code, 201)
+        response = self.post(self.student, self.author, 'я' * (MAX_MESSAGE_LENGTH + 1))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(str(MAX_MESSAGE_LENGTH), str(response.data['detail']))
+        self.assertEqual(Message.objects.count(), 1)
+
+    def test_blank_text_is_rejected(self):
+        self.assertEqual(self.post(self.student, self.author, '   ').status_code, 400)
+
+    def test_anonymous_is_refused(self):
+        response = self.client.post('/api/messages/', {
+            'course': str(self.course.id), 'receiver': self.author.id, 'text': 'x'}, format='json')
+        self.assertEqual(response.status_code, 401)
+
+
+class ChatConsumerTests(TransactionTestCase):
+    """
+    The chat WebSocket: close codes the client relies on (4001 log in again,
+    4003 never allowed, including a malformed course id) and the length limit.
+    TransactionTestCase: the consumer reads the database from another thread.
+    """
+
+    def setUp(self):
+        self.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        self.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        self.outsider = User.objects.create_user(username='outsider', password='x', role='STUDENT')
+        self.course = Course.objects.create(title='Course', author=self.author, is_published=True)
+        Enrollment.objects.create(student=self.student, course=self.course)
+
+    def connect(self, user, course_id, other_id):
+        from backend.asgi import application
+        from rest_framework_simplejwt.tokens import AccessToken
+        token = str(AccessToken.for_user(user)) if user else 'bad'
+        return WebsocketCommunicator(application, f'/ws/chat/{course_id}/{other_id}/?token={token}')
+
+    async def assert_closed_with(self, communicator, code):
+        # Accepted, then closed with the code: a browser only sees the code
+        # that way (a rejected handshake reaches it as 1006).
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        self.assertEqual(await communicator.receive_output(), {'type': 'websocket.close', 'code': code})
+
+    def test_close_codes(self):
+        async def run():
+            await self.assert_closed_with(self.connect(None, self.course.id, self.author.id), 4001)
+            await self.assert_closed_with(self.connect(self.outsider, self.course.id, self.author.id), 4003)
+            # Matches the URL pattern ([0-9a-f-]+) but is not a UUID: refused, not a server error.
+            await self.assert_closed_with(self.connect(self.student, 'abc-123', self.author.id), 4003)
+        async_to_sync(run)()
+
+    def test_message_is_saved_and_delivered_to_both_sides(self):
+        async def run():
+            student = self.connect(self.student, self.course.id, self.author.id)
+            author = self.connect(self.author, self.course.id, self.student.id)
+            self.assertTrue((await student.connect())[0])
+            self.assertTrue((await author.connect())[0])
+            await student.send_json_to({'text': '  Здравствуйте!  '})
+            for side in (student, author):
+                frame = await side.receive_json_from()
+                self.assertEqual(frame['text'], 'Здравствуйте!')
+                self.assertEqual(frame['sender'], self.student.id)
+            await student.disconnect()
+            await author.disconnect()
+        async_to_sync(run)()
+        self.assertEqual(Message.objects.count(), 1)
+
+    def test_too_long_message_is_rejected_to_the_sender_only(self):
+        async def run():
+            student = self.connect(self.student, self.course.id, self.author.id)
+            author = self.connect(self.author, self.course.id, self.student.id)
+            await student.connect()
+            await author.connect()
+            await student.send_json_to({'text': 'я' * (MAX_MESSAGE_LENGTH + 1)})
+            self.assertEqual(await student.receive_json_from(),
+                             {'error': 'too_long', 'max_length': MAX_MESSAGE_LENGTH})
+            self.assertTrue(await author.receive_nothing())
+            await student.disconnect()
+            await author.disconnect()
+        async_to_sync(run)()
+        self.assertEqual(Message.objects.count(), 0)

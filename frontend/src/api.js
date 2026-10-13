@@ -30,6 +30,26 @@ api.interceptors.request.use((config) => {
 // the UI to handle).
 let refreshInFlight = null;
 
+// Get a new access token with the stored refresh token (one request at a time,
+// shared by every caller). Resolves to the new token; rejects when there is no
+// refresh token or the server refuses it (err.response.status 401: log in again).
+export function refreshAccessToken() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return Promise.reject(new Error('No refresh token'));
+    if (!refreshInFlight) {
+        refreshInFlight = axios
+            .post(`${AUTH_BASE}/token/refresh/`, { refresh: refreshToken })
+            .then((res) => {
+                const newAccess = res.data.access;
+                localStorage.setItem('access_token', newAccess);
+                currentToken = newAccess;
+                return newAccess;
+            })
+            .finally(() => { refreshInFlight = null; });
+    }
+    return refreshInFlight;
+}
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -43,18 +63,9 @@ api.interceptors.response.use(
         }
         originalRequest._retriedAfter401 = true;
 
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
+        if (localStorage.getItem('refresh_token')) {
             try {
-                if (!refreshInFlight) {
-                    refreshInFlight = axios
-                        .post(`${AUTH_BASE}/token/refresh/`, { refresh: refreshToken })
-                        .finally(() => { refreshInFlight = null; });
-                }
-                const res = await refreshInFlight;
-                const newAccess = res.data.access;
-                localStorage.setItem('access_token', newAccess);
-                currentToken = newAccess;
+                const newAccess = await refreshAccessToken();
                 originalRequest.headers.Authorization = `Bearer ${newAccess}`;
                 return api(originalRequest);
             } catch {

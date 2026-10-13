@@ -35,6 +35,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 
 from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
+from .chat import MAX_MESSAGE_LENGTH, chat_allowed
 from .block_content import grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
@@ -1087,6 +1088,7 @@ class MessageView(APIView):
         course_id = request.data.get('course')
         receiver_id = request.data.get('receiver')
         text = request.data.get('text')
+        text = text.strip() if isinstance(text, str) else ''
 
         if not all([course_id, receiver_id, text]):
             return Response(
@@ -1094,16 +1096,20 @@ class MessageView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        course = get_object_or_404(Course, id=course_id)
+        # Same rule as the chat WebSocket (api/chat.py): author ↔ enrolled
+        # student of this course only. Also refuses malformed course ids.
+        if not chat_allowed(course_id, request.user.id, receiver_id):
+            raise PermissionDenied(gettext('Писать в чат курса могут только его автор и записанные на курс учащиеся.'))
 
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        receiver = get_object_or_404(User, id=receiver_id)
+        if len(text) > MAX_MESSAGE_LENGTH:
+            raise ParseError(
+                gettext('Сообщение слишком длинное: не больше %(max)d символов.') % {'max': MAX_MESSAGE_LENGTH}
+            )
 
         message = Message.objects.create(
             sender=request.user,
-            receiver=receiver,
-            course=course,
+            receiver_id=int(receiver_id),
+            course_id=course_id,
             text=text,
         )
 

@@ -8,6 +8,7 @@ import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
 import ChatPanel, { ChatIcon, CloseIcon } from '../components/ChatPanel';
 import { watchFigureOverflow } from '../lib/contentImages';
+import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
 import './LessonViewer.css';
 
 // Block types that are solvable tasks (have a pass/fail, count toward progress).
@@ -37,10 +38,8 @@ function LessonViewer() {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [sendingMessage, setSendingMessage] = useState(false);
-    // UI only: what the window shows about the socket and the history fetch.
-    const [chatStatus, setChatStatus] = useState('connecting');
     const [historyError, setHistoryError] = useState(false);
-    const chatSocketRef = useRef(null);
+    const [sendError, setSendError] = useState('');
     const chatButtonRef = useRef(null);
 
     const solvedBlockIds = new Set(
@@ -126,21 +125,38 @@ function LessonViewer() {
         if (!course) return;
         try {
             const res = await api.get(`/messages/?course=${course.id}`);
-            setMessages(res.data);
+            // Merge: messages that arrived live while this loaded stay.
+            setMessages(prev => mergeMessages(prev, res.data));
+            setHistoryError(false);
         } catch (err) {
             console.error('Failed to load messages:', err);
             setHistoryError(true);
         }
     }
 
+    // Socket while the window is open (reconnects by itself after a drop).
+    const { status: chatStatus, send: sendChat, pending: chatPending } = useChatSocket({
+        courseId: course?.id,
+        otherUserId: course?.author,
+        isOwn: msg => msg.sender !== course?.author,
+        enabled: showChat,
+        onMessage: msg => setMessages(prev => mergeMessages(prev, [msg])),
+        onRejected: frame => setSendError(frame.error === 'too_long'
+            ? `Сообщение не отправлено: не больше ${frame.max_length} символов.`
+            : 'Сообщение не отправлено.'),
+        // Server saved it: clear the input, unless the user has typed on since.
+        onConfirmed: text => setNewMessage(current => (current.trim() === text ? '' : current)),
+        onReconnected: fetchMessages, // pick up what was sent while offline
+    });
+
     async function handleSendMessage(e) {
         e.preventDefault();
         const text = newMessage.trim();
-        if (!text || !chatSocketRef.current || chatSocketRef.current.readyState !== WebSocket.OPEN) return;
+        if (!text || chatStatus !== 'open' || messageLength(text) > MAX_MESSAGE_LENGTH) return;
         setSendingMessage(true);
         try {
-            chatSocketRef.current.send(JSON.stringify({ text }));
-            setNewMessage('');
+            // The input keeps the text until the server confirms it (onConfirmed).
+            if (sendChat(text)) setSendError('');
         } catch (err) {
             console.error('Failed to send message:', err);
         } finally {
@@ -150,8 +166,8 @@ function LessonViewer() {
 
     function handleOpenChat() {
         if (!showChat) {
-            setChatStatus('connecting');
             setHistoryError(false);
+            setSendError('');
         }
         setShowChat(!showChat);
         if (!showChat) fetchMessages();
@@ -162,49 +178,6 @@ function LessonViewer() {
         setShowChat(false);
         chatButtonRef.current?.focus();
     }
-
-    // Open WebSocket while chat panel is visible. Closes automatically on
-    // close, route change, or component unmount.
-    useEffect(() => {
-        if (!showChat || !course) return;
-
-        const token = localStorage.getItem('access_token');
-        const wsBase = import.meta.env.DEV
-            ? 'ws://127.0.0.1:8000'
-            : `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
-        const url = `${wsBase}/ws/chat/${course.id}/${course.author}/?token=${encodeURIComponent(token || '')}`;
-
-        const socket = new WebSocket(url);
-        chatSocketRef.current = socket;
-
-        socket.onmessage = (event) => {
-            try {
-                const msg = JSON.parse(event.data);
-                setMessages((prev) => [...prev, msg]);
-            } catch (err) {
-                console.error('Bad chat message payload:', err);
-            }
-        };
-
-        socket.onerror = (err) => {
-            console.error('Chat socket error:', err);
-        };
-
-        // Status for the window only; a socket replaced by a newer one is ignored.
-        socket.onopen = () => {
-            if (chatSocketRef.current === socket) setChatStatus('open');
-        };
-        socket.onclose = () => {
-            if (chatSocketRef.current === socket) setChatStatus('closed');
-        };
-
-        return () => {
-            chatSocketRef.current = null;
-            if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
-                socket.close();
-            }
-        };
-    }, [showChat, course]);
 
     const blockNumbers = (() => {
         const map = {};
@@ -352,10 +325,11 @@ function LessonViewer() {
                             emptyHint="Задайте вопрос по уроку — учитель ответит здесь."
                             status={chatStatus}
                             historyError={historyError}
+                            sendError={sendError}
                             value={newMessage}
-                            onChange={e => setNewMessage(e.target.value)}
+                            onChange={e => { setNewMessage(e.target.value); setSendError(''); }}
                             onSubmit={handleSendMessage}
-                            sending={sendingMessage}
+                            sending={sendingMessage || chatPending}
                             onClose={handleCloseChat}
                         />
                     )}

@@ -8,6 +8,13 @@ the sorted user-id pair so both sockets end up in the same group regardless
 of who initiated.
 
 URL: ws/chat/<course_id>/<other_user_id>/?token=<jwt>
+
+Close codes: 4001 not logged in (missing / expired token: the client
+refreshes its token and reconnects), 4003 not allowed (outsider, wrong pair,
+unknown or malformed course id: the client does not retry).
+
+Server → client frames: a saved message (MessageSerializer data), or, to the
+sender only, {"error": "too_long", "max_length": N} for a rejected message.
 """
 
 import json
@@ -15,12 +22,14 @@ import json
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+from .chat import MAX_MESSAGE_LENGTH, chat_allowed
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         user = self.scope.get('user')
         if user is None or not user.is_authenticated:
-            await self.close(code=4001)
+            await self._refuse(4001)
             return
 
         self.course_id = self.scope['url_route']['kwargs']['course_id']
@@ -32,7 +41,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.course_id, self.user_id, self.other_user_id
         )
         if not allowed:
-            await self.close(code=4003)
+            await self._refuse(4003)
             return
 
         a, b = sorted([self.user_id, self.other_user_id])
@@ -40,6 +49,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
+
+    async def _refuse(self, code):
+        # Accept first, then close: closing before accept() rejects the
+        # handshake (HTTP 403) and browsers then only ever see code 1006.
+        await self.accept()
+        await self.close(code=code)
 
     async def disconnect(self, close_code):
         if hasattr(self, 'group_name'):
@@ -53,8 +68,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except json.JSONDecodeError:
             return
 
-        text = (payload.get('text') or '').strip()
+        if not isinstance(payload, dict):
+            return
+        text = payload.get('text')
+        text = text.strip() if isinstance(text, str) else ''
         if not text:
+            return
+        if len(text) > MAX_MESSAGE_LENGTH:
+            await self.send(text_data=json.dumps(
+                {'error': 'too_long', 'max_length': MAX_MESSAGE_LENGTH}
+            ))
             return
 
         message = await self._save_message(
@@ -71,28 +94,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def _verify_participants(self, course_id, user_id, other_user_id):
-        from .models import Course, Enrollment
-
-        try:
-            course = Course.objects.get(id=course_id)
-        except Course.DoesNotExist:
-            return False
-
-        # User must be either the course author or an enrolled student.
-        # Other user must also be either the author or an enrolled student.
-        def role(uid):
-            if course.author_id == uid:
-                return 'author'
-            if Enrollment.objects.filter(course=course, student_id=uid).exists():
-                return 'student'
-            return None
-
-        my_role = role(user_id)
-        other_role = role(other_user_id)
-        if my_role is None or other_role is None:
-            return False
-        # Only teacher↔student conversations allowed (not student↔student).
-        return {my_role, other_role} == {'author', 'student'}
+        # Same rule as POST /api/messages/ (api/chat.py).
+        return chat_allowed(course_id, user_id, other_user_id)
 
     @database_sync_to_async
     def _save_message(self, course_id, sender_id, receiver_id, text):
