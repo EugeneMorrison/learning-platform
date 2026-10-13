@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import api, { logout } from '../api';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import api from '../api';
 import './DashboardPage.css';
 
 function DashboardPage() {
@@ -36,11 +36,6 @@ function DashboardPage() {
         // pathname; the one same-path replace above keeps it), so no refetch loop.
     }, [navigate]);
 
-    function handleLogout() {
-        logout();
-        navigate('/login/');
-    }
-
     if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
 
     return (
@@ -50,14 +45,19 @@ function DashboardPage() {
             )}
             <div className="page__header">
                 <div>
-                    <h1 className="page__title">Добро пожаловать, {user.username}!</h1>
+                    <h1 className="page__title">Добро пожаловать, {withBreakHints(user.username)}!</h1>
                     <p className="page__lead">Роль: {user.role === 'AUTHOR' ? 'Автор' : 'Студент'}</p>
                 </div>
-                <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Выйти</button>
             </div>
             {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard user={user} />}
         </div>
     );
+}
+
+// Long usernames ("regtest_mv5nszqd_phone"): offer line breaks after _ . - @
+// so a narrow screen wraps between parts instead of mid-word.
+function withBreakHints(name) {
+    return name.split(/(?<=[_.\-@])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
 }
 
 function StudentDashboard({ user }) {
@@ -91,22 +91,19 @@ function StudentDashboard({ user }) {
             ) : (
                 <div className="card-grid">
                     {enrollments.map(enrollment => (
-                        <div
-                            key={enrollment.id}
-                            className="card card-link dash-card"
-                            onClick={() => navigate(`/courses/${enrollment.course}/`)}
-                        >
-                            <h3 className="dash-card__title">{enrollment.course_title}</h3>
+                        <div key={enrollment.id} className="card card-link dash-card">
+                            <h3 className="dash-card__title">
+                                <Link className="card-link__target" to={`/courses/${enrollment.course}/`}>
+                                    {enrollment.course_title}
+                                </Link>
+                            </h3>
                             <p className="dash-card__meta">
                                 Записан: {new Date(enrollment.enrolled_at).toLocaleDateString('ru-RU')}
                             </p>
                             <div className="dash-card__actions">
                                 <button
                                     className="btn btn-secondary btn-sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/courses/${enrollment.course}/students/${user.id}/`);
-                                    }}
+                                    onClick={() => navigate(`/courses/${enrollment.course}/students/${user.id}/`)}
                                 >
                                     Прогресс
                                 </button>
@@ -120,7 +117,6 @@ function StudentDashboard({ user }) {
 }
 
 function AuthorDashboard() {
-    const navigate = useNavigate();
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -203,12 +199,12 @@ function AuthorDashboard() {
             ) : (
                 <div className="card-grid">
                     {courses.map(course => (
-                        <div
-                            key={course.id}
-                            className="card card-link dash-card"
-                            onClick={() => navigate(`/courses/${course.id}/`)}
-                        >
-                            <h3 className="dash-card__title">{course.title}</h3>
+                        <div key={course.id} className="card card-link dash-card">
+                            <h3 className="dash-card__title">
+                                <Link className="card-link__target" to={`/courses/${course.id}/`}>
+                                    {course.title}
+                                </Link>
+                            </h3>
                             <p className="dash-card__desc">{course.description}</p>
                             <div className="dash-card__actions">
                                 <span className="pill">Уроков: {course.lesson_count}</span>

@@ -1,18 +1,13 @@
 import 'highlight.js/styles/atom-one-light.css';
-import './TextBlock.css';
+import './blocks.css';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
+import { wrapImages } from '../lib/contentImages';
 
 function TextBlock({ content }) {
-    const processedHtml = highlightPreBlocks(content.html);
+    const processedHtml = wrapImages(highlightPreBlocks(content.html));
 
     return (
-        <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '16px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        }}>
+        <div className="lesson-block">
             <div className="text-content" dangerouslySetInnerHTML={{ __html: processedHtml }} />
         </div>
     );
