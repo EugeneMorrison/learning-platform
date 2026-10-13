@@ -22,7 +22,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
     const totalTestCount = (content.tests?.length || 0) + hiddenTestCount;
 
     const [userCode, setUserCode] = useState(savedCode || content.starter_code);
-    const [testsOpen, setTestsOpen] = useState(false);
+    const [testsOpen, setTestsOpen] = useState(true);
     const [testInput, setTestInput] = useState(firstTestInput || '');
     const [selectedTestIndex, setSelectedTestIndex] = useState(hasTests ? 0 : null);
     const [runOutput, setRunOutput] = useState(null);
@@ -131,6 +131,61 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                 className="text-content lesson-block__prompt"
                 dangerouslySetInnerHTML={{ __html: wrapImages(content.prompt) }}
             />
+
+            {/* Collapsible tests table, open on load. Line breaks in the data are
+                kept (pre-wrap); a wide table scrolls inside its own box. */}
+            {content.tests && content.tests.length > 0 && (
+                <div className="tests-section">
+                    <button
+                        className="tests-toggle"
+                        onClick={() => setTestsOpen(!testsOpen)}
+                        aria-expanded={testsOpen}
+                    >
+                        <span aria-hidden="true">{testsOpen ? '▼' : '▶'}</span>
+                        <span>🌿 Тестовые данные</span>
+                    </button>
+
+                    {testsOpen && (
+                        <>
+                        <div className="lesson-block__note">
+                            Отметьте тест, чтобы подставить его входные данные в «Тестовый ввод».
+                        </div>
+                        <div className="tests-table-wrap">
+                            <table className="tests-table">
+                                <thead>
+                                    <tr>
+                                        <th className="tests-table__check"></th>
+                                        <th>№</th>
+                                        <th>Входные данные</th>
+                                        <th>Выходные данные</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {content.tests.map((test, index) => (
+                                        <tr
+                                            key={index}
+                                            className={selectedTestIndex === index ? 'tests-table__row--selected' : undefined}
+                                        >
+                                            <td className="tests-table__check">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Подставить тест ${index + 1} во ввод`}
+                                                    checked={selectedTestIndex === index}
+                                                    onChange={() => handleTestCheck(index)}
+                                                />
+                                            </td>
+                                            <td>{index + 1}</td>
+                                            <td className="tests-table__io">{typeof test === 'object' ? test.input : test}</td>
+                                            <td className="tests-table__io">{typeof test === 'object' ? test.expected : '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Code editor */}
             <div className="code-editor-bar">
@@ -276,52 +331,6 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                     {/* Hidden tests: the server sends no stderr (it could reveal the input). */}
                     {!submitResults.hidden && (
                     <pre className="test-fail__stderr">{submitResults.stderr}</pre>
-                    )}
-                </div>
-            )}
-
-            {/* Collapsible tests table */}
-            {content.tests && content.tests.length > 0 && (
-                <div>
-                    <button
-                        className="tests-toggle"
-                        onClick={() => setTestsOpen(!testsOpen)}
-                        aria-expanded={testsOpen}
-                    >
-                        <span aria-hidden="true">{testsOpen ? '▼' : '▶'}</span>
-                        <span>🌿 Тестовые данные</span>
-                    </button>
-
-                    {testsOpen && (
-                        <div className="tests-table-wrap">
-                            <table className="tests-table">
-                                <thead>
-                                    <tr>
-                                        <th className="tests-table__check"></th>
-                                        <th>№</th>
-                                        <th>Входные данные</th>
-                                        <th>Выходные данные</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {content.tests.map((test, index) => (
-                                        <tr key={index}>
-                                            <td className="tests-table__check">
-                                                <input
-                                                    type="checkbox"
-                                                    aria-label={`Подставить тест ${index + 1} во ввод`}
-                                                    checked={selectedTestIndex === index}
-                                                    onChange={() => handleTestCheck(index)}
-                                                />
-                                            </td>
-                                            <td>{index + 1}</td>
-                                            <td>{typeof test === 'object' ? test.input : test}</td>
-                                            <td>{typeof test === 'object' ? test.expected : '—'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
                     )}
                 </div>
             )}

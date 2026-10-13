@@ -181,6 +181,76 @@ class ReadAccessMatrixTests(APITestCase):
             self.assertEqual(response.status_code, expected, persona)
 
 
+class LessonNavigationTests(APITestCase):
+    """GET /api/lessons/{id}/ carries course_title and next_lesson_id (the next
+    lesson of the same course by order_index; null on the last lesson)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Строки', author=cls.author, is_published=True)
+        # Created out of order and with gaps: the order comes from order_index.
+        cls.last = Lesson.objects.create(course=cls.course, title='Last', order_index=7)
+        cls.first = Lesson.objects.create(course=cls.course, title='First', order_index=1)
+        cls.middle = Lesson.objects.create(course=cls.course, title='Middle', order_index=3)
+        # Another course's lesson sits between them by order_index; never "next".
+        other = Course.objects.create(title='Other', author=cls.author, is_published=True)
+        Lesson.objects.create(course=other, title='Elsewhere', order_index=2)
+        Enrollment.objects.create(student=cls.student, course=cls.course)
+
+    def get_lesson(self, lesson):
+        self.client.force_authenticate(self.student)
+        response = self.client.get(f'/api/lessons/{lesson.id}/')
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_next_lesson_follows_order_index_within_the_course(self):
+        self.assertEqual(str(self.get_lesson(self.first)['next_lesson_id']), str(self.middle.id))
+        self.assertEqual(str(self.get_lesson(self.middle)['next_lesson_id']), str(self.last.id))
+
+    def test_last_lesson_has_no_next(self):
+        self.assertIsNone(self.get_lesson(self.last)['next_lesson_id'])
+
+    def test_course_title_is_included(self):
+        self.assertEqual(self.get_lesson(self.middle)['course_title'], 'Строки')
+
+    def test_course_completed_only_when_every_task_is_solved(self):
+        # "Курс пройден" on the last lesson only then; until then "Последний урок".
+        quiz = Block.objects.create(lesson=self.first, type='QUIZ', order_index=1, content={
+            'question': 'q', 'options': ['a', 'b'], 'correct_answer': 1})
+        code = Block.objects.create(lesson=self.last, type='CODE', order_index=1, content={
+            'prompt': 'p', 'starter_code': '', 'tests': [{'input': '', 'expected': '1'}]})
+        Block.objects.create(lesson=self.last, type='TEXT', order_index=2, content={'html': 't'})
+        Progress.objects.create(student=self.student, lesson=self.first, block=quiz,
+                                answer={'selected': 1}, is_correct=True)
+        wrong = Progress.objects.create(student=self.student, lesson=self.last, block=code,
+                                        answer={'code': 'print(2)'}, is_correct=False)
+        self.assertFalse(self.get_lesson(self.last)['course_completed'])
+
+        wrong.is_correct = True
+        wrong.save()
+        # The TEXT block has no progress and doesn't count.
+        self.assertTrue(self.get_lesson(self.last)['course_completed'])
+
+    def test_next_lesson_id_is_read_only(self):
+        self.client.force_authenticate(self.author)
+        response = self.client.patch(f'/api/lessons/{self.first.id}/',
+                                     {'next_lesson_id': str(self.last.id)}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(self.get_lesson(self.first)['next_lesson_id']), str(self.middle.id))
+
+    def test_lesson_title_is_still_validated(self):
+        # Guards LessonSerializer.validate_title (it once ended up on a subclass).
+        self.client.force_authenticate(self.author)
+        for title in ['   ', 'x']:
+            response = self.client.patch(f'/api/lessons/{self.first.id}/', {'title': title}, format='json')
+            self.assertEqual(response.status_code, 400, title)
+            self.assertIn('title', response.data)
+        self.first.refresh_from_db()
+        self.assertEqual(self.first.title, 'First')
+
+
 class ProgressSubmitAccessTests(APITestCase):
     SUBMIT_URL = '/api/progress/submit/'
 

@@ -40,6 +40,7 @@ from .block_content import grade_fill, grade_quiz, normalize_test, test_visibili
 from .serializers import (
     CourseSerializer,
     LessonSerializer,
+    LessonViewerSerializer,
     BlockSerializer,
     EnrollmentSerializer,
     ProgressSerializer,
@@ -546,6 +547,12 @@ class LessonViewSet(viewsets.ModelViewSet):
 
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
+
+    def get_serializer_class(self):
+        # The single-lesson read adds next_lesson_id for the viewer's navigation.
+        if self.action == 'retrieve':
+            return LessonViewerSerializer
+        return LessonSerializer
 
     def get_permissions(self):
         """Set permissions based on action"""

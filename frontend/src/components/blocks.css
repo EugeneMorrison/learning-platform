@@ -594,7 +594,11 @@
     overflow-wrap: anywhere;
 }
 
-/* "🌿 Тестовые данные" toggle and table */
+/* "🌿 Тестовые данные" toggle and table (between the prompt and the editor) */
+.tests-section {
+    margin-bottom: var(--space-5);
+}
+
 .tests-toggle {
     display: flex;
     align-items: center;
@@ -640,10 +644,22 @@
 
 .tests-table td {
     font-family: var(--font-code);
+    vertical-align: top;
+}
+
+/* Input / output: line breaks as stored; long lines still wrap. */
+.tests-table__io {
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
 }
 
 .tests-table tbody tr:nth-child(even) {
     background: var(--color-soft);
+}
+
+/* The test whose input is in "Тестовый ввод". */
+.tests-table__row--selected .tests-table__check {
+    box-shadow: inset var(--space-1) 0 0 var(--color-accent);
 }
 
 .tests-table__check {

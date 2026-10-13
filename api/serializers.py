@@ -165,6 +165,43 @@ class LessonSerializer(serializers.ModelSerializer):
         return data
 
 
+class LessonViewerSerializer(LessonSerializer):
+    """
+    A single lesson for the lesson viewer (GET /api/lessons/{id}/).
+
+    Adds (read-only; only the detail response carries them, so lesson lists
+    don't pay extra queries per lesson):
+    - next_lesson_id: the next lesson of the same course by order_index,
+      null on the last lesson.
+    - course_completed: the requesting user has solved every task (QUIZ, CODE,
+      FILL) in the course; a course without tasks counts as completed.
+    """
+
+    next_lesson_id = serializers.SerializerMethodField()
+    course_completed = serializers.SerializerMethodField()
+
+    class Meta(LessonSerializer.Meta):
+        fields = LessonSerializer.Meta.fields + ['next_lesson_id', 'course_completed']
+
+    def get_next_lesson_id(self, obj):
+        return (
+            Lesson.objects.filter(course_id=obj.course_id, order_index__gt=obj.order_index)
+            .order_by('order_index')
+            .values_list('id', flat=True)
+            .first()
+        )
+
+    def get_course_completed(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        tasks = Block.objects.filter(lesson__course_id=obj.course_id, type__in=('QUIZ', 'CODE', 'FILL'))
+        # One Progress row per student per block (unique_together).
+        solved = Progress.objects.filter(student=user, block__in=tasks, is_correct=True).count()
+        return solved == tasks.count()
+
+
 # =============================================================================
 # BLOCK SERIALIZER
 # =============================================================================

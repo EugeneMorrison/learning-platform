@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
 import TextBlock from '../components/TextBlock';
@@ -260,6 +260,12 @@ function LessonViewer() {
 
                 {/* Lesson header */}
                 <div className="lesson-header">
+                    {/* Course link — site chrome, hidden in an embed like the back button */}
+                    {!isInIframe && (
+                        <Link className="lesson-header__course" to={`/courses/${lesson.course}/`}>
+                            {lesson.course_title}
+                        </Link>
+                    )}
                     <p className="lesson-header__eyebrow">Урок {lesson.order_index}</p>
                     <h1 className="lesson-header__title">{lesson.title}</h1>
                     <p className="lesson-header__meta">{blocks.length} блоков</p>
@@ -290,6 +296,27 @@ function LessonViewer() {
                             </div>
                         );
                     })()}
+
+                    {/* Next lesson by order_index; on the last lesson, back to the course
+                        ("Курс пройден" only once every task in the course is solved).
+                        Always shown (no lesson locking); hidden in an embed. */}
+                    {!isInIframe && (
+                        <nav className="lesson-nav" aria-label="Навигация по курсу">
+                            {lesson.next_lesson_id ? (
+                                <Link
+                                    className="btn btn-secondary btn-sm"
+                                    to={`/lesson/${lesson.next_lesson_id}/`}
+                                    onClick={() => window.scrollTo(0, 0)}
+                                >
+                                    Следующий урок →
+                                </Link>
+                            ) : (
+                                <Link className="btn btn-secondary btn-sm" to={`/courses/${lesson.course}/`}>
+                                    {lesson.course_completed ? 'Курс пройден → к курсу' : 'Последний урок → к курсу'}
+                                </Link>
+                            )}
+                        </nav>
+                    )}
                 </div>
 
                 {/* Render all blocks */}
@@ -351,4 +378,11 @@ function LessonViewer() {
     );
 }
 
-export default LessonViewer;
+// The router reuses the component when only :lessonId changes ("Следующий
+// урок →"); a key per lesson remounts it so the new lesson loads from scratch.
+function LessonViewerPage() {
+    const { lessonId } = useParams();
+    return <LessonViewer key={lessonId} />;
+}
+
+export default LessonViewerPage;
