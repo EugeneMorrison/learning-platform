@@ -1,0 +1,172 @@
+/* "Список уроков" panel (lesson viewer). Tokens: backend/static/public/css/tokens.css */
+
+.lessons-icon {
+    width: var(--space-5);
+    height: var(--space-5);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* The page behind doesn't scroll while the panel is open. */
+.lessons-panel-open,
+.lessons-panel-open body {
+    overflow: hidden;
+}
+
+/* Above the sticky header and the floating buttons. */
+.lessons-panel-layer {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-badge) + 1);
+}
+
+.lessons-panel__backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-ink) 50%, transparent);
+    animation: lessons-panel-fade 0.2s ease;
+}
+
+/* Slides in from the left; on a phone it takes most of the width. */
+.lessons-panel {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    width: min(var(--panel-width), calc(100% - var(--space-7)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: var(--border-width) solid var(--color-line);
+    background: var(--color-ground);
+    box-shadow: var(--shadow-lg);
+    animation: lessons-panel-slide 0.2s ease;
+}
+
+@keyframes lessons-panel-slide {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+@keyframes lessons-panel-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lessons-panel,
+    .lessons-panel__backdrop {
+        animation: none;
+    }
+}
+
+.lessons-panel__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-4) var(--space-4) var(--space-5);
+    border-bottom: var(--border-width) solid var(--color-line);
+}
+
+.lessons-panel__heading {
+    min-width: 0;
+}
+
+.lessons-panel__title {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+}
+
+.lessons-panel__course {
+    margin: var(--space-1) 0 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}
+
+.lessons-panel__close {
+    flex-shrink: 0;
+    padding: var(--space-2);
+}
+
+.lessons-panel__status {
+    padding: var(--space-5);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.lessons-panel__status .notice {
+    margin: 0 0 var(--space-3);
+}
+
+.lessons-panel__list {
+    margin: 0;
+    padding: var(--space-2) 0;
+    list-style: none;
+}
+
+.lessons-panel__link {
+    display: grid;
+    grid-template-columns: var(--space-6) 1fr auto;
+    align-items: baseline;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    color: var(--color-ink);
+    text-decoration: none;
+}
+
+/* Hover: colour and underline only; the background marks the current lesson. */
+.lessons-panel__link:hover {
+    color: var(--color-accent);
+}
+
+.lessons-panel__link:hover .lessons-panel__name {
+    text-decoration: underline;
+    text-underline-offset: var(--space-1);
+}
+
+.lessons-panel__link:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+/* The lesson open in the viewer. */
+.lessons-panel__link--current {
+    background: var(--color-soft);
+    box-shadow: inset var(--space-1) 0 0 var(--color-accent);
+    font-weight: var(--weight-bold);
+}
+
+.lessons-panel__num {
+    color: var(--color-accent);
+    font-family: var(--font-heading);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    text-align: right;
+}
+
+.lessons-panel__name {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.lessons-panel__count {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-regular);
+    white-space: nowrap;
+}
+
+/* Fully solved lesson: the only green in the panel. */
+.lessons-panel__count--solved {
+    color: var(--color-success-on-light);
+    font-weight: var(--weight-bold);
+}

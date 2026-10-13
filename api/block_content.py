@@ -22,6 +22,10 @@ FILL_GAP_RE = re.compile(r'\{\{(.*?)\}\}')
 # When no test in a CODE block carries a `visible` flag, the first N are visible.
 DEFAULT_VISIBLE_TESTS = 2
 
+# Blocks that are tasks: solved or not, counted in "Решено X из Y задач".
+# TEXT is theory. Same set as the lesson viewer's TASK_TYPES.
+TASK_TYPES = ('QUIZ', 'CODE', 'FILL')
+
 
 # -----------------------------------------------------------------------------
 # CODE tests

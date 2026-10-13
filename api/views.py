@@ -36,11 +36,12 @@ from rest_framework.views import APIView
 
 from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed
-from .block_content import grade_fill, grade_quiz, normalize_test, test_visibility
+from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
     LessonSerializer,
     LessonViewerSerializer,
+    course_lesson_ids_in_order,
     BlockSerializer,
     EnrollmentSerializer,
     ProgressSerializer,
@@ -559,6 +560,8 @@ class LessonViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'retrieve']:
             # AllowAny: get_queryset() restricts reads (anonymous → empty / 404)
             permission_classes = [AllowAny]
+        elif self.action == 'outline':
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated, IsAuthor, IsOwnerOrReadOnly]
 
@@ -611,6 +614,45 @@ class LessonViewSet(viewsets.ModelViewSet):
             if course_slug:
                 body['course_slug'] = course_slug
             return Response(body, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'])
+    def outline(self, request):
+        """
+        GET /api/lessons/outline/?course=<id>  (lesson viewer's lessons panel)
+
+        Every lesson of the course in order, with the REQUESTING user's progress:
+        [{id, title, position, task_count, solved_count}]. Same rule as the
+        viewer's "Решено X из Y задач": tasks are QUIZ/CODE/FILL blocks, solved
+        means is_correct. solved_count is null for the course author. Only the
+        course author and enrolled students get it (others: 404). The counts come
+        from one query, whatever the number of lessons.
+        """
+        try:
+            course_id = uuid.UUID(str(request.query_params.get('course', '')))
+        except ValueError:
+            raise ParseError(gettext('Укажите курс: ?course=<id>.'))
+        course = get_object_or_404(Course.objects.with_content_access(request.user), pk=course_id)
+        is_author = course.author_id == request.user.id
+
+        tasks = models.Q(blocks__type__in=TASK_TYPES)
+        lessons = Lesson.objects.filter(course=course).annotate(
+            task_count=models.Count('blocks', filter=tasks, distinct=True),
+            # One Progress row per student per block, so no double counting.
+            solved_count=models.Count('blocks__progress', distinct=True, filter=tasks & models.Q(
+                blocks__progress__student=request.user, blocks__progress__is_correct=True)),
+        ).in_bulk()
+        return Response([
+            {
+                'id': lesson_id,
+                'title': lessons[lesson_id].title,
+                'position': position,
+                'task_count': lessons[lesson_id].task_count,
+                'solved_count': None if is_author else lessons[lesson_id].solved_count,
+            }
+            # Positions from the same helper as the viewer's lesson_position.
+            for position, lesson_id in enumerate(course_lesson_ids_in_order(course.id), start=1)
+            if lesson_id in lessons
+        ])
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAuthor, IsOwnerOrReadOnly])
     def reorder(self, request, pk=None):

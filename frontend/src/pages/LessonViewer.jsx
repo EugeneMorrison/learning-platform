@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
 import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
+import LessonsPanel, { ListIcon } from '../components/LessonsPanel';
 import ChatPanel, { ChatIcon, CloseIcon } from '../components/ChatPanel';
 import { watchFigureOverflow } from '../lib/contentImages';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
@@ -24,7 +25,6 @@ function getLessonIdFromUrl() {
 }
 
 function LessonViewer() {
-    const navigate = useNavigate();
     const isInIframe = window.self !== window.top;
 
     const [lesson, setLesson] = useState(null);
@@ -40,7 +40,9 @@ function LessonViewer() {
     const [sendingMessage, setSendingMessage] = useState(false);
     const [historyError, setHistoryError] = useState(false);
     const [sendError, setSendError] = useState('');
+    const [showLessons, setShowLessons] = useState(false);
     const chatButtonRef = useRef(null);
+    const listButtonRef = useRef(null);
 
     const solvedBlockIds = new Set(
         progress.filter(p => p.is_correct === true).map(p => p.block)
@@ -222,6 +224,13 @@ function LessonViewer() {
         return <div key={block.id} id={`block-${block.id}`} className="lesson-anchor">{inner}</div>;
     }
 
+    // Lessons panel: Esc, backdrop, close button or a chosen lesson close it;
+    // focus goes back to the list button.
+    function handleCloseLessons() {
+        setShowLessons(false);
+        listButtonRef.current?.focus();
+    }
+
     // The floating chat button (student → teacher) is hidden for the course author.
     const hasChat = Boolean(user && course && user.id !== course.author);
 
@@ -248,25 +257,35 @@ function LessonViewer() {
         <>
             <div className="page page--narrow lesson-page">
 
-                {/* Back button — hidden when embedded in iframe (no parent SPA to go back to) */}
-                {!isInIframe && course && (
-                    <button
-                        className="btn btn-ghost btn-sm page__back"
-                        onClick={() => navigate(`/courses/${course.id}/`)}
-                    >
-                        ← Назад
-                    </button>
-                )}
-
-                {/* Lesson header */}
-                <div className="lesson-header">
-                    {/* Course link — site chrome, hidden in an embed like the back button */}
+                {/* Lesson header. Top row: list button, course + "Урок N из M", next
+                    link (on phones the link moves under the progress bar). The list
+                    button, course link and next link are site chrome: not in an embed. */}
+                <div className={isInIframe ? 'lesson-header' : 'lesson-header lesson-header--nav'}>
                     {!isInIframe && (
-                        <Link className="lesson-header__course" to={`/courses/${lesson.course}/`}>
-                            {lesson.course_title}
-                        </Link>
+                        <button
+                            ref={listButtonRef}
+                            type="button"
+                            className="btn btn-secondary btn-sm lesson-header__list"
+                            onClick={() => setShowLessons(true)}
+                            aria-label="Список уроков"
+                            aria-haspopup="dialog"
+                            aria-expanded={showLessons}
+                            title="Список уроков"
+                        >
+                            <ListIcon />
+                        </button>
                     )}
-                    <p className="lesson-header__eyebrow">Урок {lesson.order_index}</p>
+                    <div className="lesson-header__context">
+                        {!isInIframe && (
+                            <Link className="lesson-header__course" to={`/courses/${lesson.course}/`}>
+                                {lesson.course_title}
+                            </Link>
+                        )}
+                        {/* Position in the course's ordered lessons, not order_index. */}
+                        <p className="lesson-header__eyebrow">
+                            Урок {lesson.lesson_position} из {lesson.lesson_count}
+                        </p>
+                    </div>
                     <h1 className="lesson-header__title">{lesson.title}</h1>
                     <p className="lesson-header__meta">{blocks.length} блоков</p>
                     {(() => {
@@ -297,7 +316,7 @@ function LessonViewer() {
                         );
                     })()}
 
-                    {/* Next lesson by order_index; on the last lesson, back to the course
+                    {/* Next lesson in the course; on the last lesson, back to the course
                         ("Курс пройден" only once every task in the course is solved).
                         Always shown (no lesson locking); hidden in an embed. */}
                     {!isInIframe && (
@@ -318,6 +337,15 @@ function LessonViewer() {
                         </nav>
                     )}
                 </div>
+
+                {showLessons && (
+                    <LessonsPanel
+                        courseId={lesson.course}
+                        courseTitle={lesson.course_title}
+                        currentLessonId={lesson.id}
+                        onClose={handleCloseLessons}
+                    />
+                )}
 
                 {/* Render all blocks */}
                 {blocks.map(renderBlock)}

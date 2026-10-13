@@ -250,6 +250,109 @@ class LessonNavigationTests(APITestCase):
         self.first.refresh_from_db()
         self.assertEqual(self.first.title, 'First')
 
+    def test_lesson_position_and_count_ignore_order_index_gaps(self):
+        # order_index 1, 3, 7 → "Урок 1/2/3 из 3".
+        for lesson, position in [(self.first, 1), (self.middle, 2), (self.last, 3)]:
+            data = self.get_lesson(lesson)
+            self.assertEqual((data['lesson_position'], data['lesson_count']), (position, 3), lesson.title)
+
+
+class LessonOutlineTests(APITestCase):
+    """GET /api/lessons/outline/?course=<id>: the lessons panel. Positions agree
+    with the single lesson's lesson_position; counts follow the viewer's rule
+    (QUIZ/CODE/FILL tasks, solved = is_correct); only the caller's own progress."""
+
+    URL = '/api/lessons/outline/'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.classmate = User.objects.create_user(username='classmate', password='x', role='STUDENT')
+        cls.outsider = User.objects.create_user(username='outsider', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        # Gaps in order_index, created out of order.
+        cls.l3 = Lesson.objects.create(course=cls.course, title='Third', order_index=10)
+        cls.l1 = Lesson.objects.create(course=cls.course, title='First', order_index=2)
+        cls.l2 = Lesson.objects.create(course=cls.course, title='Theory only', order_index=5)
+        for user in (cls.student, cls.classmate):
+            Enrollment.objects.create(student=user, course=cls.course)
+
+        def block(lesson, type_, order):
+            return Block.objects.create(lesson=lesson, type=type_, order_index=order, content={})
+
+        quiz, code, fill = block(cls.l1, 'QUIZ', 1), block(cls.l1, 'CODE', 2), block(cls.l1, 'FILL', 3)
+        text1 = block(cls.l1, 'TEXT', 4)
+        block(cls.l2, 'TEXT', 1)
+        last_quiz = block(cls.l3, 'QUIZ', 1)
+
+        def progress(user, b, correct):
+            Progress.objects.create(student=user, lesson=b.lesson, block=b, answer={}, is_correct=correct)
+
+        # student: quiz + fill right, code wrong, TEXT "completed" (never a task).
+        progress(cls.student, quiz, True)
+        progress(cls.student, code, False)
+        progress(cls.student, fill, True)
+        progress(cls.student, text1, True)
+        # classmate solved everything; must not leak into the student's counts.
+        for b in (quiz, code, fill, last_quiz):
+            progress(cls.classmate, b, True)
+
+    def outline(self, user, course_id=None):
+        self.client.force_authenticate(user)
+        return self.client.get(self.URL, {'course': str(course_id or self.course.id)})
+
+    def rows(self, user):
+        response = self.outline(user)
+        self.assertEqual(response.status_code, 200)
+        return {row['title']: row for row in response.data}
+
+    def test_positions_agree_with_single_lesson_including_gaps(self):
+        data = self.outline(self.student).data
+        self.assertEqual([row['title'] for row in data], ['First', 'Theory only', 'Third'])
+        self.assertEqual([row['position'] for row in data], [1, 2, 3])
+        for row in data:
+            lesson = self.client.get(f"/api/lessons/{row['id']}/").data
+            self.assertEqual(lesson['lesson_position'], row['position'], row['title'])
+            self.assertEqual(lesson['lesson_count'], len(data))
+
+    def test_counts_follow_the_viewer_rule(self):
+        rows = self.rows(self.student)
+        self.assertEqual((rows['First']['task_count'], rows['First']['solved_count']), (3, 2))
+        self.assertEqual((rows['Theory only']['task_count'], rows['Theory only']['solved_count']), (0, 0))
+        self.assertEqual((rows['Third']['task_count'], rows['Third']['solved_count']), (1, 0))
+
+    def test_counts_match_what_the_viewer_computes(self):
+        # The viewer: tasks from /api/blocks/?lesson=, solved from /api/progress/course/.
+        self.client.force_authenticate(self.student)
+        progress = self.client.get(f'/api/progress/course/{self.course.id}/').data
+        solved_ids = {str(p['block']) for p in progress if p['is_correct'] is True}
+        for row in self.outline(self.student).data:
+            blocks = self.client.get('/api/blocks/', {'lesson': str(row['id'])}).data
+            tasks = [b for b in blocks if b['type'] in ('QUIZ', 'CODE', 'FILL')]
+            self.assertEqual(row['task_count'], len(tasks), row['title'])
+            self.assertEqual(row['solved_count'], sum(str(b['id']) in solved_ids for b in tasks), row['title'])
+
+    def test_only_the_callers_own_progress(self):
+        self.assertEqual(self.rows(self.classmate)['First']['solved_count'], 3)
+        self.assertEqual(self.rows(self.student)['First']['solved_count'], 2)
+        # No way to ask for someone else's: extra parameters are ignored.
+        self.client.force_authenticate(self.student)
+        response = self.client.get(self.URL, {'course': str(self.course.id), 'student': self.classmate.id})
+        self.assertEqual({r['title']: r['solved_count'] for r in response.data}['First'], 2)
+
+    def test_author_gets_lessons_without_progress(self):
+        rows = self.rows(self.author)
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row['solved_count'] is None for row in rows.values()))
+        self.assertEqual(rows['First']['task_count'], 3)
+
+    def test_access(self):
+        self.assertEqual(self.outline(self.outsider).status_code, 404)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get(self.URL, {'course': str(self.course.id)}).status_code, 401)
+        self.assertEqual(self.outline(self.student, course_id='not-a-uuid').status_code, 400)
+
 
 class ProgressSubmitAccessTests(APITestCase):
     SUBMIT_URL = '/api/progress/submit/'

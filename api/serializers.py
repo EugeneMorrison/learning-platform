@@ -8,7 +8,7 @@ Serializers convert between:
 """
 
 from rest_framework import serializers
-from .block_content import feedback, student_content
+from .block_content import TASK_TYPES, feedback, student_content
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message
 
 
@@ -165,38 +165,64 @@ class LessonSerializer(serializers.ModelSerializer):
         return data
 
 
+def course_lesson_ids_in_order(course_id):
+    """The course's lesson ids in reading order (by order_index; gaps don't
+    matter). A lesson's position is its index here + 1: the single source for
+    lesson_position (lesson viewer) and position (GET /api/lessons/outline/)."""
+    return list(
+        Lesson.objects.filter(course_id=course_id)
+        .order_by('order_index')
+        .values_list('id', flat=True)
+    )
+
+
 class LessonViewerSerializer(LessonSerializer):
     """
     A single lesson for the lesson viewer (GET /api/lessons/{id}/).
 
     Adds (read-only; only the detail response carries them, so lesson lists
     don't pay extra queries per lesson):
-    - next_lesson_id: the next lesson of the same course by order_index,
-      null on the last lesson.
+    - lesson_position / lesson_count: "Урок N из M"; N is the place in the
+      course's ordered lessons (1-based), not order_index.
+    - next_lesson_id: the next lesson of the same course, null on the last one.
     - course_completed: the requesting user has solved every task (QUIZ, CODE,
       FILL) in the course; a course without tasks counts as completed.
     """
 
+    lesson_position = serializers.SerializerMethodField()
+    lesson_count = serializers.SerializerMethodField()
     next_lesson_id = serializers.SerializerMethodField()
     course_completed = serializers.SerializerMethodField()
 
     class Meta(LessonSerializer.Meta):
-        fields = LessonSerializer.Meta.fields + ['next_lesson_id', 'course_completed']
+        fields = LessonSerializer.Meta.fields + [
+            'lesson_position', 'lesson_count', 'next_lesson_id', 'course_completed',
+        ]
+
+    def _ordered_ids(self, obj):
+        # One query for the three navigation fields.
+        if getattr(self, '_ids_course', None) != obj.course_id:
+            self._ids_course = obj.course_id
+            self._ids = course_lesson_ids_in_order(obj.course_id)
+        return self._ids
+
+    def get_lesson_position(self, obj):
+        return self._ordered_ids(obj).index(obj.id) + 1
+
+    def get_lesson_count(self, obj):
+        return len(self._ordered_ids(obj))
 
     def get_next_lesson_id(self, obj):
-        return (
-            Lesson.objects.filter(course_id=obj.course_id, order_index__gt=obj.order_index)
-            .order_by('order_index')
-            .values_list('id', flat=True)
-            .first()
-        )
+        ids = self._ordered_ids(obj)
+        position = ids.index(obj.id) + 1
+        return ids[position] if position < len(ids) else None
 
     def get_course_completed(self, obj):
         request = self.context.get('request')
         user = getattr(request, 'user', None)
         if not user or not user.is_authenticated:
             return False
-        tasks = Block.objects.filter(lesson__course_id=obj.course_id, type__in=('QUIZ', 'CODE', 'FILL'))
+        tasks = Block.objects.filter(lesson__course_id=obj.course_id, type__in=TASK_TYPES)
         # One Progress row per student per block (unique_together).
         solved = Progress.objects.filter(student=user, block__in=tasks, is_correct=True).count()
         return solved == tasks.count()

@@ -91,6 +91,7 @@
   --container-width: 72rem;
   --reading-width: 50rem;        /* app: lesson column (text + code editors, test tables) */
   --form-width: 26rem;           /* app: login / register card */
+  --panel-width: 26rem;          /* app: side panel (lesson viewer's "Список уроков") */
   --card-min-width: 18rem;       /* app: smallest card in a responsive grid */
   --measure: 68ch;               /* comfortable line length for long text */
   --author-photo: 20rem;         /* 320px, desktop */
