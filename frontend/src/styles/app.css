@@ -166,13 +166,43 @@ textarea.input {
     font-weight: var(--weight-medium);
 }
 
-/* A card that opens something on click (course, lesson). */
+/* A card that opens something (course, lesson). The title holds a real link
+   (.card-link__target) whose ::after covers the whole card: click anywhere,
+   Tab to it, middle-click / "open in new tab". Buttons inside the card sit
+   above that layer and stay separate controls. */
 .card-link {
-    cursor: pointer;
+    position: relative;
 }
 
 .card-link:hover {
     border-color: var(--color-accent);
+}
+
+.card-link__target {
+    color: inherit;
+    text-decoration: none;
+}
+
+.card-link__target::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--card-link-radius, var(--radius-card)); /* match the card's corners */
+}
+
+.card-link .btn {
+    position: relative;
+    z-index: 1;
+}
+
+/* Keyboard focus shows on the whole card, not just the title text. */
+.card-link__target:focus-visible {
+    outline: none;
+}
+
+.card-link__target:focus-visible::after {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
 }
 
 /* Responsive grid of cards: as many columns as fit, one on phones. */
@@ -284,7 +314,6 @@ textarea.input {
 /* Keyboard focus for everything the app styles itself */
 .btn:focus-visible,
 .input:focus-visible,
-.card-link:focus-visible,
 .auth-card a:focus-visible,
 .app-header a:focus-visible,
 .user-badge button:focus-visible {

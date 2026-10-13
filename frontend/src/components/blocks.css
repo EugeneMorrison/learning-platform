@@ -1,0 +1,685 @@
+/*
+ * Lesson blocks (TEXT, QUIZ, CODE, FILL) and the author's lesson content.
+ * Tokens only. Colour meaning: cobalt = accent and interaction; green
+ * (--color-success-on-light / -soft) only for success (correct answer, tests
+ * passed, solved block); --color-danger only for errors and failed tests;
+ * yellow (--color-highlight) never as text. The Darcula editors keep their own
+ * theme (pycharmDarcula.js).
+ */
+
+/* ---- Block card ---------------------------------------------------------- */
+
+.lesson-block {
+    margin-bottom: var(--space-5);
+    padding: var(--space-6);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-card);
+    background: var(--color-ground);
+}
+
+/* A solved task: green frame + "Решено" chip (text, so it doesn't rely on colour). */
+.lesson-block--solved {
+    border-color: var(--color-success-on-light);
+    box-shadow: inset 0 0 0 var(--border-width) var(--color-success-on-light);
+}
+
+.lesson-block__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+}
+
+.lesson-block__badge {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--color-soft);
+    color: var(--color-accent);
+    font-family: var(--font-heading);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+.lesson-block__solved {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--color-success-soft);
+    color: var(--color-success-on-light);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+.lesson-block__prompt {
+    margin-bottom: var(--space-4);
+}
+
+.lesson-block__label {
+    margin-bottom: var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* Buttons under a task. Wraps on phones (no sideways scroll at 390px). */
+.lesson-block__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+}
+
+/* Quiet text button: "↑ Вернуться к теории". */
+.lesson-block__text-btn {
+    display: block;
+    margin-top: var(--space-4);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.lesson-block__text-btn:hover {
+    color: var(--color-accent);
+}
+
+/* ---- Verdicts ------------------------------------------------------------ */
+
+.verdict {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-small);
+    font-weight: var(--weight-bold);
+}
+
+.verdict--success {
+    border-color: var(--color-success-on-light);
+    background: var(--color-success-soft);
+    color: var(--color-success-on-light);
+}
+
+.verdict--danger {
+    border-color: var(--color-danger);
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+}
+
+/* Explanation after "Верно!" reads as normal text. */
+.verdict__detail {
+    font-weight: var(--weight-regular);
+}
+
+.check-error {
+    margin-top: var(--space-3);
+    color: var(--color-danger);
+}
+
+/* ---- Author content (TEXT blocks, quiz questions, task prompts) ----------- */
+
+.text-content {
+    overflow-wrap: break-word;
+}
+
+.text-content p {
+    margin: 0 0 var(--space-3);
+}
+
+/* Lesson headings: Golos bold (decided), not the Unbounded display face. */
+.text-content h1,
+.text-content h2,
+.text-content h3,
+.text-content h4 {
+    margin: var(--space-5) 0 var(--space-2);
+    font-family: var(--font-body);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+}
+
+.text-content > :first-child {
+    margin-top: 0;
+}
+
+.text-content h1,
+.text-content h2 { font-size: var(--text-xl); }
+.text-content h3 { font-size: var(--text-lg); }
+.text-content h4 { font-size: var(--text-base); }
+
+.text-content a {
+    color: var(--color-accent);
+}
+
+.text-content ul,
+.text-content ol {
+    margin: var(--space-2) 0 var(--space-3);
+    padding-left: var(--space-5);
+}
+
+.text-content li {
+    margin: var(--space-1) 0;
+}
+
+.text-content li > ul,
+.text-content li > ol {
+    margin: var(--space-1) 0;
+}
+
+.text-content blockquote {
+    margin: var(--space-3) 0;
+    padding: var(--space-2) var(--space-4);
+    border-left: calc(var(--border-width) * 3) solid var(--color-accent);
+    border-radius: 0 var(--radius-small) var(--radius-small) 0;
+    background: var(--color-soft);
+    color: var(--color-muted);
+}
+
+.text-content blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+/* Author-uploaded images (incl. formulas pasted as pictures). Each one sits in
+   a .content-figure box (lib/contentImages.js) that scrolls sideways when the
+   picture is wider than the column. Desktop: pictures shrink to fit, as before.
+   Phones: they keep their natural size, so formulas stay readable (see below). */
+.content-figure {
+    display: inline-block;
+    max-width: 100%;
+    overflow-x: auto;
+    vertical-align: middle;
+}
+
+/* More picture to the right: a soft fade at the box's right edge hints that it
+   scrolls (class set by watchFigureOverflow, removed at the end of the scroll).
+   The mask is fixed to the box, so the fade stays put while the picture moves. */
+.content-figure--more {
+    -webkit-mask-image: linear-gradient(to right, var(--color-ink) calc(100% - var(--space-7)), transparent);
+    mask-image: linear-gradient(to right, var(--color-ink) calc(100% - var(--space-7)), transparent);
+}
+
+.text-content img {
+    max-width: 100%;
+    height: auto;
+    margin: var(--space-2) 0;
+    border-radius: var(--radius-small);
+}
+
+/* Inline code: .startswith() */
+.text-content code,
+.quiz-option code {
+    padding: 0.1em 0.4em;
+    border-radius: var(--space-1);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-family: var(--font-code);
+    font-size: 0.9em;
+}
+
+/* Code samples (highlight.js, atom-one-light colours) in theory text, quiz
+   questions and prompts. Class set by lib/pythonHighlight.js and QuizBlock.
+   Never clipped: lines wrap at spaces, and a token too long for the box
+   (no spaces to wrap at) scrolls sideways inside it. */
+.code-sample,
+.text-content pre {
+    margin: var(--space-3) 0;
+    padding: var(--space-3) var(--space-4);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    overflow-wrap: normal; /* .text-content's break-word would split tokens */
+    word-break: normal;
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
+.code-sample code,
+.text-content pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+}
+
+.code-sample code.hljs,
+.text-content .hljs {
+    padding: 0;
+    background: transparent;
+}
+
+/* ---- QUIZ ------------------------------------------------------------------ */
+
+.quiz-question {
+    margin-bottom: var(--space-4);
+    font-weight: var(--weight-bold);
+}
+
+.quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.quiz-option {
+    padding: var(--space-3) var(--space-4);
+    border: calc(var(--border-width) * 2) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+}
+
+.quiz-option:hover {
+    border-color: var(--color-accent);
+}
+
+.quiz-option--selected {
+    border-color: var(--color-accent);
+    background: var(--color-soft);
+    font-weight: var(--weight-bold);
+}
+
+.quiz-option--correct {
+    border-color: var(--color-success-on-light);
+    background: var(--color-success-soft);
+    font-weight: var(--weight-bold);
+}
+
+.quiz-option--wrong {
+    border-color: var(--color-danger);
+    background: var(--color-danger-soft);
+    font-weight: var(--weight-bold);
+}
+
+/* Once the right answer is found the options stop reacting. */
+.quiz-options--locked .quiz-option {
+    cursor: default;
+}
+
+.quiz-options--locked .quiz-option:hover:not(.quiz-option--correct) {
+    border-color: var(--color-line);
+}
+
+/* ---- FILL ------------------------------------------------------------------ */
+
+.fill-template {
+    color: var(--color-ink);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    line-height: 2.2; /* room for the pill inputs between lines */
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.fill-blank {
+    max-width: 100%;
+    padding: var(--space-1) var(--space-3);
+    border: calc(var(--border-width) * 2) solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    vertical-align: middle;
+    outline: none;
+}
+
+.fill-blank:focus {
+    border-color: var(--color-accent);
+    background: var(--color-ground);
+}
+
+.fill-blank--correct {
+    border-color: var(--color-success-on-light);
+    background: var(--color-success-soft);
+}
+
+.fill-blank--wrong {
+    border-color: var(--color-danger);
+    background: var(--color-danger-soft);
+}
+
+.fill-blank:disabled {
+    color: var(--color-ink);
+}
+
+/* ---- CODE ------------------------------------------------------------------ */
+
+.code-editor-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.code-editor-bar .lesson-block__label {
+    margin-bottom: 0;
+}
+
+/* Python version picker */
+.version-select {
+    position: relative;
+}
+
+.version-select__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-width: calc(var(--space-9) + var(--space-6));
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+}
+
+.version-select__btn:hover {
+    border-color: var(--color-accent);
+}
+
+.version-select__caret {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.version-select__menu {
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    right: 0;
+    z-index: 10; /* above the editor below it, inside the block */
+    min-width: 100%;
+    padding: var(--space-1);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    box-shadow: var(--shadow-md);
+}
+
+.version-select__item {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-small);
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.version-select__item:hover {
+    background: var(--color-soft);
+}
+
+.version-select__item--active {
+    background: var(--color-soft);
+    color: var(--color-accent);
+    font-weight: var(--weight-bold);
+}
+
+/* Darcula editor frame (the theme itself is pycharmDarcula.js) */
+.code-editor {
+    margin-bottom: var(--space-4);
+    overflow: hidden;
+    border-radius: var(--radius-small);
+}
+
+/* "Тестовый ввод" */
+.code-input {
+    min-height: calc(var(--space-8) + var(--space-2));
+    margin-bottom: var(--space-3);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    resize: vertical;
+}
+
+/* Output of "Запустить код": the dark code-card look from the landing. */
+.run-output {
+    margin-bottom: var(--space-4);
+    overflow: hidden;
+    border-radius: var(--radius-small);
+    background: var(--color-ink);
+}
+
+.run-output__label {
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-code-bar);
+    color: var(--color-code-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+.run-output__text {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    color: var(--color-code-text);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Run failed (stderr): light danger panel, so the red text keeps its contrast. */
+.run-output--error {
+    border: var(--border-width) solid var(--color-danger);
+    background: var(--color-danger-soft);
+}
+
+.run-output--error .run-output__label {
+    background: transparent;
+    color: var(--color-danger);
+    font-weight: var(--weight-bold);
+}
+
+.run-output--error .run-output__text {
+    padding-top: 0;
+    color: var(--color-danger);
+}
+
+/* Отправить / Сбросить on the left, Запустить код on the right; wraps at 390px. */
+.code-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.code-actions__main {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+/* Verdict after "Отправить" */
+.verdict--block {
+    margin: 0 0 var(--space-4);
+}
+
+.verdict__title {
+    font-size: var(--text-lg);
+}
+
+.verdict__line {
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-regular);
+}
+
+/* Failed test: header + input / expected / actual */
+.test-fail {
+    margin-bottom: var(--space-4);
+    overflow: hidden;
+    border: var(--border-width) solid var(--color-danger);
+    border-radius: var(--radius-small);
+}
+
+.test-fail__head {
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+    font-weight: var(--weight-bold);
+}
+
+.test-fail__count {
+    margin-left: var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-regular);
+}
+
+.test-fail__body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--color-ground);
+}
+
+.io-box {
+    flex: 1 1 calc(var(--space-9) + var(--space-8));
+    min-width: 0;
+}
+
+.io-box__label {
+    margin-bottom: var(--space-1);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+.io-box__pre {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.io-box__pre--actual {
+    border-color: var(--color-danger);
+    background: var(--color-danger-soft);
+}
+
+.test-fail__stderr {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-ground);
+    color: var(--color-danger);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* "🌿 Тестовые данные" toggle and table */
+.tests-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    cursor: pointer;
+}
+
+.tests-toggle:hover {
+    color: var(--color-accent);
+}
+
+.tests-table-wrap {
+    margin-top: var(--space-3);
+    overflow-x: auto;
+}
+
+.tests-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+}
+
+.tests-table th,
+.tests-table td {
+    padding: var(--space-2) var(--space-4);
+    border: var(--border-width) solid var(--color-line);
+    text-align: left;
+}
+
+.tests-table th {
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-weight: var(--weight-bold);
+}
+
+.tests-table td {
+    font-family: var(--font-code);
+}
+
+.tests-table tbody tr:nth-child(even) {
+    background: var(--color-soft);
+}
+
+.tests-table__check {
+    width: var(--space-7);
+    text-align: center;
+}
+
+.tests-table__check input {
+    accent-color: var(--color-accent);
+    cursor: pointer;
+}
+
+.lesson-block__note {
+    margin-top: var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* ---- Keyboard focus -------------------------------------------------------- */
+
+.quiz-option:focus-visible,
+.fill-blank:focus-visible,
+.lesson-block__text-btn:focus-visible,
+.version-select__btn:focus-visible,
+.tests-toggle:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+@media (max-width: 40rem) {
+    .lesson-block {
+        padding: var(--space-5) var(--space-4);
+    }
+
+    /* Formulas keep their natural size and scroll inside their box. */
+    .text-content .content-figure img {
+        max-width: none;
+    }
+}

@@ -20,6 +20,7 @@
 }
 
 .lesson-row {
+    --card-link-radius: var(--radius-small); /* focus ring follows the smaller corners */
     display: flex;
     flex-wrap: wrap;
     align-items: center;

@@ -3,8 +3,6 @@ import python from 'highlight.js/lib/languages/python';
 
 hljs.registerLanguage('python', python);
 
-const PRE_STYLE = "background:#f0f0f0;border-radius:6px;padding:10px 16px;font-family:'JetBrains Mono',Consolas,monospace;font-size:14px;line-height:1.6;overflow-x:auto;margin-bottom:12px;";
-
 /**
  * Replace every <pre>...</pre> in an HTML string with a syntax-highlighted
  * Python code block. Shared by TextBlock and QuizBlock so theory text and
@@ -23,6 +21,7 @@ export function highlightPreBlocks(html) {
             .replace(/&#39;/g, "'")
             .replace(/&amp;/g, '&');
         const highlighted = hljs.highlight(decoded, { language: 'python', ignoreIllegals: true }).value;
-        return `<pre style="${PRE_STYLE}"><code class="hljs language-python">${highlighted}</code></pre>`;
+        // Styled by .code-sample in components/blocks.css (tokens, no inline styles).
+        return `<pre class="code-sample"><code class="hljs language-python">${highlighted}</code></pre>`;
     });
 }

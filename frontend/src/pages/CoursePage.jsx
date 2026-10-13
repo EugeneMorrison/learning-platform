@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import './CoursePage.css';
 
@@ -233,32 +233,26 @@ function CoursePage() {
                 ) : (
                     <div className="lesson-list">
                     {lessons.map((lesson, index) => (
-                        <div
-                            key={lesson.id}
-                            className="card card-link lesson-row"
-                            onClick={() => navigate(`/lesson/${lesson.id}/`)}
-                        >
+                        <div key={lesson.id} className="card card-link lesson-row">
                             <div className="lesson-row__text">
-                                <strong className="lesson-row__title">Урок {index + 1}: {lesson.title}</strong>
+                                <strong className="lesson-row__title">
+                                    <Link className="card-link__target" to={`/lesson/${lesson.id}/`}>
+                                        Урок {index + 1}: {lesson.title}
+                                    </Link>
+                                </strong>
                                 <p className="lesson-row__hint">→ Открыть урок</p>
                             </div>
                             {isAuthor && (
                                 <div className="lesson-row__actions">
                                     <button
                                         className="btn btn-secondary btn-sm"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate(`/lesson/${lesson.id}/edit/`);
-                                        }}
+                                        onClick={() => navigate(`/lesson/${lesson.id}/edit/`)}
                                     >
                                         ✎ Редактировать
                                     </button>
                                     <button
                                         className="btn btn-danger btn-sm"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteLesson(lesson.id);
-                                        }}
+                                        onClick={() => handleDeleteLesson(lesson.id)}
                                     >
                                         Удалить урок
                                     </button>

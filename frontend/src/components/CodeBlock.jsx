@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from './pycharmDarcula';
+import { wrapImages } from '../lib/contentImages';
 import api from '../api';
+import './blocks.css';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
@@ -114,101 +116,45 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
         setHasSubmitted(false);
     };
 
+    const isSolved = submitResults?.status === 'success';
+
     return (
-        <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '16px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            borderLeft: '4px solid #16a34a',
-        }}>
+        <div className={isSolved ? 'lesson-block lesson-block--solved' : 'lesson-block'}>
             {/* Block type badge */}
-            <div style={{ marginBottom: '14px' }}>
-                <span style={{
-                    display: 'inline-block',
-                    padding: '4px 12px',
-                    background: '#dcfce7',
-                    color: '#15803d',
-                    borderRadius: '999px',
-                    fontWeight: '600',
-                    letterSpacing: '0.3px',
-                }}>
-                    Задача{number ? ` ${number}` : ''}
-                </span>
+            <div className="lesson-block__head">
+                <span className="lesson-block__badge">Задача{number ? ` ${number}` : ''}</span>
+                {isSolved && <span className="lesson-block__solved">✓ Решено</span>}
             </div>
 
             {/* Task prompt */}
             <div
-                className="text-content"
-                style={{ marginBottom: '16px' }}
-                dangerouslySetInnerHTML={{ __html: content.prompt }}
+                className="text-content lesson-block__prompt"
+                dangerouslySetInnerHTML={{ __html: wrapImages(content.prompt) }}
             />
 
             {/* Code editor */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '8px',
-                fontSize: '14px',
-            }}>
-                <span style={{ color: '#64748b' }}>Ваш код:</span>
-                <div ref={versionRef} style={{ position: 'relative' }}>
+            <div className="code-editor-bar">
+                <span className="lesson-block__label">Ваш код:</span>
+                <div ref={versionRef} className="version-select">
                     <button
                         type="button"
+                        className="version-select__btn"
                         onClick={() => setVersionOpen(!versionOpen)}
-                        style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            padding: '6px 12px',
-                            background: 'white',
-                            color: '#334155',
-                            border: '1px solid #cbd5e1',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            minWidth: '130px',
-                            justifyContent: 'space-between',
-                        }}
                     >
                         <span>{pythonVersion}</span>
-                        <span style={{ fontSize: '10px', color: '#64748b' }}>▼</span>
+                        <span className="version-select__caret" aria-hidden="true">▼</span>
                     </button>
                     {versionOpen && (
-                        <div style={{
-                            position: 'absolute',
-                            top: 'calc(100% + 4px)',
-                            right: 0,
-                            minWidth: '140px',
-                            background: 'white',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '6px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                            zIndex: 10,
-                            overflow: 'hidden',
-                        }}>
+                        <div className="version-select__menu">
                             {PYTHON_VERSIONS.map(v => (
                                 <div
                                     key={v}
+                                    className={v === pythonVersion
+                                        ? 'version-select__item version-select__item--active'
+                                        : 'version-select__item'}
                                     onClick={() => {
                                         setPythonVersion(v);
                                         setVersionOpen(false);
-                                    }}
-                                    style={{
-                                        padding: '8px 12px',
-                                        cursor: 'pointer',
-                                        fontSize: '13px',
-                                        background: v === pythonVersion ? '#dcfce7' : 'white',
-                                        color: '#334155',
-                                    }}
-                                    onMouseEnter={e => {
-                                        if (v !== pythonVersion) e.currentTarget.style.background = '#f8fafc';
-                                    }}
-                                    onMouseLeave={e => {
-                                        if (v !== pythonVersion) e.currentTarget.style.background = 'white';
                                     }}
                                 >
                                     {v}
@@ -218,11 +164,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                     )}
                 </div>
             </div>
-            <div style={{
-                borderRadius: '6px',
-                marginBottom: '16px',
-                overflow: 'hidden',
-            }}>
+            <div className="code-editor">
                 <CodeMirror
                     value={userCode}
                     onChange={(value) => setUserCode(value)}
@@ -245,133 +187,50 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
             </div>
 
             {/* Test input box */}
-            <div style={{ marginBottom: '8px', color: '#64748b', fontSize: '14px' }}>
-                Тестовый ввод:
-            </div>
+            <div className="lesson-block__label">Тестовый ввод:</div>
             <textarea
+                className="input code-input"
+                aria-label="Тестовый ввод"
                 value={testInput}
                 onChange={e => setTestInput(e.target.value)}
                 placeholder="Введите входные данные для проверки..."
                 spellCheck={false}
-                style={{
-                    width: '100%',
-                    background: '#f8fafc',
-                    color: '#334155',
-                    fontFamily: "'JetBrains Mono', Consolas, monospace",
-                    fontSize: '14px',
-                    padding: '12px 16px',
-                    borderRadius: '6px',
-                    border: '1px solid #e2e8f0',
-                    resize: 'vertical',
-                    minHeight: '72px',
-                    marginBottom: '12px',
-                    boxSizing: 'border-box',
-                    outline: 'none',
-                    lineHeight: '1.6',
-                }}
             />
 
             {/* Run output */}
             {runOutput && (
-                <div style={{
-                    marginBottom: '16px',
-                    background: '#1e293b',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                }}>
-                    <div style={{
-                        padding: '8px 16px',
-                        background: '#0f172a',
-                        color: '#64748b',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                    }}>
-                        Вывод:
-                    </div>
-                    <pre style={{
-                        margin: 0,
-                        padding: '12px 16px',
-                        color: runOutput.stderr ? '#dc2626' : '#0f172a',
-                        fontFamily: "'JetBrains Mono', Consolas, monospace",
-                        fontSize: '13px',
-                        lineHeight: '1.5',
-                        whiteSpace: 'pre-wrap',
-                    }}>
+                <div className={runOutput.stderr ? 'run-output run-output--error' : 'run-output'}>
+                    <div className="run-output__label">Вывод:</div>
+                    <pre className="run-output__text">
                         {runOutput.stderr || runOutput.stdout || '(нет вывода)'}
                     </pre>
                 </div>
             )}
 
-            {/* Buttons row */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        style={{
-                            padding: '10px 24px',
-                            background: isSubmitting ? '#93c5fd' : '#2563eb',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                            fontWeight: '600',
-                            fontSize: '14px',
-                        }}
-                    >
+            {/* Buttons row: wraps on narrow screens */}
+            <div className="code-actions">
+                <div className="code-actions__main">
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
                         {isSubmitting ? '⏳ Проверяется...' : '✔ Отправить'}
                     </button>
 
                     {hasSubmitted && (
-                        <button
-                            onClick={handleReset}
-                            style={{
-                                padding: '10px 24px',
-                                background: 'white',
-                                color: '#64748b',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                fontSize: '14px',
-                            }}
-                        >
+                        <button className="btn btn-secondary" onClick={handleReset}>
                             🔄 Сбросить
                         </button>
                     )}
                 </div>
 
-                <button
-                    onClick={handleRun}
-                    disabled={isRunning}
-                    style={{
-                        padding: '10px 24px',
-                        background: isRunning ? '#86efac' : '#1e293b',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: isRunning ? 'not-allowed' : 'pointer',
-                        fontWeight: '600',
-                        fontSize: '14px',
-                    }}
-                >
+                <button className="btn btn-secondary" onClick={handleRun} disabled={isRunning}>
                     {isRunning ? '⏳ Выполняется...' : '▶ Запустить код'}
                 </button>
             </div>
 
             {/* Submit results - success */}
             {submitResults && submitResults.status === 'success' && (
-                <div style={{
-                    padding: '16px',
-                    background: '#f0fdf4',
-                    border: '1px solid #bbf7d0',
-                    borderRadius: '8px',
-                    marginBottom: '16px',
-                }}>
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: '#16a34a', marginBottom: '4px' }}>
-                        Верно!
-                    </div>
-                    <div style={{ color: '#15803d', fontSize: '14px' }}>
+                <div className="verdict verdict--success verdict--block" role="status">
+                    <div className="verdict__title">✅ Верно!</div>
+                    <div className="verdict__line">
                         Все тесты пройдены ({submitResults.total}/{submitResults.total})
                     </div>
                 </div>
@@ -379,50 +238,27 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
 
             {/* Submit results - wrong answer */}
             {submitResults && submitResults.status === 'wrong_answer' && (
-                <div style={{
-                    marginBottom: '16px',
-                    border: '1px solid #fecaca',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                }}>
-                    <div style={{
-                        padding: '12px 16px',
-                        background: '#fef2f2',
-                        fontWeight: '700',
-                        fontSize: '15px',
-                        color: '#dc2626',
-                    }}>
-                        Неверный ответ на {submitResults.hidden ? 'скрытом ' : ''}тесте #{submitResults.test_number}
-                        <span style={{ fontWeight: '400', fontSize: '13px', marginLeft: '12px', color: '#64748b' }}>
+                <div className="test-fail" role="status">
+                    <div className="test-fail__head">
+                        ❌ Неверный ответ на {submitResults.hidden ? 'скрытом ' : ''}тесте #{submitResults.test_number}
+                        <span className="test-fail__count">
                             ({submitResults.passed}/{submitResults.total} пройдено)
                         </span>
                     </div>
                     {/* Hidden tests: the server sends no input/expected/actual. */}
                     {!submitResults.hidden && (
-                    <div style={{ padding: '14px 16px', background: 'white' }}>
-                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                            <div style={{ flex: 1, minWidth: '150px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                    Входные данные
-                                </div>
-                                <pre style={preBoxStyle}>{submitResults.input || '—'}</pre>
-                            </div>
-                            <div style={{ flex: 1, minWidth: '150px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                    Ожидаемый результат
-                                </div>
-                                <pre style={{ ...preBoxStyle, borderColor: '#bbf7d0', background: '#f0fdf4' }}>
-                                    {submitResults.expected}
-                                </pre>
-                            </div>
-                            <div style={{ flex: 1, minWidth: '150px' }}>
-                                <div style={{ fontSize: '12px', fontWeight: '600', color: '#94a3b8', marginBottom: '4px', textTransform: 'uppercase' }}>
-                                    Ваш результат
-                                </div>
-                                <pre style={{ ...preBoxStyle, borderColor: '#fecaca', background: '#fef2f2' }}>
-                                    {submitResults.actual || '(пусто)'}
-                                </pre>
-                            </div>
+                    <div className="test-fail__body">
+                        <div className="io-box">
+                            <div className="io-box__label">Входные данные</div>
+                            <pre className="io-box__pre">{submitResults.input || '—'}</pre>
+                        </div>
+                        <div className="io-box">
+                            <div className="io-box__label">Ожидаемый результат</div>
+                            <pre className="io-box__pre">{submitResults.expected}</pre>
+                        </div>
+                        <div className="io-box">
+                            <div className="io-box__label">Ваш результат</div>
+                            <pre className="io-box__pre io-box__pre--actual">{submitResults.actual || '(пусто)'}</pre>
                         </div>
                     </div>
                     )}
@@ -431,94 +267,56 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
 
             {/* Submit results - error */}
             {submitResults && submitResults.status === 'error' && (
-                <div style={{
-                    marginBottom: '16px',
-                    border: '1px solid #fecaca',
-                    borderRadius: '8px',
-                    overflow: 'hidden',
-                }}>
-                    <div style={{
-                        padding: '12px 16px',
-                        background: '#fef2f2',
-                        fontWeight: '700',
-                        fontSize: '15px',
-                        color: '#dc2626',
-                    }}>
+                <div className="test-fail" role="status">
+                    <div className="test-fail__head">
                         {submitResults.hidden
-                            ? `Ошибка выполнения на скрытом тесте #${submitResults.test_number}`
-                            : 'Ошибка выполнения'}
+                            ? `❌ Ошибка выполнения на скрытом тесте #${submitResults.test_number}`
+                            : '❌ Ошибка выполнения'}
                     </div>
                     {/* Hidden tests: the server sends no stderr (it could reveal the input). */}
                     {!submitResults.hidden && (
-                    <pre style={{
-                        margin: 0,
-                        padding: '14px 16px',
-                        background: '#1e1e1e',
-                        color: '#f87171',
-                        fontFamily: "'JetBrains Mono', Consolas, monospace",
-                        fontSize: '13px',
-                        lineHeight: '1.5',
-                        whiteSpace: 'pre-wrap',
-                    }}>
-                        {submitResults.stderr}
-                    </pre>
+                    <pre className="test-fail__stderr">{submitResults.stderr}</pre>
                     )}
                 </div>
             )}
 
             {/* Collapsible tests table */}
             {content.tests && content.tests.length > 0 && (
-                <div style={{ marginTop: '8px' }}>
+                <div>
                     <button
+                        className="tests-toggle"
                         onClick={() => setTestsOpen(!testsOpen)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            color: '#475569',
-                            padding: '0',
-                        }}
+                        aria-expanded={testsOpen}
                     >
-                        <span>{testsOpen ? '▼' : '▶'}</span>
+                        <span aria-hidden="true">{testsOpen ? '▼' : '▶'}</span>
                         <span>🌿 Тестовые данные</span>
                     </button>
 
                     {testsOpen && (
-                        <div style={{ marginTop: '12px', overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                        <div className="tests-table-wrap">
+                            <table className="tests-table">
                                 <thead>
-                                    <tr style={{ background: '#f1f5f9' }}>
-                                        <th style={{ ...thStyle, width: '36px', textAlign: 'center' }}></th>
-                                        <th style={thStyle}>№</th>
-                                        <th style={thStyle}>Входные данные</th>
-                                        <th style={thStyle}>Выходные данные</th>
+                                    <tr>
+                                        <th className="tests-table__check"></th>
+                                        <th>№</th>
+                                        <th>Входные данные</th>
+                                        <th>Выходные данные</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {content.tests.map((test, index) => (
-                                        <tr key={index} style={{
-                                            background: index % 2 === 0 ? 'white' : '#f8fafc'
-                                        }}>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                        <tr key={index}>
+                                            <td className="tests-table__check">
                                                 <input
                                                     type="checkbox"
+                                                    aria-label={`Подставить тест ${index + 1} во ввод`}
                                                     checked={selectedTestIndex === index}
                                                     onChange={() => handleTestCheck(index)}
-                                                    style={{ cursor: 'pointer' }}
                                                 />
                                             </td>
-                                            <td style={tdStyle}>{index + 1}</td>
-                                            <td style={tdStyle}>
-                                                {typeof test === 'object' ? test.input : test}
-                                            </td>
-                                            <td style={{ ...tdStyle, color: '#16a34a', fontWeight: '600' }}>
-                                                {typeof test === 'object' ? test.expected : '—'}
-                                            </td>
+                                            <td>{index + 1}</td>
+                                            <td>{typeof test === 'object' ? test.input : test}</td>
+                                            <td>{typeof test === 'object' ? test.expected : '—'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -529,38 +327,12 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
             )}
 
             {hiddenTestCount > 0 && (
-                <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748b' }}>
+                <div className="lesson-block__note">
                     {hasTests ? 'Ещё скрытых тестов' : 'Скрытых тестов'}: {hiddenTestCount}. Решение проверяется на всех тестах.
                 </div>
             )}
         </div>
     );
 }
-
-const preBoxStyle = {
-    margin: 0,
-    padding: '10px 14px',
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    borderRadius: '6px',
-    fontFamily: "'JetBrains Mono', Consolas, monospace",
-    fontSize: '13px',
-    lineHeight: '1.5',
-    whiteSpace: 'pre-wrap',
-};
-
-const thStyle = {
-    padding: '10px 16px',
-    textAlign: 'left',
-    fontWeight: '600',
-    color: '#475569',
-    border: '1px solid #e2e8f0',
-};
-
-const tdStyle = {
-    padding: '8px 16px',
-    border: '1px solid #e2e8f0',
-    fontFamily: "'JetBrains Mono', Consolas, monospace",
-};
 
 export default CodeBlock;

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import hljs from 'highlight.js/lib/core';
 import python from 'highlight.js/lib/languages/python';
-import './QuizBlock.css';
+import './blocks.css';
 import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
+import { wrapImages } from '../lib/contentImages';
 
 hljs.registerLanguage('python', python);
 
@@ -74,57 +75,27 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
     }
 
     return (
-        <div className="quiz-block" style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '16px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            borderLeft: '4px solid #2563eb',
-        }}>
-            {/* Block type badge */}
-            <div style={{ marginBottom: '14px' }}>
-                <span style={{
-                    display: 'inline-block',
-                    padding: '4px 12px',
-                    background: '#ede9fe',
-                    color: '#6d28d9',
-                    borderRadius: '999px',
-                    fontWeight: '600',
-                    letterSpacing: '0.3px',
-                }}>
-                    Тест{number ? ` ${number}` : ''}
-                </span>
+        <div className={isCorrect ? 'lesson-block lesson-block--solved' : 'lesson-block'}>
+            <div className="lesson-block__head">
+                <span className="lesson-block__badge">Тест{number ? ` ${number}` : ''}</span>
+                {isCorrect && <span className="lesson-block__solved">✓ Решено</span>}
             </div>
 
             {htmlQuestion ? (
                 <div
-                    className="text-content"
-                    style={{ marginBottom: '16px' }}
-                    dangerouslySetInnerHTML={{ __html: highlightPreBlocks(content.question) }}
+                    className="text-content lesson-block__prompt"
+                    dangerouslySetInnerHTML={{ __html: wrapImages(highlightPreBlocks(content.question)) }}
                 />
             ) : (
                 <>
                     <p
-                        style={{ fontWeight: '600', marginBottom: codePart ? '12px' : '16px' }}
+                        className="quiz-question"
                         dangerouslySetInnerHTML={{ __html: '❓ ' + questionText }}
                     />
                     {codePart && (
-                        <pre style={{
-                            background: '#f0f0f0',
-                            borderRadius: '6px',
-                            padding: '10px 16px',
-                            fontFamily: "'JetBrains Mono', Consolas, monospace",
-                            fontSize: '14px',
-                            lineHeight: '1.6',
-                            marginBottom: '12px',
-                            overflowX: 'auto',
-                            whiteSpace: 'pre-wrap',
-                            color: '#383a42',
-                        }}>
+                        <pre className="code-sample">
                             <code
                                 className="hljs language-python"
-                                style={{ background: 'transparent' }}
                                 dangerouslySetInnerHTML={{ __html: highlightedCode }}
                             />
                         </pre>
@@ -132,23 +103,12 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
                 </>
             )}
 
-            <div className="quiz-options" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className={isCorrect ? 'quiz-options quiz-options--locked' : 'quiz-options'}>
                 {content.options.map((option, index) => (
                     <button
                         key={index}
                         onClick={() => handleOptionClick(index)}
-                        style={{
-                            padding: '10px 16px',
-                            borderRadius: '6px',
-                            border: '2px solid',
-                            cursor: isCorrect ? 'default' : 'pointer',
-                            textAlign: 'left',
-                            background: getOptionBackground(index, selected, submitted, isCorrect),
-                            borderColor: getOptionBorder(index, selected, submitted, isCorrect),
-                            fontWeight: index === selected ? '600' : 'normal',
-                            fontFamily: "'JetBrains Mono', Consolas, monospace",
-                            fontSize: '14px',
-                        }}
+                        className={optionClass(index, selected, submitted, isCorrect)}
                         dangerouslySetInnerHTML={{ __html: option }}
                     />
                 ))}
@@ -156,76 +116,43 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
 
             {/* Check Answer button — shown before submission */}
             {!submitted && (
-                <button
-                    onClick={handleSubmit}
-                    disabled={selected === null || checking}
-                    style={{
-                        marginTop: '16px',
-                        padding: '10px 24px',
-                        background: selected === null || checking ? '#94a3b8' : '#2563eb',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: selected === null || checking ? 'not-allowed' : 'pointer',
-                        fontWeight: '600',
-                    }}
-                >
-                    {checking ? 'Проверяем…' : 'Проверить ответ'}
-                </button>
+                <div className="lesson-block__actions">
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleSubmit}
+                        disabled={selected === null || checking}
+                    >
+                        {checking ? 'Проверяем…' : 'Проверить ответ'}
+                    </button>
+                </div>
             )}
 
             {checkError && (
-                <div style={{ marginTop: '12px', color: '#dc2626' }}>{checkError}</div>
+                <div className="check-error" role="alert">{checkError}</div>
             )}
 
             {/* Feedback — always appears before the retry/solve button */}
             {submitted && (
-                <div style={{
-                    marginTop: '16px',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    background: isCorrect ? '#dcfce7' : '#fee2e2',
-                    color: isCorrect ? '#16a34a' : '#dc2626',
-                    fontWeight: '600',
-                }}>
-                    {isCorrect
-                        ? '✅ Верно!' + (result.explanation ? ' ' + result.explanation : '')
-                        : '❌ Неверно! Попробуйте еще раз!'}
+                <div className={isCorrect ? 'verdict verdict--success' : 'verdict verdict--danger'} role="status">
+                    {isCorrect ? '✅ Верно!' : '❌ Неверно! Попробуйте еще раз!'}
+                    {isCorrect && result.explanation && (
+                        <span className="verdict__detail"> {result.explanation}</span>
+                    )}
                 </div>
             )}
 
             {/* Retry / Solve again button — after feedback in both cases */}
             {submitted && (
-                <button
-                    onClick={handleReset}
-                    style={{
-                        marginTop: '12px',
-                        padding: '10px 24px',
-                        background: 'white',
-                        color: '#475569',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                    }}
-                >
-                    {isCorrect ? 'Решить снова' : 'Попробовать снова'}
-                </button>
+                <div className="lesson-block__actions">
+                    <button className="btn btn-secondary" onClick={handleReset}>
+                        {isCorrect ? 'Решить снова' : 'Попробовать снова'}
+                    </button>
+                </div>
             )}
 
             <button
+                className="lesson-block__text-btn"
                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                style={{
-                    display: 'block',
-                    marginTop: '16px',
-                    padding: '0',
-                    background: 'none',
-                    border: 'none',
-                    color: '#64748b',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                }}
             >
                 ↑ Вернуться к теории
             </button>
@@ -235,16 +162,10 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
 
 // Only the selected option is coloured after checking (green if the server said
 // correct, red otherwise); the correct option is never revealed.
-function getOptionBackground(index, selected, submitted, isCorrect) {
-    if (submitted && index === selected) return isCorrect ? '#dcfce7' : '#fee2e2';
-    if (index === selected) return '#eff6ff';
-    return 'white';
-}
-
-function getOptionBorder(index, selected, submitted, isCorrect) {
-    if (submitted && index === selected) return isCorrect ? '#16a34a' : '#dc2626';
-    if (index === selected) return '#2563eb';
-    return '#e2e8f0';
+function optionClass(index, selected, submitted, isCorrect) {
+    if (index !== selected) return 'quiz-option';
+    if (!submitted) return 'quiz-option quiz-option--selected';
+    return isCorrect ? 'quiz-option quiz-option--correct' : 'quiz-option quiz-option--wrong';
 }
 
 export default QuizBlock;

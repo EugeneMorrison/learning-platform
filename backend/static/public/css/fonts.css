@@ -6,12 +6,12 @@
  * Fontsource packages, split by subset: unicode-range makes the browser fetch
  * only the subsets a page actually uses (latin-ext carries the ruble sign).
  *
- * JetBrains Mono (code card in the landing hero, 400): the official v2.304
- * webfont from github.com/JetBrains/JetBrainsMono, SIL OFL 1.1
- * (../fonts/JetBrainsMono-OFL.txt).
+ * JetBrains Mono (code: 400 in the landing hero and the app, 600 for bold code
+ * in the app): the official v2.304 webfonts from github.com/JetBrains/JetBrainsMono,
+ * SIL OFL 1.1 (../fonts/JetBrainsMono-OFL.txt). Italic stays synthesised.
  *
- * The React app links this file too (see frontend/vite.config.js) and adds only
- * JetBrains Mono 600 itself (frontend/src/index.css).
+ * The React app links this file too (see frontend/vite.config.js). A weight is
+ * only downloaded by pages that use it, so 600 costs the landing nothing.
  */
 
 /* JetBrains Mono */
@@ -22,6 +22,14 @@
   font-weight: 400;
   font-display: swap;
   src: url("../fonts/JetBrainsMono-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("../fonts/JetBrainsMono-SemiBold.woff2") format("woff2");
 }
 
 /* Unbounded */

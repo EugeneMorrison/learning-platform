@@ -6,6 +6,8 @@ import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
+import { watchFigureOverflow } from '../lib/contentImages';
+import './LessonViewer.css';
 
 // Block types that are solvable tasks (have a pass/fail, count toward progress).
 const TASK_TYPES = new Set(['QUIZ', 'CODE', 'FILL']);
@@ -52,6 +54,12 @@ function LessonViewer() {
     useEffect(() => {
         loadLesson();
     }, []);
+
+    // Fade at the right edge of formula boxes that scroll sideways (phones).
+    useEffect(() => {
+        if (loading) return undefined;
+        return watchFigureOverflow(document.querySelector('.lesson-page'));
+    }, [loading, blocks]);
 
     async function loadLesson() {
         try {
@@ -214,22 +222,25 @@ function LessonViewer() {
             default:
                 return null;
         }
-        return <div key={block.id} id={`block-${block.id}`}>{inner}</div>;
+        return <div key={block.id} id={`block-${block.id}`} className="lesson-anchor">{inner}</div>;
     }
 
+    // The floating chat button (student → teacher) is hidden for the course author.
+    const hasChat = Boolean(user && course && user.id !== course.author);
+
     if (loading) return (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
-            Loading lesson...
+        <div className="page page--narrow lesson-state">
+            <p className="page-status" role="status">Loading lesson...</p>
         </div>
     );
 
     if (error) return (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#dc2626' }}>
-            <p>{error.message}</p>
+        <div className="page page--narrow lesson-state">
+            <p className="notice notice-danger" role="alert">{error.message}</p>
             {error.href && (
                 // Public Django pages: plain link. In an embed, open our site in a new tab
                 // instead of navigating inside the host page's iframe.
-                <a href={error.href} {...(isInIframe ? { target: '_blank', rel: 'noopener' } : {})}>
+                <a className="btn btn-secondary lesson-state__link" href={error.href} {...(isInIframe ? { target: '_blank', rel: 'noopener' } : {})}>
                     {error.linkLabel}
                 </a>
             )}
@@ -238,7 +249,7 @@ function LessonViewer() {
 
     return (
         <>
-            <div className="page page--narrow">
+            <div className="page page--narrow lesson-page">
 
                 {/* Back button — hidden when embedded in iframe (no parent SPA to go back to) */}
                 {!isInIframe && course && (
@@ -251,53 +262,33 @@ function LessonViewer() {
                 )}
 
                 {/* Lesson header */}
-                <div style={{
-                    background: 'white',
-                    borderRadius: '8px',
-                    padding: '32px',
-                    marginBottom: '24px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    borderTop: '4px solid #0C4B33',
-                }}>
-                    <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '8px' }}>
-                        Урок {lesson.order_index}
-                    </div>
-                    <h1 style={{ fontSize: '28px', color: '#0C4B33' }}>
-                        {lesson.title}
-                    </h1>
-                    <div style={{ marginTop: '12px', color: '#64748b', fontSize: '14px' }}>
-                        {blocks.length} блоков
-                    </div>
+                <div className="lesson-header">
+                    <p className="lesson-header__eyebrow">Урок {lesson.order_index}</p>
+                    <h1 className="lesson-header__title">{lesson.title}</h1>
+                    <p className="lesson-header__meta">{blocks.length} блоков</p>
                     {(() => {
                         const taskBlocks = blocks.filter(b => TASK_TYPES.has(b.type));
                         const total = taskBlocks.length;
                         if (total === 0) return null;
                         const solved = taskBlocks.filter(b => solvedBlockIds.has(b.id)).length;
                         const percent = Math.round((solved / total) * 100);
+                        const complete = solved === total;
                         return (
-                            <div style={{ marginTop: '16px' }}>
-                                <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    color: '#475569',
-                                    fontSize: '13px',
-                                    marginBottom: '6px',
-                                }}>
+                            <div className={complete ? 'lesson-progress lesson-progress--complete' : 'lesson-progress'}>
+                                <div className="lesson-progress__labels">
                                     <span>Решено {solved} из {total} задач</span>
-                                    <span>{percent}%</span>
+                                    <span>{complete ? '✓ Урок пройден' : `${percent}%`}</span>
                                 </div>
-                                <div style={{
-                                    height: '8px',
-                                    background: '#e2e8f0',
-                                    borderRadius: '4px',
-                                    overflow: 'hidden',
-                                }}>
-                                    <div style={{
-                                        width: `${percent}%`,
-                                        height: '100%',
-                                        background: '#0C4B33',
-                                        transition: 'width 0.3s ease',
-                                    }} />
+                                <div
+                                    className="lesson-progress__track"
+                                    role="progressbar"
+                                    aria-label="Решено задач"
+                                    aria-valuemin={0}
+                                    aria-valuemax={total}
+                                    aria-valuenow={solved}
+                                >
+                                    {/* Width is data, so it stays inline. */}
+                                    <div className="lesson-progress__fill" style={{ width: `${percent}%` }} />
                                 </div>
                             </div>
                         );
@@ -312,30 +303,20 @@ function LessonViewer() {
             {/* Floating "next task" button */}
             {firstUnresolved && (
                 <button
+                    className={hasChat ? 'btn btn-primary next-task-btn next-task-btn--beside-chat' : 'btn btn-primary next-task-btn'}
                     onClick={scrollToNextTask}
-                    style={{
-                        position: 'fixed',
-                        bottom: '24px',
-                        left: '24px',
-                        zIndex: 1000,
-                        padding: '12px 20px',
-                        background: '#0C4B33',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '24px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                    }}
+                    aria-label="К следующей задаче"
+                    title="К следующей задаче"
                 >
-                    К следующей задаче ↓
+                    {/* Phones: only the arrow shows (a round button next to the chat). */}
+                    <span className="next-task-btn__text">К следующей задаче</span>
+                    <span aria-hidden="true">↓</span>
                 </button>
             )}
 
             {/* Floating chat button — student→teacher chat. Hidden for the course
                 author, who has a dedicated per-student chat on the course page. */}
-            {user && course && user.id !== course.author && (
+            {hasChat && (
             <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000 }}>
 
                 {showChat && (

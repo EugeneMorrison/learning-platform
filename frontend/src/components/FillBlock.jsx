@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import api from '../api';
+import './blocks.css';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
+import { wrapImages } from '../lib/contentImages';
 import { parseTemplate } from '../lib/fillTemplate';
 
 /**
@@ -73,50 +75,24 @@ function FillBlock({ content, blockId, savedProgress, number }) {
     const allFilled = values.every(v => v.trim());
 
     return (
-        <div style={{
-            background: 'white',
-            borderRadius: '8px',
-            padding: '24px',
-            marginBottom: '16px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            borderLeft: '4px solid #c2410c',
-        }}>
-            <div style={{ marginBottom: '14px' }}>
-                <span style={{
-                    display: 'inline-block',
-                    padding: '4px 12px',
-                    background: '#ffedd5',
-                    color: '#c2410c',
-                    borderRadius: '999px',
-                    fontWeight: '600',
-                    letterSpacing: '0.3px',
-                }}>
-                    Пропуски{number ? ` ${number}` : ''}
-                </span>
+        <div className={isCorrect ? 'lesson-block lesson-block--solved' : 'lesson-block'}>
+            <div className="lesson-block__head">
+                <span className="lesson-block__badge">Пропуски{number ? ` ${number}` : ''}</span>
+                {isCorrect && <span className="lesson-block__solved">✓ Решено</span>}
             </div>
 
             {content.prompt && (
                 <div
-                    className="text-content"
-                    style={{ marginBottom: '16px' }}
-                    dangerouslySetInnerHTML={{ __html: highlightPreBlocks(content.prompt) }}
+                    className="text-content lesson-block__prompt"
+                    dangerouslySetInnerHTML={{ __html: wrapImages(highlightPreBlocks(content.prompt)) }}
                 />
             )}
 
-            <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>
-                Заполните пропуски:
-            </div>
+            <div className="lesson-block__label">Заполните пропуски:</div>
 
             {/* Text flows as plain text (author's line breaks preserved); only the
                 blanks are bordered inputs that grow with what the student types. */}
-            <div style={{
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                lineHeight: 2.2,
-                fontFamily: "'JetBrains Mono', Consolas, monospace",
-                fontSize: '14px',
-                color: '#334155',
-            }}>
+            <div className="fill-template">
                 {segments.map((seg, idx) => {
                     if (seg.type === 'text') return <span key={idx}>{seg.value}</span>;
                     const i = seg.index;
@@ -126,81 +102,48 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                         <input
                             key={idx}
                             type="text"
+                            aria-label={`Пропуск ${i + 1}`}
+                            className={submitted ? (ok ? 'fill-blank fill-blank--correct' : 'fill-blank fill-blank--wrong') : 'fill-blank'}
                             value={values[i]}
                             disabled={isCorrect}
                             onChange={e => { setBlank(i, e.target.value); if (submitted) setResult(null); }}
-                            style={{
-                                fontFamily: "'JetBrains Mono', Consolas, monospace",
-                                fontSize: '14px',
-                                padding: '4px 12px',
-                                borderRadius: '999px',
-                                border: '2px solid',
-                                borderColor: submitted ? (ok ? '#16a34a' : '#dc2626') : '#c7d2fe',
-                                background: submitted ? (ok ? '#dcfce7' : '#fee2e2') : '#eef2ff',
-                                width: `${ch}ch`,
-                                maxWidth: '100%',
-                                outline: 'none',
-                                verticalAlign: 'middle',
-                            }}
+                            style={{ width: `${ch}ch` /* grows with the answer */ }}
                         />
                     );
                 })}
             </div>
 
             {!submitted && (
-                <button
-                    onClick={handleSubmit}
-                    disabled={!allFilled || checking}
-                    style={{
-                        marginTop: '16px',
-                        padding: '10px 24px',
-                        background: allFilled && !checking ? '#c2410c' : '#94a3b8',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: allFilled && !checking ? 'pointer' : 'not-allowed',
-                        fontWeight: '600',
-                    }}
-                >
-                    {checking ? 'Проверяем…' : 'Проверить'}
-                </button>
+                <div className="lesson-block__actions">
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleSubmit}
+                        disabled={!allFilled || checking}
+                    >
+                        {checking ? 'Проверяем…' : 'Проверить'}
+                    </button>
+                </div>
             )}
 
             {checkError && (
-                <div style={{ marginTop: '12px', color: '#dc2626' }}>{checkError}</div>
+                <div className="check-error" role="alert">{checkError}</div>
             )}
 
             {submitted && (
-                <div style={{
-                    marginTop: '16px',
-                    padding: '12px',
-                    borderRadius: '6px',
-                    background: isCorrect ? '#dcfce7' : '#fee2e2',
-                    color: isCorrect ? '#16a34a' : '#dc2626',
-                    fontWeight: '600',
-                }}>
-                    {isCorrect
-                        ? ('✅ Верно!' + (result.explanation ? ' ' + result.explanation : ''))
-                        : '❌ Неверно! Проверьте заполнение и попробуйте ещё раз.'}
+                <div className={isCorrect ? 'verdict verdict--success' : 'verdict verdict--danger'} role="status">
+                    {isCorrect ? '✅ Верно!' : '❌ Неверно! Проверьте заполнение и попробуйте ещё раз.'}
+                    {isCorrect && result.explanation && (
+                        <span className="verdict__detail"> {result.explanation}</span>
+                    )}
                 </div>
             )}
 
             {submitted && (
-                <button
-                    onClick={handleReset}
-                    style={{
-                        marginTop: '12px',
-                        padding: '10px 24px',
-                        background: 'white',
-                        color: '#475569',
-                        border: '1px solid #cbd5e1',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                    }}
-                >
-                    {isCorrect ? 'Решить снова' : 'Попробовать снова'}
-                </button>
+                <div className="lesson-block__actions">
+                    <button className="btn btn-secondary" onClick={handleReset}>
+                        {isCorrect ? 'Решить снова' : 'Попробовать снова'}
+                    </button>
+                </div>
             )}
         </div>
     );
