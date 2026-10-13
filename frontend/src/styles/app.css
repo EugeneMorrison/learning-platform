@@ -311,6 +311,19 @@ textarea.input {
     color: var(--color-muted);
 }
 
+/* Hidden visually, still read by screen readers (same as on the public pages). */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Keyboard focus for everything the app styles itself */
 .btn:focus-visible,
 .input:focus-visible,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
+import ChatPanel from '../components/ChatPanel';
 import './CoursePage.css';
 
 function CoursePage() {
@@ -17,7 +18,11 @@ function CoursePage() {
     const [newMessage, setNewMessage] = useState('');
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [sendingMessage, setSendingMessage] = useState(false);
+    // UI only: what the window shows about the socket and the history fetch.
+    const [chatStatus, setChatStatus] = useState('connecting');
+    const [historyError, setHistoryError] = useState(false);
     const chatSocketRef = useRef(null);
+    const chatButtonRefs = useRef({});
 
     // Lesson form state
     const [showLessonForm, setShowLessonForm] = useState(false);
@@ -125,6 +130,7 @@ function CoursePage() {
         ));
     } catch (err) {
         console.error('Failed to load messages:', err);
+        setHistoryError(true);
     }
 }
 
@@ -170,6 +176,14 @@ function CoursePage() {
             console.error('Chat socket error:', err);
         };
 
+        // Status for the window only; a socket replaced by a newer one is ignored.
+        socket.onopen = () => {
+            if (chatSocketRef.current === socket) setChatStatus('open');
+        };
+        socket.onclose = () => {
+            if (chatSocketRef.current === socket) setChatStatus('closed');
+        };
+
         return () => {
             chatSocketRef.current = null;
             if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
@@ -177,6 +191,21 @@ function CoursePage() {
             }
         };
     }, [selectedStudent, courseId]);
+
+    function openChat(student) {
+        setChatStatus('connecting');
+        setHistoryError(false);
+        setSelectedStudent(student);
+        fetchMessages(student.id);
+    }
+
+    // Close button, Esc, or the student's "Чат" button again. Closing the
+    // window closes the socket (effect cleanup), as leaving the page did.
+    function closeChat() {
+        const id = selectedStudent?.id;
+        setSelectedStudent(null);
+        chatButtonRefs.current[id]?.focus();
+    }
 
 
     if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
@@ -307,68 +336,38 @@ function CoursePage() {
                                             Прогресс
                                         </button>
                                         <button
+                                            ref={el => { chatButtonRefs.current[enrollment.student] = el; }}
                                             className="btn btn-secondary btn-sm"
-                                            onClick={() => {
-                                                setSelectedStudent({ id: enrollment.student, name: enrollment.student_name });
-                                                fetchMessages(enrollment.student);
-                                            }}
+                                            aria-expanded={selectedStudent?.id === enrollment.student}
+                                            aria-controls={selectedStudent?.id === enrollment.student ? `student-chat-${enrollment.student}` : undefined}
+                                            onClick={() => (selectedStudent?.id === enrollment.student
+                                                ? closeChat()
+                                                : openChat({ id: enrollment.student, name: enrollment.student_name }))}
                                         >
-                                            💬 Чат
+                                            Чат
                                         </button>
                                     </div>
                                 </div>
 
                                 {/* Chat window */}
                                 {selectedStudent?.id === enrollment.student && (
-                                    <div style={{ marginTop: '16px' }}>
-                                        <div style={{
-                                            border: '1px solid #e2e8f0',
-                                            borderRadius: '8px',
-                                            padding: '12px',
-                                            minHeight: '150px',
-                                            maxHeight: '300px',
-                                            overflowY: 'auto',
-                                            background: '#f8fafc',
-                                            marginBottom: '8px',
-                                        }}>
-                                            {messages.length === 0 ? (
-                                                <p style={{ color: '#94a3b8', textAlign: 'center' }}>
-                                                    Сообщений пока нет
-                                                </p>
-                                            ) : (
-                                                messages.map(msg => (
-                                                    <div key={msg.id} style={{
-                                                        marginBottom: '8px',
-                                                        textAlign: msg.sender === enrollment.student ? 'left' : 'right',
-                                                    }}>
-                                                        <span style={{
-                                                            display: 'inline-block',
-                                                            background: msg.sender === enrollment.student ? 'white' : '#0C4B33',
-                                                            color: msg.sender === enrollment.student ? '#333' : 'white',
-                                                            padding: '8px 12px',
-                                                            borderRadius: '8px',
-                                                            fontSize: '14px',
-                                                            maxWidth: '70%',
-                                                        }}>
-                                                            <strong>{msg.sender_username}:</strong> {msg.text}
-                                                        </span>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                        <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px' }}>
-                                            <input
-                                                type="text"
-                                                placeholder="Написать сообщение..."
-                                                value={newMessage}
-                                                onChange={e => setNewMessage(e.target.value)}
-                                                style={{ flex: 1, padding: '8px' }}
-                                            />
-                                            <button type="submit" disabled={sendingMessage}>
-                                                {sendingMessage ? '...' : 'Отправить'}
-                                            </button>
-                                        </form>
-                                    </div>
+                                    <ChatPanel
+                                        id={`student-chat-${enrollment.student}`}
+                                        variant="inline"
+                                        headingLevel={3}
+                                        title="Чат со студентом"
+                                        subtitle={enrollment.student_name}
+                                        messages={messages}
+                                        isOwn={msg => msg.sender !== enrollment.student}
+                                        emptyHint="Напишите студенту первым — ответ появится здесь."
+                                        status={chatStatus}
+                                        historyError={historyError}
+                                        value={newMessage}
+                                        onChange={e => setNewMessage(e.target.value)}
+                                        onSubmit={handleSendMessage}
+                                        sending={sendingMessage}
+                                        onClose={closeChat}
+                                    />
                                 )}
                             </div>
                         ))

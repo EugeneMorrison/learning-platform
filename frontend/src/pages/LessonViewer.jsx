@@ -6,6 +6,7 @@ import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
+import ChatPanel, { ChatIcon, CloseIcon } from '../components/ChatPanel';
 import { watchFigureOverflow } from '../lib/contentImages';
 import './LessonViewer.css';
 
@@ -36,7 +37,11 @@ function LessonViewer() {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [sendingMessage, setSendingMessage] = useState(false);
+    // UI only: what the window shows about the socket and the history fetch.
+    const [chatStatus, setChatStatus] = useState('connecting');
+    const [historyError, setHistoryError] = useState(false);
     const chatSocketRef = useRef(null);
+    const chatButtonRef = useRef(null);
 
     const solvedBlockIds = new Set(
         progress.filter(p => p.is_correct === true).map(p => p.block)
@@ -124,6 +129,7 @@ function LessonViewer() {
             setMessages(res.data);
         } catch (err) {
             console.error('Failed to load messages:', err);
+            setHistoryError(true);
         }
     }
 
@@ -143,8 +149,18 @@ function LessonViewer() {
     }
 
     function handleOpenChat() {
+        if (!showChat) {
+            setChatStatus('connecting');
+            setHistoryError(false);
+        }
         setShowChat(!showChat);
         if (!showChat) fetchMessages();
+    }
+
+    // Close button and Esc: focus goes back to the chat button.
+    function handleCloseChat() {
+        setShowChat(false);
+        chatButtonRef.current?.focus();
     }
 
     // Open WebSocket while chat panel is visible. Closes automatically on
@@ -172,6 +188,14 @@ function LessonViewer() {
 
         socket.onerror = (err) => {
             console.error('Chat socket error:', err);
+        };
+
+        // Status for the window only; a socket replaced by a newer one is ignored.
+        socket.onopen = () => {
+            if (chatSocketRef.current === socket) setChatStatus('open');
+        };
+        socket.onclose = () => {
+            if (chatSocketRef.current === socket) setChatStatus('closed');
         };
 
         return () => {
@@ -317,114 +341,37 @@ function LessonViewer() {
             {/* Floating chat button — student→teacher chat. Hidden for the course
                 author, who has a dedicated per-student chat on the course page. */}
             {hasChat && (
-            <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 1000 }}>
-
-                {showChat && (
-                    <div style={{
-                        width: '320px',
-                        background: 'white',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
-                        marginBottom: '12px',
-                        overflow: 'hidden',
-                    }}>
-                        <div style={{
-                            background: '#0C4B33',
-                            color: 'white',
-                            padding: '12px 16px',
-                            fontWeight: '600',
-                        }}>
-                            💬 Чат с учителем
-                        </div>
-                        <div style={{
-                            height: '250px',
-                            overflowY: 'auto',
-                            padding: '12px',
-                            background: '#f8fafc',
-                        }}>
-                            {messages.length === 0 ? (
-                                <p style={{ color: '#94a3b8', textAlign: 'center', fontSize: '14px' }}>
-                                    Сообщений пока нет
-                                </p>
-                            ) : (
-                                messages.map(msg => (
-                                    <div key={msg.id} style={{
-                                        marginBottom: '8px',
-                                        textAlign: msg.sender === course?.author ? 'left' : 'right',
-                                    }}>
-                                        <span style={{
-                                            display: 'inline-block',
-                                            background: msg.sender === course?.author ? 'white' : '#0C4B33',
-                                            color: msg.sender === course?.author ? '#333' : 'white',
-                                            padding: '8px 12px',
-                                            borderRadius: '8px',
-                                            fontSize: '13px',
-                                            maxWidth: '80%',
-                                            boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                                        }}>
-                                            <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '2px' }}>
-                                                {msg.sender_username}
-                                            </div>
-                                            {msg.text}
-                                        </span>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        <form onSubmit={handleSendMessage} style={{
-                            display: 'flex',
-                            gap: '8px',
-                            padding: '12px',
-                            borderTop: '1px solid #e2e8f0',
-                        }}>
-                            <input
-                                type="text"
-                                placeholder="Написать сообщение..."
-                                value={newMessage}
-                                onChange={e => setNewMessage(e.target.value)}
-                                style={{
-                                    flex: 1,
-                                    padding: '8px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e2e8f0',
-                                    fontSize: '13px',
-                                }}
-                            />
-                            <button type="submit" disabled={sendingMessage} style={{
-                                background: '#0C4B33',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                padding: '8px 12px',
-                                cursor: 'pointer',
-                            }}>
-                                {sendingMessage ? '...' : '→'}
-                            </button>
-                        </form>
-                    </div>
-                )}
-
-                <button
-                    onClick={handleOpenChat}
-                    style={{
-                        width: '56px',
-                        height: '56px',
-                        borderRadius: '50%',
-                        background: '#0C4B33',
-                        color: 'white',
-                        border: 'none',
-                        fontSize: '24px',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginLeft: 'auto',
-                    }}
-                >
-                    💬
-                </button>
-            </div>
+                <>
+                    {showChat && (
+                        <ChatPanel
+                            id="lesson-chat"
+                            title="Чат с учителем"
+                            subtitle={course.author_name}
+                            messages={messages}
+                            isOwn={msg => msg.sender !== course.author}
+                            emptyHint="Задайте вопрос по уроку — учитель ответит здесь."
+                            status={chatStatus}
+                            historyError={historyError}
+                            value={newMessage}
+                            onChange={e => setNewMessage(e.target.value)}
+                            onSubmit={handleSendMessage}
+                            sending={sendingMessage}
+                            onClose={handleCloseChat}
+                        />
+                    )}
+                    <button
+                        ref={chatButtonRef}
+                        type="button"
+                        className="chat-fab"
+                        onClick={handleOpenChat}
+                        aria-label="Чат с учителем"
+                        aria-expanded={showChat}
+                        aria-controls={showChat ? 'lesson-chat' : undefined}
+                        title={showChat ? 'Закрыть чат' : 'Чат с учителем'}
+                    >
+                        {showChat ? <CloseIcon /> : <ChatIcon />}
+                    </button>
+                </>
             )}
         </>
     );

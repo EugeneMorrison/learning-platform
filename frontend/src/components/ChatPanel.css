@@ -1,0 +1,305 @@
+/* Chat: the floating button and window on the lesson page, and the inline
+   window in a student's card on the course page. Own messages are cobalt,
+   the other person's are neutral; red only for a lost connection or a failed
+   load. Contrast: white on cobalt 7.6:1, ink on white 18.0:1, muted on white
+   7.9:1 and on --color-soft 7.3:1, danger on its tint 6.1:1. */
+
+.chat-icon {
+    width: var(--space-5);
+    height: var(--space-5);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Floating button: 56px at right/bottom 24px. The round "next task" button on
+   phones is positioned against these numbers (LessonViewer.css). */
+.chat-fab {
+    --chat-fab-size: calc(var(--space-7) + var(--space-2));
+    position: fixed;
+    right: var(--space-5);
+    bottom: var(--space-5);
+    z-index: var(--z-floating);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--chat-fab-size);
+    height: var(--chat-fab-size);
+    padding: 0;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    color: var(--color-ground);
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+}
+
+.chat-fab:hover {
+    background: var(--color-ink);
+}
+
+.chat-fab .chat-icon {
+    width: var(--space-6);
+    height: var(--space-6);
+}
+
+/* Window */
+.chat-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: var(--border-width) solid var(--color-line);
+    background: var(--color-ground);
+    color: var(--color-ink);
+}
+
+.chat-panel--floating {
+    /* Sits above the 56px button with a 12px gap, below the sticky header. */
+    --chat-bottom: calc(var(--space-5) + var(--space-7) + var(--space-2) + var(--space-3));
+    --chat-header-clearance: calc(var(--space-8) + var(--space-3));
+    position: fixed;
+    right: var(--space-5);
+    bottom: var(--chat-bottom);
+    z-index: var(--z-chat);
+    width: min(24rem, calc(100vw - 2 * var(--space-4)));
+    height: min(32rem, calc(100vh - var(--chat-bottom) - var(--chat-header-clearance)));
+    height: min(32rem, calc(var(--chat-viewport, 100dvh) - var(--chat-bottom) - var(--chat-header-clearance)));
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-lg);
+}
+
+.chat-panel--inline {
+    margin-top: var(--space-4);
+    border-radius: var(--radius-small);
+}
+
+.chat-panel:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.chat-panel__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+    border-bottom: var(--border-width) solid var(--color-line);
+}
+
+.chat-panel__heading {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.chat-panel__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+    overflow-wrap: anywhere;
+}
+
+.chat-panel__subtitle {
+    margin: var(--space-1) 0 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+    overflow-wrap: anywhere;
+}
+
+.chat-panel__close {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--space-7) - var(--space-1));
+    height: calc(var(--space-7) - var(--space-1));
+    padding: 0;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.chat-panel__close:hover {
+    border-color: var(--color-line);
+    color: var(--color-ink);
+}
+
+/* Message list */
+.chat-panel__log {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-4);
+    background: var(--color-soft);
+}
+
+.chat-panel--inline .chat-panel__log {
+    flex: none;
+    min-height: calc(var(--space-9) + var(--space-7));
+    max-height: calc(2 * var(--space-9) + var(--space-8));
+}
+
+.chat-panel__messages {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    list-style: none;
+}
+
+.chat-message {
+    align-self: flex-start;
+    max-width: 85%;
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    border-bottom-left-radius: var(--space-1);
+    background: var(--color-ground);
+    color: var(--color-ink);
+}
+
+.chat-message--own {
+    align-self: flex-end;
+    border-color: var(--color-accent);
+    border-radius: var(--radius-small);
+    border-bottom-right-radius: var(--space-1);
+    background: var(--color-accent);
+    color: var(--color-ground);
+}
+
+.chat-message__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-2);
+    margin: 0 0 var(--space-1);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+}
+
+.chat-message--own .chat-message__meta {
+    justify-content: flex-end;
+    color: var(--color-ground);
+}
+
+.chat-message__author {
+    font-weight: var(--weight-medium);
+    overflow-wrap: anywhere;
+}
+
+.chat-message__text {
+    margin: 0;
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* Empty state */
+.chat-panel__empty {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100%;
+    text-align: center;
+}
+
+.chat-panel__empty-title {
+    margin: 0;
+    font-weight: var(--weight-medium);
+}
+
+.chat-panel__empty-hint {
+    margin: var(--space-1) 0 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* Connection / load notes */
+.chat-panel__status:empty {
+    display: none;
+}
+
+.chat-panel__status {
+    padding: var(--space-2) var(--space-4) 0;
+}
+
+.chat-panel__note {
+    margin: 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.chat-panel__note--error {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-small);
+    background: var(--color-danger-soft);
+    color: var(--color-danger);
+}
+
+.chat-panel__log > .chat-panel__note--error {
+    margin-bottom: var(--space-3);
+}
+
+/* Input row */
+.chat-panel__form {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3);
+}
+
+.chat-panel__status:empty + .chat-panel__form {
+    border-top: var(--border-width) solid var(--color-line);
+}
+
+/* 16px text: smaller makes iOS zoom the page when the field is focused. */
+.chat-panel__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+}
+
+.chat-panel__send {
+    flex: none;
+    width: calc(var(--space-7) - var(--space-1));
+    height: calc(var(--space-7) - var(--space-1));
+    padding: 0;
+}
+
+/* Keyboard focus */
+.chat-fab:focus-visible,
+.chat-panel__close:focus-visible,
+.chat-panel__log:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.chat-panel__log:focus-visible {
+    outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+/* On-screen keyboard open (phones, tablets): sit right above it and use the
+   height left over. Set by useKeyboardInset in ChatPanel.jsx. */
+.chat-panel--floating.chat-panel--keyboard {
+    bottom: calc(var(--chat-keyboard) + var(--space-2));
+    height: calc(var(--chat-viewport) - var(--chat-header-clearance) - var(--space-2));
+}
+
+@media (max-width: 40rem) {
+    .chat-panel--floating {
+        left: var(--space-4);
+        right: var(--space-4);
+        width: auto;
+    }
+
+    .chat-message {
+        max-width: 90%;
+    }
+}
