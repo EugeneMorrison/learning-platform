@@ -281,7 +281,8 @@ function LessonEditor() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <div>
-                    <div style={{ fontSize: 13, color: '#64748b' }}>Редактор урока {lesson.order_index}</div>
+                    {/* Position in the course, as on the course page (not order_index). */}
+                    <div style={{ fontSize: 13, color: '#64748b' }}>Редактор урока {lesson.lesson_position}</div>
                     <h2 style={{ margin: '4px 0 0' }}>{lesson.title}</h2>
                 </div>
                 <button onClick={() => navigate(`/lesson/${lessonId}/`)} style={ghostBtn}>

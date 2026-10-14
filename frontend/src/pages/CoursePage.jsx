@@ -31,6 +31,12 @@ function CoursePage() {
     const [newLessonTitle, setNewLessonTitle] = useState('');
     const [creatingLesson, setCreatingLesson] = useState(false);
 
+    // Lesson ↑ / ↓: one move at a time (a double click must not move twice).
+    const [movingLesson, setMovingLesson] = useState(false);
+    const [moveStatus, setMoveStatus] = useState(''); // for screen readers
+    const movingRef = useRef(false);
+    const moveButtonRefs = useRef({});
+
     // Student form state
     const [showStudentForm, setShowStudentForm] = useState(false);
     const [studentUsername, setStudentUsername] = useState('');
@@ -52,8 +58,8 @@ function CoursePage() {
                 setCourse(courseRes.data);
                 setLessons(lessonsRes.data);
 
-                // Only fetch enrollments for authors
-                if (userRes.data.role === 'AUTHOR') {
+                // Only the course's own author manages its students.
+                if (courseRes.data.author === userRes.data.id) {
                     const enrollmentsRes = await api.get(`/courses/${courseId}/enrollments/`);
                     setEnrollments(enrollmentsRes.data);
                 }
@@ -102,6 +108,36 @@ function CoursePage() {
         } catch (err) {
             console.error('Failed to delete lesson:', err);
             alert('Не удалось удалить урок.');
+        }
+    }
+
+    // Move a lesson one place up (dir -1) or down (+1). The server renumbers
+    // the course in one transaction and returns the list in the new order;
+    // the "Урок N" labels follow the list position.
+    async function handleMoveLesson(index, dir) {
+        if (movingRef.current) return;
+        const lesson = lessons[index];
+        movingRef.current = true;
+        setMovingLesson(true);
+        setMoveStatus('');
+        try {
+            const res = await api.post(`/lessons/${lesson.id}/reorder/`, { new_order: index + 1 + dir });
+            setLessons(res.data);
+            const position = res.data.findIndex(l => l.id === lesson.id) + 1;
+            setMoveStatus(`Урок «${lesson.title}» теперь ${position}-й.`);
+            // Keep keyboard focus on the moved lesson's arrow (or the other
+            // one once it reaches the top / bottom).
+            requestAnimationFrame(() => {
+                const same = moveButtonRefs.current[`${lesson.id}:${dir}`];
+                const other = moveButtonRefs.current[`${lesson.id}:${-dir}`];
+                (same && !same.disabled ? same : other)?.focus();
+            });
+        } catch (err) {
+            console.error('Failed to move lesson:', err);
+            alert('Не удалось переместить урок.');
+        } finally {
+            movingRef.current = false;
+            setMovingLesson(false);
         }
     }
 
@@ -195,7 +231,10 @@ function CoursePage() {
     if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
     if (!course) return <div className="page"><p className="page-status">Курс не найден.</p></div>;
 
-    const isAuthor = user?.role === 'AUTHOR';
+    // All author controls (add / edit / delete / move lessons, students,
+    // enrolment) are for the author who owns this course. Any other user,
+    // another author included, sees the course like a reader.
+    const isOwner = Boolean(user && course.author === user.id);
 
     return (
         <div className="page">
@@ -211,20 +250,20 @@ function CoursePage() {
                 </div>
             </div>
 
-            <div className={isAuthor ? 'course-layout course-layout--with-aside' : 'course-layout'}>
+            <div className={isOwner ? 'course-layout course-layout--with-aside' : 'course-layout'}>
 
             {/* Lessons section */}
             <section className="section">
                 <div className="section__header">
                     <h2 className="section__title">Уроки</h2>
-                    {isAuthor && (
+                    {isOwner && (
                         <button className="btn btn-secondary btn-sm" onClick={() => setShowLessonForm(!showLessonForm)}>
                             {showLessonForm ? 'Отмена' : '+ Добавить урок'}
                         </button>
                     )}
                 </div>
 
-                {isAuthor && showLessonForm && (
+                {isOwner && showLessonForm && (
                     <form onSubmit={handleAddLesson} className="inline-form">
                         <input
                             className="input"
@@ -241,6 +280,8 @@ function CoursePage() {
                     </form>
                 )}
 
+                <p className="visually-hidden" role="status">{moveStatus}</p>
+
                 {lessons.length === 0 ? (
                     <p className="muted">Уроков пока нет.</p>
                 ) : (
@@ -255,8 +296,28 @@ function CoursePage() {
                                 </strong>
                                 <p className="lesson-row__hint">→ Открыть урок</p>
                             </div>
-                            {isAuthor && (
+                            {isOwner && (
                                 <div className="lesson-row__actions">
+                                    <button
+                                        ref={el => { moveButtonRefs.current[`${lesson.id}:-1`] = el; }}
+                                        className="btn btn-secondary btn-sm lesson-row__move"
+                                        onClick={() => handleMoveLesson(index, -1)}
+                                        disabled={movingLesson || index === 0}
+                                        aria-label="Переместить выше"
+                                        title="Переместить выше"
+                                    >
+                                        <span aria-hidden="true">↑</span>
+                                    </button>
+                                    <button
+                                        ref={el => { moveButtonRefs.current[`${lesson.id}:1`] = el; }}
+                                        className="btn btn-secondary btn-sm lesson-row__move"
+                                        onClick={() => handleMoveLesson(index, 1)}
+                                        disabled={movingLesson || index === lessons.length - 1}
+                                        aria-label="Переместить ниже"
+                                        title="Переместить ниже"
+                                    >
+                                        <span aria-hidden="true">↓</span>
+                                    </button>
                                     <button
                                         className="btn btn-secondary btn-sm"
                                         onClick={() => navigate(`/lesson/${lesson.id}/edit/`)}
@@ -277,8 +338,8 @@ function CoursePage() {
                 )}
             </section>
 
-            {/* Students section — only for authors */}
-            {isAuthor && (
+            {/* Students section: only for the course's own author */}
+            {isOwner && (
                 <section className="section course-students">
                     <div className="section__header">
                         <h2 className="section__title">Студенты</h2>

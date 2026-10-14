@@ -632,63 +632,61 @@ class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsAuthor, IsOwnerOrReadOnly])
     def reorder(self, request, pk=None):
         """
-        Reorder a lesson.
+        Move a lesson to another place in its course (course page ↑ / ↓).
 
-        POST /api/lessons/{id}/reorder/
-        Body: {"new_order": 3}
+        POST /api/lessons/{id}/reorder/   Body: {"new_order": N}
+
+        N is the 1-based POSITION in the course's ordered lessons
+        (course_lesson_ids_in_order), so gaps in order_index don't matter.
+        Missing or not an integer → 400; below 1 → 400; above the number of
+        lessons → the last place (clamped). Owner only, as for edit/delete:
+        another author's lesson is a 404, a student 403.
+
+        The course keeps the same set of order_index values, reassigned in the
+        new order, in one transaction. Lessons that change move to temporary
+        values above all others first, so unique (course, order_index) never
+        clashes. Returns the course's lessons in the new order.
         """
         lesson = self.get_object()
-        new_order = request.data.get('new_order')
-
+        new_order = self._parse_position(request.data.get('new_order'))
         if new_order is None:
-            return Response(
-                {'error': 'new_order is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        new_order = int(new_order)
-
+            return Response({'error': 'new_order must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
         if new_order < 1:
-            return Response(
-                {'error': 'new_order must be at least 1'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({'error': 'new_order must be at least 1'}, status=status.HTTP_400_BAD_REQUEST)
 
-        old_order = lesson.order_index
-        course = lesson.course
+        with transaction.atomic():
+            lessons = {
+                l.pk: l for l in Lesson.objects.select_for_update().filter(course_id=lesson.course_id)
+            }
+            ids = course_lesson_ids_in_order(lesson.course_id)
+            new_order = min(new_order, len(ids))
+            slots = [lessons[pk].order_index for pk in ids]  # the values in use, ascending
+            ids.remove(lesson.pk)
+            ids.insert(new_order - 1, lesson.pk)
 
-        # Get all lessons in this course
-        lessons = list(course.lessons.all().order_by('order_index'))
-        max_order = len(lessons)
+            changed = [(pk, slot) for pk, slot in zip(ids, slots) if lessons[pk].order_index != slot]
+            temporary = max(slots) + 1
+            for offset, (pk, _) in enumerate(changed):
+                Lesson.objects.filter(pk=pk).update(order_index=temporary + offset)
+            for pk, slot in changed:
+                Lesson.objects.filter(pk=pk).update(order_index=slot)
 
-        if new_order > max_order:
-            new_order = max_order
+        ordered = Lesson.objects.filter(course_id=lesson.course_id).order_by('order_index')
+        return Response(self.get_serializer(ordered, many=True).data)
 
-        # Same position, no change needed
-        if old_order == new_order:
-            serializer = self.get_serializer(lesson)
-            return Response(serializer.data)
-
-        # Reorder logic
-        if old_order < new_order:
-            # Moving down: shift lessons between old and new position up
-            for l in lessons:
-                if old_order < l.order_index <= new_order:
-                    l.order_index -= 1
-                    l.save()
-        else:
-            # Moving up: shift lessons between new and old position down
-            for l in lessons:
-                if new_order <= l.order_index < old_order:
-                    l.order_index += 1
-                    l.save()
-
-        # Update current lesson
-        lesson.order_index = new_order
-        lesson.save()
-
-        serializer = self.get_serializer(lesson)
-        return Response(serializer.data)
+    @staticmethod
+    def _parse_position(value):
+        """An int from JSON or a form/str ("3"); None for anything else."""
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            try:
+                return int(value.strip())
+            except ValueError:
+                return None
+        return None
 
 
 # =============================================================================

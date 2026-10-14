@@ -619,6 +619,98 @@ class BlockContentValidationOnPatchTests(APITestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class LessonReorderTests(APITestCase):
+    """POST /api/lessons/{id}/reorder/ {"new_order": N}: N is a 1-based
+    position in the course's lesson list; the course page's ↑ / ↓."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.other = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        # Gaps in order_index, created out of order.
+        cls.c = Lesson.objects.create(course=cls.course, title='C', order_index=7)
+        cls.a = Lesson.objects.create(course=cls.course, title='A', order_index=1)
+        cls.d = Lesson.objects.create(course=cls.course, title='D', order_index=20)
+        cls.b = Lesson.objects.create(course=cls.course, title='B', order_index=3)
+        # Another course with a lesson at the same order_index values: untouched.
+        other_course = Course.objects.create(title='Other', author=cls.author)
+        cls.elsewhere = Lesson.objects.create(course=other_course, title='X', order_index=3)
+        Enrollment.objects.create(student=cls.student, course=cls.course)
+
+    def reorder(self, lesson, new_order, user=None, **extra):
+        self.client.force_authenticate(user or self.author)
+        body = {} if new_order is ... else {'new_order': new_order}
+        return self.client.post(f'/api/lessons/{lesson.id}/reorder/', body, format='json', **extra)
+
+    def titles(self):
+        return list(Lesson.objects.filter(course=self.course).order_by('order_index')
+                    .values_list('title', flat=True))
+
+    def test_move_up(self):
+        response = self.reorder(self.c, 1)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(), ['C', 'A', 'B', 'D'])
+        # The response is the course's list in the new order.
+        self.assertEqual([l['title'] for l in response.data], ['C', 'A', 'B', 'D'])
+
+    def test_move_down(self):
+        response = self.reorder(self.a, 3)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(), ['B', 'C', 'A', 'D'])
+
+    def test_gaps_keep_the_same_order_index_values(self):
+        self.reorder(self.b, 4)
+        values = list(Lesson.objects.filter(course=self.course).order_by('order_index')
+                      .values_list('title', 'order_index'))
+        self.assertEqual(values, [('A', 1), ('C', 3), ('D', 7), ('B', 20)])
+        self.elsewhere.refresh_from_db()
+        self.assertEqual(self.elsewhere.order_index, 3)
+
+    def test_first_up_is_rejected_and_last_down_stays(self):
+        # The UI disables these; the API: below 1 → 400, past the end → clamped.
+        self.assertEqual(self.reorder(self.a, 0).status_code, 400)
+        response = self.reorder(self.d, 5)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(), ['A', 'B', 'C', 'D'])
+        self.assertEqual(self.reorder(self.a, 99).status_code, 200)
+        self.assertEqual(self.titles(), ['B', 'C', 'D', 'A'])
+
+    def test_same_place_changes_nothing(self):
+        response = self.reorder(self.b, 2)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.titles(), ['A', 'B', 'C', 'D'])
+
+    def test_new_order_must_be_an_integer(self):
+        for value in ('abc', '', 2.5, True, None, [2], {'n': 2}, ...):
+            with self.subTest(value=value):
+                self.assertEqual(self.reorder(self.b, value).status_code, 400)
+        self.assertEqual(self.titles(), ['A', 'B', 'C', 'D'])
+        # A numeric string is fine (forms send strings).
+        self.assertEqual(self.reorder(self.b, '3').status_code, 200)
+        self.assertEqual(self.titles(), ['A', 'C', 'B', 'D'])
+
+    def test_access(self):
+        self.assertEqual(self.reorder(self.b, 1, user=self.student).status_code, 403)
+        self.assertEqual(self.reorder(self.b, 1, user=self.other).status_code, 404)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post(f'/api/lessons/{self.b.id}/reorder/', {'new_order': 1},
+                                          format='json').status_code, 401)
+        self.assertEqual(self.titles(), ['A', 'B', 'C', 'D'])
+
+    def test_navigation_and_outline_follow_the_new_order(self):
+        self.reorder(self.d, 1)  # D, A, B, C
+        self.client.force_authenticate(self.student)
+        d = self.client.get(f'/api/lessons/{self.d.id}/').data
+        self.assertEqual((d['lesson_position'], str(d['next_lesson_id'])), (1, str(self.a.id)))
+        c = self.client.get(f'/api/lessons/{self.c.id}/').data
+        self.assertEqual((c['lesson_position'], c['next_lesson_id']), (4, None))
+        outline = self.client.get('/api/lessons/outline/', {'course': str(self.course.id)}).data
+        self.assertEqual([(r['title'], r['position']) for r in outline],
+                         [('D', 1), ('A', 2), ('B', 3), ('C', 4)])
+
+
 class ProgressSubmitAccessTests(APITestCase):
     SUBMIT_URL = '/api/progress/submit/'
 
