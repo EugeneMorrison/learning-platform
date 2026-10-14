@@ -97,7 +97,7 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                     if (seg.type === 'text') return <span key={idx}>{seg.value}</span>;
                     const i = seg.index;
                     const ok = perBlankCorrect[i];
-                    const ch = Math.max(8, (values[i]?.length || 0) + 2);
+                    const chars = Math.max(5, values[i]?.length || 0);
                     return (
                         <input
                             key={idx}
@@ -107,7 +107,7 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                             value={values[i]}
                             disabled={isCorrect}
                             onChange={e => { setBlank(i, e.target.value); if (submitted) setResult(null); }}
-                            style={{ width: `${ch}ch` /* grows with the answer */ }}
+                            style={{ '--fill-chars': chars /* grows with the answer; width in blocks.css */ }}
                         />
                     );
                 })}

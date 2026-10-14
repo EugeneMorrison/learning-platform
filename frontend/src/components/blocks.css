@@ -323,6 +323,9 @@
 }
 
 .fill-blank {
+    /* border-box: room for the text (--fill-chars, set by FillBlock) plus 1ch
+       for the caret, plus the side padding and both borders. */
+    width: calc((var(--fill-chars, 5) + 1) * 1ch + 2 * var(--space-3) + 4 * var(--border-width));
     max-width: 100%;
     padding: var(--space-1) var(--space-3);
     border: calc(var(--border-width) * 2) solid var(--color-line);
@@ -335,9 +338,13 @@
     outline: none;
 }
 
+/* Focus is shown by the cobalt border alone: an outer ring would cover the
+   neighbouring characters (e.g. the quotes in print("…")). */
 .fill-blank:focus {
     border-color: var(--color-accent);
     background: var(--color-ground);
+    outline: none;
+    box-shadow: none;
 }
 
 .fill-blank--correct {
@@ -444,7 +451,13 @@
     margin-bottom: var(--space-3);
     font-family: var(--font-code);
     font-size: var(--text-sm);
-    resize: vertical;
+    /* CodeBlock sets the height to fit the lines; past ~15 lines it scrolls. */
+    max-height: calc(15 * var(--text-sm) * var(--leading-normal) + 2 * var(--space-3) + 2 * var(--border-width));
+}
+
+/* The height follows the content, so no manual handle (beats textarea.input). */
+.input.code-input {
+    resize: none;
 }
 
 /* Output of "Запустить код": the dark code-card look from the landing. */
@@ -681,7 +694,6 @@
 /* ---- Keyboard focus -------------------------------------------------------- */
 
 .quiz-option:focus-visible,
-.fill-blank:focus-visible,
 .lesson-block__text-btn:focus-visible,
 .version-select__btn:focus-visible,
 .tests-toggle:focus-visible {

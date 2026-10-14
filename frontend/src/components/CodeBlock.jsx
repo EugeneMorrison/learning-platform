@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from './pycharmDarcula';
@@ -37,6 +37,19 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
     const [pythonVersion, setPythonVersion] = useState('Python 3.12');
     const [versionOpen, setVersionOpen] = useState(false);
     const versionRef = useRef(null);
+    const testInputRef = useRef(null);
+
+    // "Тестовый ввод" grows with its lines (also for the prefilled example);
+    // past the CSS max-height (~15 lines) it scrolls.
+    useLayoutEffect(() => {
+        const el = testInputRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        const borders = el.offsetHeight - el.clientHeight;
+        const needed = el.scrollHeight + borders;
+        el.style.height = `${needed}px`;
+        el.style.overflowY = needed > parseFloat(getComputedStyle(el).maxHeight) ? 'auto' : 'hidden';
+    }, [testInput]);
 
     useEffect(() => {
         function handleClickOutside(e) {
@@ -244,6 +257,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
             {/* Test input box */}
             <div className="lesson-block__label">Тестовый ввод:</div>
             <textarea
+                ref={testInputRef}
                 className="input code-input"
                 aria-label="Тестовый ввод"
                 value={testInput}
