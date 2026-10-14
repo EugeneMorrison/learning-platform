@@ -1,27 +1,30 @@
 /*
- * Landing page: hero with a decorative Python code card, and the course catalog
+ * Landing page: hero (text + the author's picture), and the course catalog
  * (numbered-path motif on the cards). Uses only the variables from tokens.css.
  */
 
-/* Hero */
+/* Hero: text + the author's picture. Phones and tablets: one column, the
+   picture under the text. From 56.25rem (900px): two columns, below. */
 .hero {
-  padding: var(--space-8) 0 var(--space-7);
+  padding: var(--space-6) 0 0;  /* the picture sits on the bottom edge */
+  overflow-x: hidden;  /* fallback for overflow-x: clip */
+  overflow-x: clip;    /* the illustration may bleed past the container edge */
 }
 
 .hero__inner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;  /* text starts at the top, level with the code card */
-  justify-content: space-between;
-  gap: var(--space-7);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
 }
 
+/* Above the illustration where it reaches into the column gap. */
 .hero__text {
-  flex: 1 1 calc(var(--container-width) / 2);
+  position: relative;
+  z-index: 1;
   min-width: 0;
 }
 
-/* Full course name, a small line above the hero heading. */
+/* Small greeting above the heading. */
 .hero__eyebrow {
   margin-bottom: var(--space-3);
   color: var(--color-accent);
@@ -35,11 +38,14 @@
   margin-bottom: var(--space-5);
 }
 
-.hero__lead {
+/* The author's paragraphs: regular body text. */
+.hero__about {
   max-width: calc(var(--container-width) / 2);
   margin-bottom: var(--space-6);
-  color: var(--color-muted);
-  font-size: var(--text-lg);
+}
+
+.hero__about p:last-child {
+  margin-bottom: 0;
 }
 
 .hero__actions {
@@ -48,99 +54,73 @@
   gap: var(--space-3);
 }
 
-/* Decorative Python code card: a small dark editor window (pure HTML/CSS). */
-.hero__code {
-  flex: 1 1 calc(var(--container-width) / 3);
+/* The picture: two layers measured from the mockup, in % of .hero__media.
+   Front: the author's cut-out, 70% wide, right of centre; it sets the box
+   height and its bottom is the hero's bottom edge (no bottom padding).
+   Back: the violet illustration, 119% wide, from -9.8% to 109.2%: its
+   leftmost violet starts at about -4.4%, inside the column gap, so nothing
+   violet sits behind the text; the transparent glow may reach further.
+   Phones: the box is narrowed so the whole illustration fits the screen. */
+.hero__media {
+  position: relative;
+  z-index: 0;  /* own stacking context: the illustration stays behind */
+  width: 84%;
   min-width: 0;
-  max-width: calc(var(--container-width) / 2.25);
+  margin-left: 8.2%;
 }
 
-/* The cat sits under the code card, right-aligned, looking up at the code.
-   max-width matches the 26rem in the <img sizes> attribute.
-   The desk in the artwork runs to the image's bottom and left edges; two
-   intersected gradient masks fade those edges out (only the alpha of the
-   mask colour matters). The WebP files themselves are unchanged. */
-.hero__cat {
-  width: 85%;
-  max-width: 26rem;
+.hero__media picture,
+.hero__media img {
+  display: block;
+}
+
+.hero__bg {
+  position: absolute;
+  bottom: 0;
+  left: -9.8%;
+  z-index: -1;
+  width: 119%;
+  pointer-events: none;
+}
+
+.hero__bg img {
+  width: 100%;
   height: auto;
-  margin: var(--space-4) 0 0 auto;
-  -webkit-mask-image:
-    linear-gradient(to top, transparent, var(--color-ink) 14%),
-    linear-gradient(to right, transparent, var(--color-ink) 8%);
-  -webkit-mask-composite: source-in;
-  mask-image:
-    linear-gradient(to top, transparent, var(--color-ink) 14%),
-    linear-gradient(to right, transparent, var(--color-ink) 8%);
-  mask-composite: intersect;
 }
 
-.code-card {
-  overflow: hidden;
-  border-radius: var(--radius-card);
-  background: var(--color-ink);
-  color: var(--color-code-text);
-  font-family: var(--font-code);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
+.hero__author {
+  width: 70%;
+  margin-left: 22%;
 }
 
-.code-card__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-code-bar);
+.hero__img {
+  width: 100%;
+  height: auto;
 }
 
-.code-card__dot {
-  flex-shrink: 0;
-  width: var(--space-3);
-  height: var(--space-3);
-  border-radius: var(--radius-pill);
-}
+/* Desktop: text about 45%, picture about 55%; the text is centred against the
+   picture, which sits on the hero's bottom edge. */
+@media (min-width: 56.25rem) {
+  .hero {
+    padding-top: var(--space-5);
+  }
 
-.code-card__dot--accent { background: var(--color-accent); }
-.code-card__dot--highlight { background: var(--color-highlight); }
-.code-card__dot--muted { background: var(--color-code-muted); }
+  .hero__inner {
+    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+    align-items: center;
+  }
 
-.code-card__file {
-  margin-left: var(--space-2);
-  overflow: hidden;
-  color: var(--color-code-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+  /* The surname stays on one line in the 45% column: full h1 size from
+     about 1280px, scaled down towards --text-2xl on narrower desktops. */
+  .hero__title {
+    font-size: clamp(var(--text-2xl), 3.4vw, var(--text-3xl));
+  }
 
-/* Long lines scroll inside the card only, never the page. */
-.code-card__code {
-  margin: 0;
-  padding: var(--space-5);
-  overflow-x: auto;
-  font: inherit;
-  white-space: pre;
-}
-
-.tok-keyword { color: var(--color-highlight); }
-.tok-function { color: var(--color-accent-on-dark); }
-.tok-string,
-.tok-comment { color: var(--color-code-muted); }
-
-.code-card__output {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-5);
-  border-top: var(--border-width) solid var(--color-code-bar);
-}
-
-.code-card__label {
-  color: var(--color-code-muted);
-}
-
-.code-card__result {
-  padding: 0 var(--space-5) var(--space-4);
-  color: var(--color-success);
+  .hero__media {
+    align-self: end;
+    width: auto;
+    margin-left: 0;
+  }
 }
 
 /* Catalog */
@@ -355,10 +335,6 @@
 
 /* Narrow screens */
 @media (max-width: 40rem) {
-  .hero {
-    padding-top: var(--space-6);
-  }
-
   /* Author: photo on top, full width up to a sensible max. */
   .author__inner {
     flex-direction: column;
@@ -371,18 +347,5 @@
     flex-basis: auto;
     width: 100%;
     max-width: var(--author-photo-phone-max);
-  }
-
-  /* Code card goes under the text, full width. */
-  .hero__code {
-    flex-basis: 100%;
-    max-width: none;
-  }
-
-  /* Cat under the code card, smaller and centred (matches sizes="18rem"). */
-  .hero__cat {
-    width: 100%;
-    max-width: 18rem;
-    margin: var(--space-4) auto 0;
   }
 }

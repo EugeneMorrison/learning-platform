@@ -113,7 +113,7 @@ class LandingCatalogTests(PublicPagesTestCase):
         response = self.client.get('/en/')
 
         self.assertContains(response, '<html lang="en">')
-        self.assertContains(response, 'Learn Python step by step')
+        self.assertContains(response, "I'm Lyudmila Kolesnikova")
         self.assertContains(response, 'Lessons: 0')
         self.assertContains(response, 'Free')
         # Database content stays as entered (no model translations yet).
@@ -406,38 +406,111 @@ class HeaderAuthLinkTests(PublicPagesTestCase):
         self.assertEqual(anonymous.status_code, 401)
 
 
-class HeroCodeCardTests(PublicPagesTestCase):
-    """Hero shows Python through a decorative code card (no logos), translated."""
+class HeroTests(PublicPagesTestCase):
+    """Hero: text + a two-layer picture (the violet illustration behind the
+    author's cut-out), WebP with PNG fallbacks, loaded eagerly, alt translated."""
 
-    CASES = [
-        ('/', 'ru', ['>Учитесь Python шаг за шагом<', '# Урок 1: функции',
-                     'f"Привет, {name}!"', '"Мир"', 'Вывод', 'Привет, Мир!',
-                     '✓ Все тесты пройдены (3/3)',
-                     'Пример задачи: функция на Python возвращает приветствие']),
-        ('/en/', 'en', ['>Learn Python step by step<', '# Lesson 1: functions',
-                        'f"Hello, {name}!"', '"World"', 'Output', 'Hello, World!',
-                        '✓ All tests passed (3/3)',
-                        'Example task: a Python function returns a greeting']),
+    CASES = [('/', 'ru', 'Людмила Колесникова'), ('/en/', 'en', 'Lyudmila Kolesnikova')]
+
+    def hero_html(self, url):
+        html = self.client.get(url).content.decode()
+        return re.search(r'<section class="hero".*?</section>', html, re.S).group(0)
+
+    # (picture class, WebP srcset entries, PNG fallback, width/height attributes)
+    LAYERS = [
+        ('hero__bg', ['hero-bg-768.webp 768w', 'hero-bg-1536.webp 1536w'], 'hero-bg.png', (1536, 1024)),
+        ('hero__author', ['hero-author-432.webp 432w', 'hero-author-864.webp 864w'], 'hero-author.png', (864, 1120)),
     ]
 
-    def test_card_renders_translated(self):
-        for url, lang, expected in self.CASES:
-            html = self.client.get(url).content.decode()
-            with self.subTest(lang=lang):
-                self.assertIn('lesson_01.py', html)
-                for text in expected:
-                    self.assertIn(text, html)
+    def layer(self, hero, css_class):
+        return re.search(rf'<picture class="{css_class}">.*?</picture>', hero, re.S).group(0)
 
-    def test_card_is_decorative_with_a_text_alternative(self):
-        html = self.client.get('/').content.decode()
-        card = re.search(r'<div class="code-card"([^>]*)>', html)
-        self.assertIsNotNone(card)
-        self.assertIn('aria-hidden="true"', card.group(1))
-        # The sentence for screen readers sits outside the hidden card.
-        sentence_at = html.index('<p class="visually-hidden">Пример задачи')
-        self.assertLess(sentence_at, card.start())
-        # Old decorative path is gone from the hero; cards keep their step badges.
-        self.assertNotIn('hero-path', html)
+    def test_two_layers_with_webp_sources_and_png_fallback(self):
+        for url, lang, alt in self.CASES:
+            hero = self.hero_html(url)
+            # Back layer first in the markup; the author paints on top of it.
+            self.assertLess(hero.index('class="hero__bg"'), hero.index('class="hero__author"'))
+            for css_class, srcset, png, (width, height) in self.LAYERS:
+                with self.subTest(lang=lang, layer=css_class):
+                    picture = self.layer(hero, css_class)
+                    source = re.search(r'<source type="image/webp"[^>]*>', picture).group(0)
+                    for entry in srcset:
+                        self.assertIn(f'public/img/{entry}', source)
+                    img = re.search(r'<img[^>]*>', picture).group(0)
+                    self.assertIn(f'public/img/{png}"', img)
+                    self.assertIn(f'width="{width}" height="{height}"', img)
+                    self.assertNotIn('loading=', img)  # above the fold: never lazy
+
+    def test_background_is_decorative_and_author_has_alt(self):
+        for url, lang, alt in self.CASES:
+            hero = self.hero_html(url)
+            with self.subTest(lang=lang):
+                bg = re.search(r'<img[^>]*>', self.layer(hero, 'hero__bg')).group(0)
+                self.assertIn('alt=""', bg)
+                self.assertIn('aria-hidden="true"', bg)
+                author = re.search(r'<img[^>]*>', self.layer(hero, 'hero__author')).group(0)
+                self.assertIn(f'alt="{alt}"', author)
+                self.assertNotIn('aria-hidden', author)
+                # The flattened picture is no longer used.
+                self.assertNotIn('public/img/hero.png', hero)
+                self.assertNotIn('public/img/hero-896.webp', hero)
+
+    def test_files_exist_and_match_the_size_attributes(self):
+        from django.contrib.staticfiles import finders
+        from PIL import Image
+
+        for _, srcset, png, (width, height) in self.LAYERS:
+            for name in [png] + [entry.split()[0] for entry in srcset]:
+                path = finders.find(f'public/img/{name}')
+                self.assertIsNotNone(path, name)
+                with Image.open(path) as im:
+                    self.assertEqual(im.mode, 'RGBA', name)  # transparent layers
+                    # Same aspect ratio as the width/height attributes (no layout shift).
+                    self.assertAlmostEqual(im.width / im.height, width / height, places=2, msg=name)
+
+    def test_code_card_and_cat_are_gone(self):
+        hero = self.hero_html('/')
+        for old in ['code-card', 'lesson_01.py', 'hero__cat', 'cat-desk']:
+            self.assertNotIn(old, hero)
+        # The cat artwork stays in static files for later use.
+        from django.contrib.staticfiles import finders
+        self.assertIsNotNone(finders.find('public/img/cat-desk-800.webp'))
+
+    TEXTS = {
+        '/': ['<p class="hero__eyebrow">Привет!</p>',
+              '<h1 id="hero-title" class="hero__title">Я Людмила Колесникова</h1>',
+              '<p>Автор образовательного проекта учиЛКа.</p>',
+              '<p>Уже более 10 лет я преподаю, создаю образовательные курсы и руковожу проектами.</p>',
+              '<p>Здесь я делюсь своим опытом и знаниями: от программирования и создания игр '
+              'до управления людьми и командами.</p>',
+              '<p>Люблю объяснять сложное простыми словами и уверена, что ошибки — лучшие учителя, '
+              'а не повод сдаваться!</p>',
+              '>Смотреть курсы<', 'data-account-label="Мой кабинет"'],
+        '/en/': ['<p class="hero__eyebrow">Hi!</p>',
+                 '<h1 id="hero-title" class="hero__title">I\'m Lyudmila Kolesnikova</h1>',
+                 '<p>Author of the educational project uchiLKa.</p>',
+                 '<p>For more than 10 years I have been teaching, creating educational courses '
+                 'and leading projects.</p>',
+                 '<p>Here I share my experience and knowledge: from programming and game development '
+                 'to managing people and teams.</p>',
+                 '<p>I love explaining complex things in simple words, and I believe that mistakes '
+                 'are the best teachers, not a reason to give up!</p>',
+                 '>Browse courses<', 'data-account-label="My account"'],
+    }
+
+    def test_author_texts_in_ru_and_en(self):
+        for url, texts in self.TEXTS.items():
+            hero = self.hero_html(url)
+            with self.subTest(url=url):
+                for text in texts:
+                    self.assertIn(text, hero)
+
+    def test_old_hero_texts_are_gone(self):
+        hero = self.hero_html('/') + self.hero_html('/en/')
+        for old in ['Python: от ужаса до понимания', 'Учитесь Python шаг за шагом',
+                    'Короткие уроки и практика', 'Python: from horror to understanding',
+                    'Learn Python step by step', 'hero__lead']:
+            self.assertNotIn(old, hero)
 
     def test_no_remote_font_hosts(self):
         from django.contrib.staticfiles import finders
@@ -501,6 +574,18 @@ class ProductionStaticFilesTests(TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.static_root, landing.group(1))))
         # No unhashed public stylesheet left in the page.
         self.assertNotRegex(html, r'href="/static/public/css/[a-z]+\.css"')
+
+    def test_hero_images_are_collected_and_hashed(self):
+        import os
+
+        html = self.client.get('/').content.decode()
+        for name in ['hero-bg', 'hero-bg-1536', 'hero-bg-768',
+                     'hero-author', 'hero-author-864', 'hero-author-432']:
+            ext = 'png' if name in ('hero-bg', 'hero-author') else 'webp'
+            pattern = rf'public/img/{name}\.[0-9a-f]{{12}}\.{ext}'
+            found = re.search(r'/static/(' + pattern + ')', html)
+            self.assertIsNotNone(found, pattern)
+            self.assertTrue(os.path.exists(os.path.join(self.static_root, found.group(1))))
 
 
 class AuthorAndReviewsSectionTests(PublicPagesTestCase):
