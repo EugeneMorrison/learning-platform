@@ -8,7 +8,7 @@ Serializers convert between:
 """
 
 from rest_framework import serializers
-from .block_content import TASK_TYPES, feedback, student_content
+from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message
 
 
@@ -273,58 +273,59 @@ class BlockSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
-    def validate_content(self, value):
+    def validate(self, attrs):
         """
-        Custom validation for content field.
-
-        Makes sure content has required fields based on block type.
-        This runs automatically when data comes in from API!
+        Content must fit the block type. Runs whenever type or content changes,
+        using the stored value for whichever one the request leaves out: a PATCH
+        with only "content" is checked against the block's type, a PATCH with
+        only "type" checks the stored content. (Before, a PATCH without "type"
+        skipped this, and e.g. a string as content broke the lesson for
+        students.) Errors stay under "content". A PATCH of order_index alone
+        (the editor's up/down) isn't affected.
         """
-        block_type = self.initial_data.get('type')
+        attrs = super().validate(attrs)
+        if 'type' in attrs or 'content' in attrs:
+            block_type = attrs.get('type', getattr(self.instance, 'type', None))
+            content = attrs.get('content', getattr(self.instance, 'content', None))
+            error = block_content_error(block_type, content)
+            if error:
+                raise serializers.ValidationError({'content': [error]})
+        return attrs
 
-        if block_type == 'TEXT':
-            if 'html' not in value:
-                raise serializers.ValidationError(
-                    "TEXT blocks must have 'html' field in content"
-                )
 
-        elif block_type == 'QUIZ':
-            required_fields = ['question', 'options', 'correct_answer']
-            for field in required_fields:
-                if field not in value:
-                    raise serializers.ValidationError(
-                        f"QUIZ blocks must have '{field}' field in content"
-                    )
+def block_content_error(block_type, value):
+    """Why content doesn't fit the block type, or None when it does."""
+    if not isinstance(value, dict):
+        return "content must be a JSON object"
 
-        elif block_type == 'CODE':
-            required_fields = ['prompt', 'starter_code']
-            for field in required_fields:
-                if field not in value:
-                    raise serializers.ValidationError(
-                        f"CODE blocks must have '{field}' field in content"
-                    )
-            # Optional per-test flag: shown to students or hidden.
-            for test in value.get('tests') or []:
-                if isinstance(test, dict) and 'visible' in test and not isinstance(test['visible'], bool):
-                    raise serializers.ValidationError(
-                        "CODE test 'visible' must be true or false"
-                    )
+    if block_type == 'TEXT':
+        if 'html' not in value:
+            return "TEXT blocks must have 'html' field in content"
 
-        elif block_type == 'FILL':
-            # Fill-in-the-blanks: a code/text template with {{answer}} markers.
-            template = value.get('template')
-            if not template:
-                raise serializers.ValidationError(
-                    "FILL blocks must have a non-empty 'template' field in content"
-                )
-            import re
-            blanks = re.findall(r'\{\{(.*?)\}\}', template)
-            if not blanks or not any(b.strip() for b in blanks):
-                raise serializers.ValidationError(
-                    "FILL template must contain at least one blank with an answer, e.g. print({{8}})"
-                )
+    elif block_type == 'QUIZ':
+        for field in ['question', 'options', 'correct_answer']:
+            if field not in value:
+                return f"QUIZ blocks must have '{field}' field in content"
 
-        return value
+    elif block_type == 'CODE':
+        for field in ['prompt', 'starter_code']:
+            if field not in value:
+                return f"CODE blocks must have '{field}' field in content"
+        # Optional per-test flag: shown to students or hidden.
+        for test in value.get('tests') or []:
+            if isinstance(test, dict) and 'visible' in test and not isinstance(test['visible'], bool):
+                return "CODE test 'visible' must be true or false"
+
+    elif block_type == 'FILL':
+        # Fill-in-the-blanks: a code/text template with {{answer}} markers.
+        template = value.get('template')
+        if not template:
+            return "FILL blocks must have a non-empty 'template' field in content"
+        blanks = FILL_GAP_RE.findall(template)
+        if not blanks or not any(b.strip() for b in blanks):
+            return "FILL template must contain at least one blank with an answer, e.g. print({{8}})"
+
+    return None
 
 
 # =============================================================================

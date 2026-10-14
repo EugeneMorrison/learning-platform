@@ -475,6 +475,150 @@ class BlockDuplicateTests(APITestCase):
         self.assertEqual(self.lesson_order(), before)
 
 
+class ParentOwnershipTests(APITestCase):
+    """Lessons and blocks may only be created in, or moved into, the requesting
+    author's own course / lesson (403 otherwise). The owner is unaffected."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username='owner', password='x', role='AUTHOR')
+        cls.other = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.course = Course.objects.create(title='Owner course', author=cls.owner)
+        cls.lesson = Lesson.objects.create(course=cls.course, title='Owner lesson', order_index=1)
+        cls.course2 = Course.objects.create(title='Owner course 2', author=cls.owner)
+        cls.lesson2 = Lesson.objects.create(course=cls.course2, title='Owner lesson 2', order_index=1)
+        cls.other_course = Course.objects.create(title='Other course', author=cls.other)
+        cls.other_lesson = Lesson.objects.create(course=cls.other_course, title='Other lesson', order_index=1)
+        cls.other_block = Block.objects.create(lesson=cls.other_lesson, type='TEXT', order_index=1,
+                                               content={'html': '<p>other</p>'})
+        cls.block = Block.objects.create(lesson=cls.lesson, type='TEXT', order_index=1,
+                                         content={'html': '<p>mine</p>'})
+
+    def as_(self, user):
+        self.client.force_authenticate(user)
+        return self.client
+
+    # --- creating in someone else's course / lesson ------------------------
+
+    def test_other_author_cannot_create_a_lesson_in_my_course(self):
+        response = self.as_(self.other).post('/api/lessons/', {
+            'course': str(self.course.id), 'title': 'Injected', 'order_index': 5}, format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Lesson.objects.filter(title='Injected').exists())
+
+    def test_other_author_cannot_create_a_block_in_my_lesson(self):
+        response = self.as_(self.other).post('/api/blocks/', {
+            'lesson': str(self.lesson.id), 'type': 'TEXT', 'order_index': 9,
+            'content': {'html': '<p>injected</p>'}}, format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.lesson.blocks.count(), 1)
+
+    # --- moving into someone else's course / lesson ------------------------
+
+    def test_other_author_cannot_move_their_block_into_my_lesson(self):
+        for method in ('patch', 'put'):
+            body = {'lesson': str(self.lesson.id), 'order_index': 50}
+            if method == 'put':
+                body.update(type='TEXT', content={'html': '<p>other</p>'})
+            response = getattr(self.as_(self.other), method)(
+                f'/api/blocks/{self.other_block.id}/', body, format='json')
+            self.assertEqual(response.status_code, 403, method)
+            self.other_block.refresh_from_db()
+            self.assertEqual(self.other_block.lesson_id, self.other_lesson.id, method)
+
+    def test_other_author_cannot_move_their_lesson_into_my_course(self):
+        other_lesson2 = Lesson.objects.create(course=self.other_course, title='Other 2', order_index=2)
+        response = self.as_(self.other).patch(f'/api/lessons/{other_lesson2.id}/', {
+            'course': str(self.course.id), 'order_index': 60}, format='json')
+        self.assertEqual(response.status_code, 403)
+        other_lesson2.refresh_from_db()
+        self.assertEqual(other_lesson2.course_id, self.other_course.id)
+
+    def test_owner_cannot_move_into_someone_elses_lesson_or_course_either(self):
+        response = self.as_(self.owner).patch(f'/api/blocks/{self.block.id}/', {
+            'lesson': str(self.other_lesson.id), 'order_index': 70}, format='json')
+        self.assertEqual(response.status_code, 403)
+        response = self.as_(self.owner).patch(f'/api/lessons/{self.lesson2.id}/', {
+            'course': str(self.other_course.id), 'order_index': 70}, format='json')
+        self.assertEqual(response.status_code, 403)
+
+    # --- the owner still can -------------------------------------------------
+
+    def test_owner_creates_and_moves_within_own_courses(self):
+        client = self.as_(self.owner)
+        response = client.post('/api/lessons/', {
+            'course': str(self.course.id), 'title': 'New lesson', 'order_index': 2}, format='json')
+        self.assertEqual(response.status_code, 201)
+        response = client.post('/api/blocks/', {
+            'lesson': str(self.lesson.id), 'type': 'QUIZ', 'order_index': 2,
+            'content': {'question': 'q', 'options': ['a', 'b'], 'correct_answer': 0}}, format='json')
+        self.assertEqual(response.status_code, 201)
+        # Move a block to another lesson, and a lesson to another course, both owned.
+        response = client.patch(f'/api/blocks/{self.block.id}/', {
+            'lesson': str(self.lesson2.id), 'order_index': 5}, format='json')
+        self.assertEqual(response.status_code, 200)
+        response = client.patch(f'/api/lessons/{self.lesson2.id}/', {
+            'course': str(self.course.id), 'order_index': 3}, format='json')
+        self.assertEqual(response.status_code, 200)
+        # The editor's save (PUT with its own lesson) and up/down (PATCH order_index).
+        response = client.put(f'/api/blocks/{self.block.id}/', {
+            'lesson': str(self.lesson2.id), 'type': 'TEXT', 'order_index': 6,
+            'content': {'html': '<p>edited</p>'}}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(client.patch(f'/api/blocks/{self.block.id}/', {'order_index': 7},
+                                      format='json').status_code, 200)
+
+    def test_unknown_parent_is_still_a_400(self):
+        response = self.as_(self.owner).post('/api/blocks/', {
+            'lesson': '3fa85f64-5717-4562-b3fc-2c963f66afa6', 'type': 'TEXT', 'order_index': 3,
+            'content': {'html': 'x'}}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('lesson', response.data)
+
+
+class BlockContentValidationOnPatchTests(APITestCase):
+    """PATCH without "type" is validated against the block's stored type; a
+    PATCH of "type" alone checks the stored content."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=course, title='Lesson', order_index=1)
+        Enrollment.objects.create(student=cls.student, course=course)
+        cls.quiz_content = {'question': 'q', 'options': ['a', 'b'], 'correct_answer': 1}
+        cls.quiz = Block.objects.create(lesson=cls.lesson, type='QUIZ', order_index=1, content=cls.quiz_content)
+
+    def patch(self, body):
+        self.client.force_authenticate(self.author)
+        return self.client.patch(f'/api/blocks/{self.quiz.id}/', body, format='json')
+
+    def test_patch_without_type_and_invalid_content_is_400(self):
+        for content in ({}, {'question': 'q'}, 'just a string', ['a', 'list']):
+            response = self.patch({'content': content})
+            self.assertEqual(response.status_code, 400, content)
+            self.assertIn('content', response.data)
+        self.quiz.refresh_from_db()
+        self.assertEqual(self.quiz.content, self.quiz_content)
+        # The lesson still loads for students.
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.client.get('/api/blocks/', {'lesson': str(self.lesson.id)}).status_code, 200)
+
+    def test_patch_of_type_alone_checks_the_stored_content(self):
+        response = self.patch({'type': 'CODE'})
+        self.assertEqual(response.status_code, 400)
+        self.quiz.refresh_from_db()
+        self.assertEqual(self.quiz.type, 'QUIZ')
+
+    def test_valid_patches_still_work(self):
+        response = self.patch({'content': dict(self.quiz_content, question='new')})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.patch({'order_index': 4}).status_code, 200)
+        response = self.patch({'type': 'TEXT', 'content': {'html': '<p>now theory</p>'}})
+        self.assertEqual(response.status_code, 200)
+
+
 class ProgressSubmitAccessTests(APITestCase):
     SUBMIT_URL = '/api/progress/submit/'
 

@@ -532,11 +532,40 @@ class CourseViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
 
+
+class ParentOwnerMixin:
+    """
+    Create/update of a child object: its PARENT must belong to the requesting
+    author too (a lesson's course, a block's lesson), not only the object
+    itself. Without this an author could create lessons/blocks in another
+    author's course, or move their own into it by changing course/lesson.
+
+    The rule is IsOwnerOrReadOnly applied to the parent, via
+    check_object_permissions: not the owner → 403, like a write to another
+    author's course. An unknown parent id is already a 400 from the
+    serializer's related field.
+    """
+    parent_field = None
+
+    def check_parent_owner(self, serializer):
+        parent = serializer.validated_data.get(self.parent_field)
+        if parent is not None:
+            self.check_object_permissions(self.request, parent)
+
+    def perform_create(self, serializer):
+        self.check_parent_owner(serializer)
+        super().perform_create(serializer)
+
+    def perform_update(self, serializer):
+        self.check_parent_owner(serializer)
+        super().perform_update(serializer)
+
+
 # =============================================================================
 # LESSON VIEWSET
 # =============================================================================
 
-class LessonViewSet(viewsets.ModelViewSet):
+class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
     """
     CRUD operations for lessons.
 
@@ -544,11 +573,14 @@ class LessonViewSet(viewsets.ModelViewSet):
     - Read: the course's author and its enrolled students only
       (LessonQuerySet.visible_to). list/retrieve stay AllowAny so anonymous
       requests get an empty list / 404 rather than 401.
-    - Authors can create/edit lessons in THEIR courses only
+    - Authors can create/edit lessons in THEIR courses only: another author's
+      lesson is a 404 (get_queryset); a course they don't own, as the lesson's
+      course on create or update, is a 403 (ParentOwnerMixin).
     """
 
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
+    parent_field = 'course'
 
     def get_serializer_class(self):
         # The single-lesson read adds next_lesson_id for the viewer's navigation.
@@ -721,18 +753,21 @@ class LessonViewSet(viewsets.ModelViewSet):
 # BLOCK VIEWSET
 # =============================================================================
 
-class BlockViewSet(viewsets.ModelViewSet):
+class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
     """
     CRUD operations for blocks.
 
     Permissions:
     - Read: the course's author and its enrolled students only
       (BlockQuerySet.visible_to); anonymous requests get an empty list / 404.
-    - Authors can create/edit blocks in THEIR courses only
+    - Authors can create/edit blocks in THEIR courses only: another author's
+      block is a 404 (get_queryset); a lesson they don't own, as the block's
+      lesson on create or update, is a 403 (ParentOwnerMixin).
     """
 
     queryset = Block.objects.all()
     serializer_class = BlockSerializer
+    parent_field = 'lesson'
 
     def get_permissions(self):
         """Set permissions based on action"""
