@@ -354,6 +354,127 @@ class LessonOutlineTests(APITestCase):
         self.assertEqual(self.outline(self.student, course_id='not-a-uuid').status_code, 400)
 
 
+class BlockDuplicateTests(APITestCase):
+    """POST /api/blocks/{id}/duplicate/: the lesson editor's "Копировать"."""
+
+    CONTENT = {
+        'TEXT': {'html': '<p>Теория</p><img src="/media/lesson_images/a.png">'},
+        'QUIZ': {'question': 'q', 'options': ['a', 'b'], 'correct_answer': 1, 'explanation': 'e'},
+        'CODE': {'prompt': 'p', 'starter_code': '# код\n', 'solution': 'print(1)',
+                 'tests': [{'input': '1\n2', 'expected': '3', 'visible': True},
+                           {'input': '5\n5', 'expected': '10', 'visible': False}]},
+        'FILL': {'prompt': 'p', 'template': 'print({{8}})', 'explanation': 'e'},
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.other_author = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=cls.course, title='Lesson', order_index=1)
+        Enrollment.objects.create(student=cls.student, course=cls.course)
+        # One block of each type, order_index 1..4.
+        cls.blocks = [
+            Block.objects.create(lesson=cls.lesson, type=type_, order_index=i, content=cls.CONTENT[type_])
+            for i, type_ in enumerate(['TEXT', 'QUIZ', 'CODE', 'FILL'], start=1)
+        ]
+
+    def duplicate(self, block, user=None):
+        self.client.force_authenticate(user or self.author)
+        return self.client.post(f'/api/blocks/{block.id}/duplicate/')
+
+    def lesson_order(self, lesson=None):
+        """[(id, order_index)] of the lesson's blocks in order."""
+        return list(Block.objects.filter(lesson=lesson or self.lesson)
+                    .order_by('order_index').values_list('id', 'order_index'))
+
+    def test_copy_in_the_middle_goes_right_below(self):
+        text, quiz, code, fill = self.blocks
+        response = self.duplicate(quiz)
+        self.assertEqual(response.status_code, 201)
+        new_id = response.data['id']
+        self.assertEqual([str(i) for i, _ in self.lesson_order()],
+                         [str(b.id) for b in (text, quiz)] + [str(new_id)] + [str(b.id) for b in (code, fill)])
+        # Blocks below moved down by one; those above didn't move.
+        self.assertEqual([o for _, o in self.lesson_order()], [1, 2, 3, 4, 5])
+        self.assertEqual(response.data['order_index'], 3)
+
+    def test_copy_of_the_last_block(self):
+        fill = self.blocks[-1]
+        response = self.duplicate(fill)
+        self.assertEqual(response.status_code, 201)
+        order = self.lesson_order()
+        self.assertEqual(str(order[-1][0]), str(response.data['id']))
+        self.assertEqual([o for _, o in order], [1, 2, 3, 4, 5])
+
+    def test_gaps_in_order_index(self):
+        lesson = Lesson.objects.create(course=self.course, title='Gaps', order_index=2)
+        a = Block.objects.create(lesson=lesson, type='TEXT', order_index=0, content={'html': 'a'})
+        b = Block.objects.create(lesson=lesson, type='TEXT', order_index=5, content={'html': 'b'})
+        c = Block.objects.create(lesson=lesson, type='TEXT', order_index=6, content={'html': 'c'})
+        d = Block.objects.create(lesson=lesson, type='TEXT', order_index=20, content={'html': 'd'})
+        new_id = self.duplicate(b).data['id']
+        order = self.lesson_order(lesson)
+        self.assertEqual([str(i) for i, _ in order], [str(x) for x in (a.id, b.id, new_id, c.id, d.id)])
+        # Gaps above stay; only blocks below moved, by one.
+        self.assertEqual([o for _, o in order], [0, 5, 6, 7, 21])
+
+    def test_copies_of_all_types_pass_validation_and_keep_content(self):
+        for block in self.blocks:
+            response = self.duplicate(block)
+            self.assertEqual(response.status_code, 201, block.type)
+            self.assertEqual(response.data['type'], block.type)
+            self.assertNotEqual(str(response.data['id']), str(block.id))
+            # The author's view: full content, hidden tests and solution included.
+            self.assertEqual(response.data['content'], self.CONTENT[block.type], block.type)
+        # TEXT: the image URL is kept as is.
+        text_copy = Block.objects.filter(lesson=self.lesson, type='TEXT').exclude(pk=self.blocks[0].pk).get()
+        self.assertIn('/media/lesson_images/a.png', text_copy.content['html'])
+
+    def test_content_is_a_deep_copy(self):
+        code = self.blocks[2]
+        new_id = self.duplicate(code).data['id']
+        copy_ = Block.objects.get(pk=new_id)
+        copy_.content['tests'][0]['expected'] = 'changed'
+        copy_.content['prompt'] = 'changed'
+        copy_.save()
+        code.refresh_from_db()
+        self.assertEqual(code.content, self.CONTENT['CODE'])
+
+    def test_invalid_original_is_refused_and_nothing_moves(self):
+        # Same validation as the editor: a FILL without a blank can't be copied,
+        # and the shift is rolled back.
+        broken = self.blocks[1]
+        Block.objects.filter(pk=broken.pk).update(type='FILL', content={'template': 'no blanks'})
+        before = self.lesson_order()
+        self.assertEqual(self.duplicate(broken).status_code, 400)
+        self.assertEqual(self.lesson_order(), before)
+
+    def test_no_progress_or_attempts_are_copied(self):
+        quiz = self.blocks[1]
+        Progress.objects.create(student=self.student, lesson=self.lesson, block=quiz,
+                                answer={'selected': 1}, is_correct=True)
+        Attempt.objects.create(student=self.student, block=quiz, answer={'selected': 1}, is_correct=True)
+        new_id = self.duplicate(quiz).data['id']
+        self.assertFalse(Progress.objects.filter(block_id=new_id).exists())
+        self.assertFalse(Attempt.objects.filter(block_id=new_id).exists())
+        self.assertEqual(Progress.objects.filter(block=quiz).count(), 1)
+        self.assertEqual(Attempt.objects.filter(block=quiz).count(), 1)
+
+    def test_access(self):
+        quiz = self.blocks[1]
+        before = self.lesson_order()
+        self.assertEqual(self.duplicate(quiz, self.student).status_code, 403)
+        # Another author: 404, the same as PATCH/DELETE on that block.
+        self.client.force_authenticate(self.other_author)
+        self.assertEqual(self.client.patch(f'/api/blocks/{quiz.id}/', {'order_index': 9}).status_code, 404)
+        self.assertEqual(self.duplicate(quiz, self.other_author).status_code, 404)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post(f'/api/blocks/{quiz.id}/duplicate/').status_code, 401)
+        self.assertEqual(self.lesson_order(), before)
+
+
 class ProgressSubmitAccessTests(APITestCase):
     SUBMIT_URL = '/api/progress/submit/'
 

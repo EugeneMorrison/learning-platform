@@ -21,12 +21,13 @@ from django.shortcuts import get_object_or_404
 from django.http import Http404
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.db import models
+from django.db import models, transaction
 from datetime import datetime
 import subprocess
 import sys
 import tempfile
 import os
+import copy
 import uuid
 
 from django_filters.rest_framework import DjangoFilterBackend
@@ -768,6 +769,47 @@ class BlockViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(lesson_id=lesson_id)
 
         return queryset
+
+    @action(detail=True, methods=['post'])
+    def duplicate(self, request, pk=None):
+        """
+        POST /api/blocks/{id}/duplicate/  (lesson editor's "Копировать")
+
+        Copies the block directly below itself: new id, same type, a deep copy
+        of content (image URLs stay as they are; no files are copied). No
+        progress or attempts are copied. Returns the new block (201), in the
+        same shape as GET /api/blocks/{id}/.
+
+        Permissions as for edit/delete: IsAuthenticated + IsAuthor (students
+        403) + IsOwnerOrReadOnly. get_object() runs check_object_permissions,
+        and get_queryset() only has the author's own blocks for write actions,
+        so another author's block is a 404 (as for PATCH/DELETE).
+        """
+        original = self.get_object()
+        with transaction.atomic():
+            # Work from the position in the lesson's ordered blocks, so gaps
+            # in order_index don't matter.
+            siblings = list(
+                Block.objects.select_for_update()
+                .filter(lesson_id=original.lesson_id)
+                .order_by('order_index')
+            )
+            position = next(i for i, b in enumerate(siblings) if b.pk == original.pk)
+            # Everything below moves down by one, bottom first: each block steps
+            # into a free order_index, so unique (lesson, order_index) never clashes.
+            for block in reversed(siblings[position + 1:]):
+                Block.objects.filter(pk=block.pk).update(order_index=block.order_index + 1)
+            # Same validation as a block created in the editor; a failure here
+            # rolls the shift back.
+            serializer = self.get_serializer(data={
+                'lesson': original.lesson_id,
+                'type': original.type,
+                'order_index': siblings[position].order_index + 1,
+                'content': copy.deepcopy(original.content),
+            })
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 def lesson_viewer(request):

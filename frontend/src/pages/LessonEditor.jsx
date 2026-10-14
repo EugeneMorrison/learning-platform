@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
@@ -66,12 +66,22 @@ function LessonEditor() {
     const [draft, setDraft] = useState(null);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
-    const [busy, setBusy] = useState(false); // reorder/delete in flight
+    const [busy, setBusy] = useState(false); // reorder/delete/copy in flight
+    const [copiedId, setCopiedId] = useState(null); // new copy, briefly highlighted
+    const [copyStatus, setCopyStatus] = useState(''); // for screen readers
+    const copyingRef = useRef(false); // a double click must not make two copies
 
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lessonId]);
+
+    // The highlight on a fresh copy goes away after a moment.
+    useEffect(() => {
+        if (!copiedId) return undefined;
+        const timer = setTimeout(() => setCopiedId(null), 2500);
+        return () => clearTimeout(timer);
+    }, [copiedId]);
 
     async function load() {
         try {
@@ -207,6 +217,33 @@ function LessonEditor() {
         }
     }
 
+    // "Копировать": the server puts the copy right below the original and moves
+    // the blocks below down by one (one transaction). Mirror that locally: no
+    // reload, no scroll jump, and the edit form stays closed.
+    async function handleDuplicate(block) {
+        if (copyingRef.current) return;
+        copyingRef.current = true;
+        setBusy(true);
+        setCopyStatus('');
+        try {
+            const res = await api.post(`/blocks/${block.id}/duplicate/`);
+            const copy = res.data;
+            setBlocks(prev => {
+                const i = prev.findIndex(b => b.id === block.id);
+                const below = prev.slice(i + 1).map(b => ({ ...b, order_index: b.order_index + 1 }));
+                return [...prev.slice(0, i + 1), copy, ...below];
+            });
+            setCopiedId(copy.id);
+            setCopyStatus('Блок скопирован, копия ниже.');
+        } catch (e) {
+            console.error('Failed to copy block:', e);
+            alert('Не удалось скопировать блок.');
+        } finally {
+            copyingRef.current = false;
+            setBusy(false);
+        }
+    }
+
     // Swap order_index with the neighbour. Uses a temporary free index to dodge
     // the (lesson, order_index) unique constraint during the swap.
     async function moveBlock(index, dir) {
@@ -252,6 +289,7 @@ function LessonEditor() {
                 </button>
             </div>
             <hr style={{ margin: '20px 0' }} />
+            <p className="visually-hidden" role="status">{copyStatus}</p>
 
             {/* Existing blocks */}
             {blocks.length === 0 && !draft && (
@@ -270,18 +308,20 @@ function LessonEditor() {
                             formError={formError}
                         />
                     ) : (
-                        <div style={blockCard}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                                <div style={{ minWidth: 0 }}>
+                        <div style={{ ...blockCard, ...(copiedId === block.id ? copiedCard : null) }}>
+                            {/* Wraps on narrow screens: the buttons go under the preview. */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                                <div style={{ minWidth: 0, flex: '1 1 var(--card-min-width)' }}>
                                     <span style={badge}>{TYPE_LABELS[block.type]}</span>
                                     <div style={{ marginTop: 8, color: '#475569', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 520 }}>
                                         {blockPreview(block)}
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                     <button title="Вверх" disabled={busy || index === 0} onClick={() => moveBlock(index, -1)} style={iconBtn}>↑</button>
                                     <button title="Вниз" disabled={busy || index === blocks.length - 1} onClick={() => moveBlock(index, 1)} style={iconBtn}>↓</button>
                                     <button disabled={busy} onClick={() => startEdit(block)} style={iconBtn}>✎ Изменить</button>
+                                    <button disabled={busy} onClick={() => handleDuplicate(block)} style={iconBtn} title="Копия появится ниже">⧉ Копировать</button>
                                     <button disabled={busy} onClick={() => handleDelete(block)} style={deleteBtn}>Удалить</button>
                                 </div>
                             </div>
@@ -617,6 +657,12 @@ const blockCard = {
     padding: 16,
     marginTop: 12,
     background: 'white',
+};
+
+// A fresh copy, for a moment (tokens: backend/static/public/css/tokens.css).
+const copiedCard = {
+    background: 'var(--color-soft)',
+    boxShadow: '0 0 0 var(--focus-ring-width) var(--color-accent)',
 };
 
 const badge = {
