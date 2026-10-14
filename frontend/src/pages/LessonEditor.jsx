@@ -4,6 +4,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
+import EditableTitle from '../components/EditableTitle';
 import { parseTemplate } from '../lib/fillTemplate';
 import api from '../api';
 
@@ -283,7 +284,15 @@ function LessonEditor() {
                 <div>
                     {/* Position in the course, as on the course page (not order_index). */}
                     <div style={{ fontSize: 13, color: '#64748b' }}>Редактор урока {lesson.lesson_position}</div>
-                    <h2 style={{ margin: '4px 0 0' }}>{lesson.title}</h2>
+                    <EditableTitle
+                        as="h2"
+                        value={lesson.title}
+                        canEdit
+                        onSave={async title => {
+                            const res = await api.patch(`/lessons/${lessonId}/`, { title });
+                            setLesson(prev => ({ ...prev, title: res.data.title }));
+                        }}
+                    />
                 </div>
                 <button onClick={() => navigate(`/lesson/${lessonId}/`)} style={ghostBtn}>
                     👁 Предпросмотр

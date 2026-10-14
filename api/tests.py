@@ -181,6 +181,52 @@ class ReadAccessMatrixTests(APITestCase):
             self.assertEqual(response.status_code, expected, persona)
 
 
+class RenameTests(APITestCase):
+    """PATCH {"title"} on a course / lesson: owner only, validated, URL-neutral."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.other = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Python', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=cls.course, title='Variables', order_index=1)
+
+    def rename(self, user, kind, obj, title):
+        self.client.force_authenticate(user)
+        return self.client.patch(f'/api/{kind}/{obj.id}/', {'title': title}, format='json')
+
+    def test_owner_renames_course_and_slug_stays(self):
+        slug = self.course.slug
+        response = self.rename(self.author, 'courses', self.course, '  Новое название  ')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['title'], 'Новое название')
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.slug, slug)
+
+    def test_owner_renames_lesson(self):
+        response = self.rename(self.author, 'lessons', self.lesson, 'Типы данных')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['title'], 'Типы данных')
+
+    def test_others_cannot_rename(self):
+        self.assertEqual(self.rename(self.other, 'courses', self.course, 'X1').status_code, 403)
+        self.assertEqual(self.rename(self.student, 'courses', self.course, 'X1').status_code, 403)
+        self.assertEqual(self.rename(self.other, 'lessons', self.lesson, 'X1').status_code, 404)
+        self.assertEqual(self.rename(self.student, 'lessons', self.lesson, 'X1').status_code, 403)
+        self.course.refresh_from_db()
+        self.lesson.refresh_from_db()
+        self.assertEqual((self.course.title, self.lesson.title), ('Python', 'Variables'))
+
+    def test_empty_and_too_long_titles_are_rejected_in_russian(self):
+        for kind, obj in [('courses', self.course), ('lessons', self.lesson)]:
+            for title in ['', '   ', 'x' * 256]:
+                response = self.rename(self.author, kind, obj, title)
+                self.assertEqual(response.status_code, 400, (kind, title))
+                self.assertRegex(response.data['title'][0], '[А-Яа-я]')
+            self.assertEqual(self.rename(self.author, kind, obj, 'y' * 255).status_code, 200)
+
+
 class LessonNavigationTests(APITestCase):
     """GET /api/lessons/{id}/ carries course_title and next_lesson_id (the next
     lesson of the same course by order_index; null on the last lesson)."""

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import ChatPanel from '../components/ChatPanel';
+import EditableTitle from '../components/EditableTitle';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
 import './CoursePage.css';
 
@@ -141,6 +142,17 @@ function CoursePage() {
         }
     }
 
+    // Rename: the server's answer is the source of truth for the new title.
+    async function handleRenameCourse(title) {
+        const res = await api.patch(`/courses/${courseId}/`, { title });
+        setCourse(prev => ({ ...prev, title: res.data.title }));
+    }
+
+    async function handleRenameLesson(lessonId, title) {
+        const res = await api.patch(`/lessons/${lessonId}/`, { title });
+        setLessons(prev => prev.map(l => (l.id === lessonId ? { ...l, title: res.data.title } : l)));
+    }
+
     async function handleAddStudent(e) {
         e.preventDefault();
         setStudentError('');
@@ -245,7 +257,13 @@ function CoursePage() {
             </button>
             <div className="page__header">
                 <div>
-                    <h1 className="page__title">{course.title}</h1>
+                    <EditableTitle
+                        as="h1"
+                        className="page__title"
+                        value={course.title}
+                        canEdit={isOwner}
+                        onSave={handleRenameCourse}
+                    />
                     {course.description && <p className="page__lead">{course.description}</p>}
                 </div>
             </div>
@@ -289,11 +307,18 @@ function CoursePage() {
                     {lessons.map((lesson, index) => (
                         <div key={lesson.id} className="card card-link lesson-row">
                             <div className="lesson-row__text">
-                                <strong className="lesson-row__title">
-                                    <Link className="card-link__target" to={`/lesson/${lesson.id}/`}>
-                                        Урок {index + 1}: {lesson.title}
-                                    </Link>
-                                </strong>
+                                <EditableTitle
+                                    as="strong"
+                                    className="lesson-row__title"
+                                    value={lesson.title}
+                                    canEdit={isOwner}
+                                    onSave={title => handleRenameLesson(lesson.id, title)}
+                                    display={
+                                        <Link className="card-link__target" to={`/lesson/${lesson.id}/`}>
+                                            Урок {index + 1}: {lesson.title}
+                                        </Link>
+                                    }
+                                />
                                 <p className="lesson-row__hint">→ Открыть урок</p>
                             </div>
                             {isOwner && (

@@ -7,6 +7,7 @@ Serializers convert between:
 
 """
 
+from django.utils.translation import gettext
 from rest_framework import serializers
 from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message
@@ -58,6 +59,13 @@ class UserSerializer(serializers.ModelSerializer):
 # COURSE SERIALIZER
 # =============================================================================
 
+TITLE_ERRORS = {
+    'blank': 'Название не может быть пустым.',
+    'null': 'Название не может быть пустым.',
+    'max_length': 'Название не длиннее 255 символов.',
+}
+
+
 class CourseSerializer(serializers.ModelSerializer):
     """
     Serializer for Course model.
@@ -85,6 +93,7 @@ class CourseSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at']
+        extra_kwargs = {'title': {'error_messages': TITLE_ERRORS}}
 
     def get_lesson_count(self, obj):
         """Count lessons in this course"""
@@ -120,6 +129,7 @@ class LessonSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {'title': {'error_messages': TITLE_ERRORS}}
 
     def get_block_count(self, obj):
         """Count blocks in this lesson"""
@@ -128,10 +138,10 @@ class LessonSerializer(serializers.ModelSerializer):
     def validate_title(self, value):
         """Validate lesson title."""
         if not value or not value.strip():
-            raise serializers.ValidationError("Title cannot be empty.")
+            raise serializers.ValidationError(gettext('Название не может быть пустым.'))
 
         if len(value.strip()) < 2:
-            raise serializers.ValidationError("Title must be at least 2 characters.")
+            raise serializers.ValidationError(gettext('Название должно быть не короче 2 символов.'))
 
         return value.strip()
 

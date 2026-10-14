@@ -1,0 +1,37 @@
+/* Inline rename: title + small pencil, or the input that replaces them.
+   Tokens: backend/static/public/css/tokens.css */
+
+.editable-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.editable-title > :first-child {
+    min-width: 0;
+}
+
+.editable-title__pencil {
+    flex: none;
+    position: relative;
+    z-index: 1; /* above a card's stretched link */
+    padding-inline: var(--space-2);
+    color: var(--color-muted);
+}
+
+.editable-title__pencil:hover,
+.editable-title__pencil:focus-visible {
+    color: var(--color-accent);
+}
+
+.editable-title--editing {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    width: min(100%, var(--form-width));
+}
+
+.editable-title--editing .notice {
+    margin: 0;
+}
