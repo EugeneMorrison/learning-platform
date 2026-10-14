@@ -41,15 +41,29 @@ _load_dotenv(BASE_DIR / '.env')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY',
-    'django-insecure-141-unw@7284(f^5la_k&+m@!tyz_$^z2+%^!m41c8dl_ur_i4',
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
 # Production-safe default: DEBUG is off unless the environment / .env turns it on.
 DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1', 'yes')
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# It also signs the JWT login tokens (SIMPLE_JWT below). There is no fallback
+# in the code: without DEBUG the server refuses to start unless SECRET_KEY is
+# set in the environment (.env). With DEBUG on and no SECRET_KEY, a random key
+# is made once and kept in .dev-secret-key (git-ignored), so dev logins
+# survive restarts.
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
+if not SECRET_KEY:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            'SECRET_KEY is not set. Set it in the environment or .env '
+            '(see .env.example); the server does not start without it when DEBUG is off.'
+        )
+    _dev_key_file = BASE_DIR / '.dev-secret-key'
+    if not _dev_key_file.exists():
+        from django.core.management.utils import get_random_secret_key
+        _dev_key_file.write_text(get_random_secret_key(), encoding='utf-8')
+    SECRET_KEY = _dev_key_file.read_text(encoding='utf-8').strip()
 
 # Always allowed: the production IP and local access. ALLOWED_HOSTS in the
 # environment (comma-separated) adds more hosts, it never removes these.

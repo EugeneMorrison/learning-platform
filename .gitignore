@@ -33,6 +33,7 @@ desktop.ini
 # Environment variables
 .env
 .env.local
+.dev-secret-key
 
 # Test files
 check_permissions.py

@@ -696,25 +696,26 @@ RUN_TESTS_URL = '/api/run-tests/'
 
 
 def fake_run(stdout='2\n', returncode=0, stderr=''):
-    """Stand-in for subprocess.run: the tests never start a real interpreter."""
+    """Stand-in for runner.run_python: these tests never start an interpreter
+    (RunnerLockdownTests below do)."""
     return mock.patch(
-        'api.views.subprocess.run',
+        'api.views.run_python',
         return_value=subprocess.CompletedProcess(
             args=[], returncode=returncode, stdout=stdout, stderr=stderr),
     )
 
 
 def fake_program(outputs, errors=None):
-    """subprocess.run stand-in that answers by stdin: outputs[stdin] is printed;
+    """run_python stand-in that answers by stdin: outputs[stdin] is printed;
     stdin in `errors` exits with that stderr. Unknown stdin prints nothing."""
     errors = errors or {}
 
-    def run(args, input='', **kwargs):
-        if input in errors:
-            return subprocess.CompletedProcess(args, 1, stdout='', stderr=errors[input])
-        return subprocess.CompletedProcess(args, 0, stdout=outputs.get(input, '') + '\n', stderr='')
+    def run(code, stdin='', version=''):
+        if stdin in errors:
+            return subprocess.CompletedProcess([], 1, stdout='', stderr=errors[stdin])
+        return subprocess.CompletedProcess([], 0, stdout=outputs.get(stdin, '') + '\n', stderr='')
 
-    return mock.patch('api.views.subprocess.run', side_effect=run)
+    return mock.patch('api.views.run_python', side_effect=run)
 
 
 class StudentContentAndGradingTests(APITestCase):
@@ -834,7 +835,7 @@ class StudentContentAndGradingTests(APITestCase):
             response = self.run_tests(tests=[{'input': 'evil', 'expected': 'anything'}],
                                       is_correct=False)
 
-        self.assertEqual([c.kwargs['input'] for c in run.call_args_list],
+        self.assertEqual([c.kwargs['stdin'] for c in run.call_args_list],
                          ['in1', 'in2', self.HIDDEN_IN])
         self.assertEqual(response.data['status'], 'success')
         self.assertTrue(response.data['is_correct'])

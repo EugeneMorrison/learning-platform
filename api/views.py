@@ -24,9 +24,6 @@ from django.core.files.storage import default_storage
 from django.db import models, transaction
 from datetime import datetime
 import subprocess
-import sys
-import tempfile
-import os
 import copy
 import uuid
 
@@ -37,6 +34,7 @@ from rest_framework.views import APIView
 
 from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed
+from .runner import RunnerUnavailable, run_python
 from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
@@ -76,22 +74,6 @@ def status_view(request):
         'timestamp': datetime.now().isoformat(),
         'version': '1.0.0'
     })
-
-
-PYTHON_BINARIES = {
-    'Python 3.10': '/usr/local/bin/python3.10',
-    'Python 3.12': '/usr/local/bin/python3.12',
-}
-
-
-def resolve_python(version_str):
-    # In Docker (Linux) the mapped binaries exist — return them.
-    # In manual setup (Windows/macOS) they don't, so fall back to the
-    # interpreter running Django, which is whatever's in the venv.
-    path = PYTHON_BINARIES.get(version_str)
-    if path and os.path.exists(path):
-        return path
-    return sys.executable
 
 
 def get_accessible_block(user, block_id, missing_message, forbidden_message):
@@ -183,26 +165,10 @@ class RunCodeView(CodeRunnerAccessMixin, APIView):
         if not code.strip():
             return Response({'error': 'No code provided'}, status=400)
 
-        tmp_path = None
+        # api/runner.py: empty environment, own temp dir, resource limits,
+        # unprivileged user in Docker.
         try:
-            with tempfile.NamedTemporaryFile(
-                mode='w', suffix='.py', delete=False, encoding='utf-8'
-            ) as f:
-                f.write(code)
-                tmp_path = f.name
-
-            run_env = os.environ.copy()
-            run_env['PYTHONUTF8'] = '1'
-            result = subprocess.run(
-                [resolve_python(version), tmp_path],
-                input=stdin,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                encoding='utf-8',
-                errors='replace',
-                env=run_env,
-            )
+            result = run_python(code, stdin=stdin, version=version)
             return Response({
                 'stdout': result.stdout,
                 'stderr': result.stderr,
@@ -210,14 +176,10 @@ class RunCodeView(CodeRunnerAccessMixin, APIView):
             })
         except subprocess.TimeoutExpired:
             return Response({'error': 'Time limit exceeded (5s)'}, status=408)
+        except RunnerUnavailable:
+            return Response({'error': 'Code runner is not available'}, status=503)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
-        finally:
-            if tmp_path:
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
 
 
 class RunTestsView(CodeRunnerAccessMixin, APIView):
@@ -245,22 +207,12 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
         if not tests:
             return Response({'error': 'No tests provided'}, status=400)
 
-        tmp_path = None
         try:
-            with tempfile.NamedTemporaryFile(
-                mode='w', suffix='.py', delete=False, encoding='utf-8'
-            ) as f:
-                f.write(code)
-                tmp_path = f.name
-            outcome = self.run_all(tmp_path, version, tests)
+            outcome = self.run_all(code, version, tests)
+        except RunnerUnavailable:
+            return Response({'error': 'Code runner is not available'}, status=503)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
-        finally:
-            if tmp_path:
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
 
         is_correct = outcome['status'] == 'success'
         progress = record_answer(request.user, block, {'code': code}, is_correct)
@@ -269,7 +221,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
         return Response(outcome)
 
     @staticmethod
-    def run_all(tmp_path, version, tests):
+    def run_all(code, version, tests):
         visible = test_visibility(tests)
         total = len(tests)
         results = []
@@ -291,18 +243,8 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
         for i, test in enumerate(tests):
             stdin, expected = normalize_test(test)
             try:
-                run_env = os.environ.copy()
-                run_env['PYTHONUTF8'] = '1'
-                proc = subprocess.run(
-                    [resolve_python(version), tmp_path],
-                    input=stdin,
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    encoding='utf-8',
-                    errors='replace',
-                    env=run_env,
-                )
+                # A fresh run per test (api/runner.py): nothing carries over.
+                proc = run_python(code, stdin=stdin, version=version)
             except subprocess.TimeoutExpired:
                 return stop('error', i, input=stdin, stderr='Time limit exceeded (5s)')
 

@@ -50,6 +50,16 @@ COPY --from=py310 /usr/local/lib/python3.10 /usr/local/lib/python3.10
 COPY --from=py310 /usr/local/lib/libpython3.10.so.1.0 /usr/local/lib/libpython3.10.so.1.0
 RUN ldconfig && python3.10 --version
 
+# --- Code runner user (api/runner.py) -------------------------------
+# Student code runs as this unprivileged system user, never as root.
+# It owns nothing. Each run gets its own directory under
+# /var/lib/runner: root-owned and 0711, so the runner can enter its
+# own run directory but can't list or write the parent.
+RUN groupadd --system runner \
+ && useradd --system --gid runner --no-create-home \
+        --home-dir /nonexistent --shell /usr/sbin/nologin runner \
+ && mkdir -p /var/lib/runner && chmod 0711 /var/lib/runner
+
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -70,11 +80,23 @@ COPY --from=frontend-build /app/frontend/dist frontend/dist/
 ENV DB_DIR=/app/db
 RUN mkdir -p /app/db
 
+# --- Keep the runner user out ---------------------------------------
+# /app (code, database volume, media volume, static files) is
+# root-only: without x on /app the runner can't reach anything below
+# it, the volumes mounted at /app/db and /app/media included.
+# No directory in the image stays world-writable (/tmp, /var/tmp,
+# /run/lock, ...), so the runner can write only in its run directory.
+RUN chmod 0700 /app \
+ && find / -xdev -type d -perm -0002 -exec chmod o-w {} +
+
 # Port Django will listen on
 EXPOSE 8000
 
-# On startup: run migrations, load test data, start server
+# On startup: run migrations, load test data, start server.
+# /dev/shm and /dev/mqueue are mounted by Docker at run time (world-
+# writable), so the runner's write access is removed here, not above.
 CMD ["bash", "-c", "\
+    (chmod o-w /dev/shm /dev/mqueue 2>/dev/null || true) && \
     echo 'Running migrations...' && \
     python manage.py migrate && \
     python manage.py loaddata fixtures.json 2>/dev/null || true && \
