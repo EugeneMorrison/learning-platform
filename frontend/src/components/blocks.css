@@ -460,6 +460,15 @@
     resize: none;
 }
 
+/* Focus = the cobalt border alone, like .fill-blank (no outer ring). The border
+   keeps its width, so the box does not change size. */
+.input.code-input:focus,
+.input.code-input:focus-visible {
+    border-color: var(--color-accent);
+    outline: none;
+    box-shadow: none;
+}
+
 /* Output of "Запустить код": the dark code-card look from the landing. */
 .run-output {
     margin-bottom: var(--space-4);
