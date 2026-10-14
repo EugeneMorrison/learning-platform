@@ -162,12 +162,16 @@ class RunnerLimitsTests(SimpleTestCase):
         result = run("while True:\n    print('x' * 1000)")
         self.assertNotEqual(result.returncode, 0)
         self.assertLessEqual(len(result.stdout), runner.FILE_BYTES)
+        # A clear reason, not the raw EFBIG traceback the cap causes.
         self.assertIn('Output limit exceeded', result.stderr)
+        self.assertNotIn('Errno 27', result.stderr)
+        self.assertNotIn('Traceback', result.stderr)
 
     def test_large_file_is_capped(self):
         result = run("open('big.bin', 'wb').write(b'x' * (5 * 1024 ** 2))\nprint('written')")
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn('written', result.stdout)
+        self.assertIn('File size limit exceeded', result.stderr)
 
     def test_forked_children_do_not_outlive_the_run(self):
         result = run("""
@@ -196,33 +200,54 @@ class RunnerUserTests(SimpleTestCase):
         self.assertEqual(groups.strip(), '[]')
 
     def test_cannot_read_database_code_media_or_env(self):
-        targets = {
-            'database': str(settings.DATABASES['default']['NAME']),
-            'code': str(Path(settings.BASE_DIR) / 'backend' / 'settings.py'),
-            'env': str(Path(settings.BASE_DIR) / '.env'),
-            'pid1_environ': '/proc/1/environ',
+        # The REAL production paths. Not settings.DATABASES: during tests
+        # Django replaces its NAME with the in-memory test database.
+        app = Path(settings.BASE_DIR)
+        files = {
+            'database': Path(settings.DB_DIR) / 'db.sqlite3',
+            'code': app / 'backend' / 'settings.py',
+            'env': app / '.env',
+            'media_file': Path(settings.MEDIA_ROOT) / 'runner-probe.txt',
+            'pid1_environ': Path('/proc/1/environ'),
         }
-        result = run(f"""
-            import json
-            out = {{}}
-            for name, path in {targets!r}.items():
-                try:
-                    open(path, 'rb').read(1)
-                    out[name] = 'READ'
-                except Exception as exc:
-                    out[name] = type(exc).__name__
-            for name, path in {{'media': {str(settings.MEDIA_ROOT)!r}, 'app': {str(settings.BASE_DIR)!r}}}.items():
-                try:
-                    import os
-                    os.listdir(path)
-                    out[name] = 'LISTED'
-                except Exception as exc:
-                    out[name] = type(exc).__name__
-            print(json.dumps(out))
-        """)
+        dirs = {'app': app, 'db_dir': Path(settings.DB_DIR), 'media': Path(settings.MEDIA_ROOT)}
+
+        # Something real to read: dummies where the test container has none
+        # (removed afterwards; existing files are never touched).
+        created = []
+        for name in ('database', 'env', 'media_file'):
+            path = files[name]
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'dummy for test_cannot_read_database_code_media_or_env')
+                created.append(path)
+        try:
+            probes = {name: ('read', str(p)) for name, p in files.items()}
+            probes.update({name: ('list', str(p)) for name, p in dirs.items()})
+            result = run(f"""
+                import json, os
+                out = {{}}
+                for name, (how, path) in {probes!r}.items():
+                    try:
+                        if how == 'read':
+                            open(path, 'rb').read(1)
+                        else:
+                            os.listdir(path)
+                        out[name] = 'ALLOWED'
+                    except Exception as exc:
+                        out[name] = type(exc).__name__
+                print(json.dumps(out))
+            """)
+        finally:
+            for path in created:
+                path.unlink()
+        self.assertEqual(result.returncode, 0, result.stderr)
         out = json.loads(result.stdout)
-        for name, outcome in out.items():
-            self.assertEqual(outcome, 'PermissionError', name)
+        self.assertEqual(set(out), set(probes))
+        # Every item, not just the first failure: all mismatches at once.
+        failures = {name: f'{outcome} ({probes[name][0]} {probes[name][1]})'
+                    for name, outcome in out.items() if outcome != 'PermissionError'}
+        self.assertEqual(failures, {})
 
     def test_cannot_write_outside_its_run_directory(self):
         result = run("""

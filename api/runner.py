@@ -156,11 +156,23 @@ def run_python(code, stdin='', version=''):
             finally:
                 # Also after a normal exit: children it left behind go too.
                 _kill(proc)
+            # The file size limit stops output at FILE_BYTES. Python ignores
+            # SIGXFSZ, so the student's print() gets EFBIG ("OSError: [Errno
+            # 27] File too large") rather than the process being killed:
+            # detect the cap by the size the output reached.
+            stdout_capped = os.fstat(out.fileno()).st_size >= FILE_BYTES
+            stderr_capped = os.fstat(err.fileno()).st_size >= FILE_BYTES
             stdout, stderr = _read(out), _read(err)
 
         returncode = proc.returncode
-        if os.name == 'posix' and returncode == -signal.SIGXFSZ:
-            stderr += f'\nOutput limit exceeded ({FILE_BYTES // 1024 ** 2} MB)'
+        limit_mb = FILE_BYTES // 1024 ** 2
+        if os.name == 'posix' and (stdout_capped or stderr_capped or returncode == -signal.SIGXFSZ):
+            # The traceback is our own limit firing: show the reason instead.
+            message = f'Output limit exceeded ({limit_mb} MB)'
+            stderr = f'{stderr}\n{message}' if stderr_capped else message
+        elif os.name == 'posix' and '[Errno 27]' in stderr:
+            # A file the code wrote itself went over the limit.
+            stderr += f'\nFile size limit exceeded ({limit_mb} MB)'
         elif os.name == 'posix' and returncode in (-signal.SIGXCPU, -signal.SIGKILL):
             stderr += f'\nTime limit exceeded ({CPU_SECONDS}s CPU)'
         return subprocess.CompletedProcess(args, returncode, stdout, stderr)
