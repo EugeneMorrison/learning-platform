@@ -1,0 +1,12 @@
+{% load i18n %}{% autoescape off %}{% blocktranslate %}Здравствуйте, {{ username }}!{% endblocktranslate %}
+
+{% translate "Чтобы завершить регистрацию, подтвердите адрес почты по ссылке:" %}
+
+{{ link }}
+
+{% translate "Ссылка действует 24 часа и только один раз." %}
+
+{% translate "Если вы не регистрировались на нашем сайте, просто проигнорируйте это письмо." %}
+
+{{ site_url }}
+{% endautoescape %}

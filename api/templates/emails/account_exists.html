@@ -1,0 +1,10 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ language }}">
+<body style="margin:0;padding:24px;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#111;">
+  <p>{% blocktranslate %}Здравствуйте, {{ username }}!{% endblocktranslate %}</p>
+  <p>{% translate "Кто-то пытался зарегистрироваться на нашем сайте с этим адресом почты. Аккаунт с этим адресом у вас уже есть, новый не создан." %}</p>
+  <p>{% translate "Если это были вы, просто войдите:" %}</p>
+  <p><a href="{{ login_link }}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#2340D6;color:#fff;text-decoration:none;">{% translate "Войти" %}</a></p>
+  <p style="color:#555;">{% translate "Если это были не вы, ничего делать не нужно." %}</p>
+</body>
+</html>

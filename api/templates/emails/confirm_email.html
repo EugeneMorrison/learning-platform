@@ -1,0 +1,11 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ language }}">
+<body style="margin:0;padding:24px;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#111;">
+  <p>{% blocktranslate %}Здравствуйте, {{ username }}!{% endblocktranslate %}</p>
+  <p>{% translate "Чтобы завершить регистрацию, подтвердите адрес почты по ссылке:" %}</p>
+  <p><a href="{{ link }}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#2340D6;color:#fff;text-decoration:none;">{% translate "Подтвердить адрес почты" %}</a></p>
+  <p style="color:#555;">{% translate "Если кнопка не работает, скопируйте ссылку в адресную строку браузера:" %}<br><a href="{{ link }}" style="color:#2340D6;word-break:break-all;">{{ link }}</a></p>
+  <p style="color:#555;">{% translate "Ссылка действует 24 часа и только один раз." %}</p>
+  <p style="color:#555;">{% translate "Если вы не регистрировались на нашем сайте, просто проигнорируйте это письмо." %}</p>
+</body>
+</html>

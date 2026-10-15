@@ -11,7 +11,8 @@ Model Relationships:
 
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
+from django.db.models.functions import Lower
 from slugify import slugify
 
 
@@ -65,6 +66,15 @@ class BlockQuerySet(models.QuerySet):
 # USER MODEL (Extended Authentication)
 # =============================================================================
 
+class UserManager(DjangoUserManager):
+    """createsuperuser accounts are confirmed from the start: they never get a
+    confirmation email and must be able to log in right away."""
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('email_verified', True)
+        return super().create_superuser(username, email, password, **extra_fields)
+
+
 class User(AbstractUser):
     """
     Extended Django User model with role-based access.
@@ -92,8 +102,28 @@ class User(AbstractUser):
         help_text="User's role in the platform"
     )
 
+    # Public sign-up creates unconfirmed accounts; login waits for the emailed
+    # link (api/email_confirmation.py). Superusers, admin-created and seeded
+    # users are confirmed from the start; the migration confirmed existing users.
+    email_verified = models.BooleanField(
+        default=False,
+        help_text="The user confirmed this email address (required to log in)"
+    )
+    # Consent to the personal data policy given at sign-up: when, and which
+    # version of the policy (settings.PRIVACY_POLICY_VERSION at that moment).
+    accepted_privacy_at = models.DateTimeField(null=True, blank=True)
+    privacy_version = models.CharField(max_length=20, blank=True)
+
+    objects = UserManager()
+
     class Meta:
         db_table = 'users'  # Custom table name (cleaner than auth_user)
+        constraints = [
+            # One account per address, whatever the letter case (sign-up stores it
+            # lowercased). Empty emails (older accounts) are not constrained.
+            models.UniqueConstraint(
+                Lower('email'), condition=~models.Q(email=''), name='users_email_ci_unique'),
+        ]
 
     def __str__(self):
         return f"{self.username} ({self.role})"

@@ -2,14 +2,22 @@
 Authentication Views for the Learning Platform
 
 Provides:
-- User registration
-- Login (get JWT tokens)
+- User registration (with an emailed confirmation link)
+- Email confirmation and resending the link
+- Login (get JWT tokens; only for confirmed addresses)
 - Get current user info
 - Logout (client-side token deletion)
 """
 
+from urllib.parse import urlencode
+
+from django.conf import settings
+from django.core.validators import validate_email
+from django.db import IntegrityError, transaction
+from django.shortcuts import redirect
+from django.utils import timezone, translation
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -17,7 +25,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import (
     MinimumLengthValidator, get_default_password_validators, validate_password)
 from django.core.exceptions import ValidationError as DjangoValidationError
+from .email_confirmation import (
+    confirm_email, normalize_email, safe_next, send_account_exists_email, send_confirmation_email)
 from .serializers import UserSerializer
+from .throttles import RegisterThrottle, ResendConfirmationEmailThrottle, ResendConfirmationThrottle
 
 User = get_user_model()
 
@@ -39,14 +50,35 @@ def _register_error(message, code, **extra):
     return Response({'error': message, 'code': code, **extra}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def _registered(email):
+    """The one sign-up answer, whether or not the address already had an account
+    (no way to tell from outside which addresses are registered)."""
+    return Response({
+        'detail': f'Мы отправили письмо на {email}. Откройте ссылку из письма, чтобы подтвердить адрес и войти.',
+        'email': email,
+    }, status=status.HTTP_201_CREATED)
+
+
+def _email_language(request):
+    """Language for emails: the site's language cookie (RU/EN switch on the public
+    pages), else the browser's Accept-Language, else Russian. Not the active
+    language: /api/ has no /en/ prefix, so Django always activates Russian there."""
+    return translation.get_language_from_request(request)
+
+
+def _is_true(value):
+    return value is True or str(value).lower() in ('true', '1', 'on', 'yes')
+
+
 @api_view(['POST'])
 @authentication_classes([])  # never authenticates: a stale token in the header can't 401 sign-up
 @permission_classes([AllowAny])  # Anyone can register
+@throttle_classes([RegisterThrottle])  # it sends an email: limited per IP
 def register_view(request):
     """
-    Register a new user and log them in. Public registration always creates
-    a STUDENT: any "role" in the body is ignored. Authors and admins are
-    created only in the Django admin.
+    Register a new STUDENT account and email a confirmation link. Any "role" in
+    the body is ignored; authors and admins are created in the Django admin.
+    No tokens: the account can log in once the address is confirmed.
 
     POST /api/auth/register/
 
@@ -54,80 +86,135 @@ def register_view(request):
     {
         "username": "alice",
         "email": "alice@example.com",
-        "password": "password123"
+        "password": "password123",
+        "accept_privacy": true,
+        "next": "/enroll/<id>/"   (optional: where to continue after login)
     }
 
-    Returns 201, same shape as login:
-    {
-        "user": {...},
-        "tokens": {
-            "access": "...",
-            "refresh": "..."
-        }
-    }
+    Returns 201 {"detail": "...", "email": "alice@example.com"}. The same 201
+    when the address already has an account: then no account is created and the
+    address's owner gets an "you already have an account" email instead.
 
     Errors (400): {"error": "...", "code": ...}, code is one of
-    "required" (+ "fields"), "invalid_username", "username_taken",
-    "email_taken", "weak_password" (+ "codes" and "messages" from Django's
-    AUTH_PASSWORD_VALIDATORS, and "min_length" from MinimumLengthValidator).
+    "required" (+ "fields"), "privacy_required", "invalid_username",
+    "invalid_email", "username_taken", "weak_password" (+ "codes" and
+    "messages" from Django's AUTH_PASSWORD_VALIDATORS, and "min_length" from
+    MinimumLengthValidator). 429 when the IP has registered too often.
     """
-    # Get data from request
     username = (request.data.get('username') or '').strip()
-    email = request.data.get('email')
+    email = normalize_email(request.data.get('email'))
     password = request.data.get('password') or ''
     first_name = request.data.get('first_name', '')
     last_name = request.data.get('last_name', '')
 
-    # Validation
-    missing = [name for name, value in (('username', username), ('password', password)) if not value]
+    missing = [name for name, value in (('username', username), ('email', email), ('password', password))
+               if not value]
     if missing:
-        return _register_error('Username and password are required', 'required', fields=missing)
+        return _register_error('Заполните имя пользователя, почту и пароль.', 'required', fields=missing)
+
+    if not _is_true(request.data.get('accept_privacy')):
+        return _register_error('Нужно согласие с политикой обработки персональных данных.', 'privacy_required')
 
     try:
         User.username_validator(username)
     except DjangoValidationError:
-        return _register_error('Invalid username', 'invalid_username')
+        return _register_error('Недопустимое имя пользователя.', 'invalid_username')
+
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        return _register_error('Введите правильный адрес почты.', 'invalid_email')
 
     # Case-insensitive: "Alice" can't sign up next to "alice" (login stays exact).
     if User.objects.filter(username__iexact=username).exists():
-        return _register_error('Username already exists', 'username_taken')
+        return _register_error('Это имя пользователя уже занято.', 'username_taken')
 
     # The project's AUTH_PASSWORD_VALIDATORS (length, common, numeric, similar to username).
     try:
-        validate_password(password, user=User(username=username, email=email or ''))
+        validate_password(password, user=User(username=username, email=email))
     except DjangoValidationError as exc:
         return _register_error(
-            'Password is too weak', 'weak_password',
+            'Слишком простой пароль.', 'weak_password',
             codes=[e.code for e in exc.error_list],
             messages=list(exc.messages),
             min_length=_min_password_length(),
         )
 
-    # Check if email already exists
-    if email and User.objects.filter(email=email).exists():
-        return _register_error('Email already exists', 'email_taken')
+    language = _email_language(request)
+    existing = User.objects.filter(email__iexact=email).first()
+    if existing is None:
+        try:
+            with transaction.atomic():
+                # Role is fixed: never taken from the request.
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,  # Django automatically hashes password
+                    role='STUDENT',
+                    first_name=first_name,
+                    last_name=last_name,
+                    email_verified=False,
+                    accepted_privacy_at=timezone.now(),
+                    privacy_version=settings.PRIVACY_POLICY_VERSION,
+                )
+        except IntegrityError:
+            # A simultaneous sign-up took the address (or the username) first.
+            existing = User.objects.filter(email__iexact=email).first()
+            if existing is None:
+                return _register_error('Это имя пользователя уже занято.', 'username_taken')
+        else:
+            send_confirmation_email(user, language, request.data.get('next'))
+            return _registered(email)
 
-    # Create user. Role is fixed: never taken from the request.
-    user = User.objects.create_user(
-        username=username,
-        email=email,
-        password=password,  # Django automatically hashes password
-        role='STUDENT',
-        first_name=first_name,
-        last_name=last_name
-    )
+    send_account_exists_email(existing, language)
+    return _registered(email)
 
-    # Generate JWT tokens
-    refresh = RefreshToken.for_user(user)
 
-    # Return user data + tokens
+# =============================================================================
+# EMAIL CONFIRMATION
+# =============================================================================
+
+def confirm_email_view(request):
+    """
+    GET /api/auth/confirm-email/?token=...  (the link in the confirmation email)
+
+    Confirms the address and redirects to the login page, which shows the
+    result: /login/?confirm=ok | expired | invalid | used (plus the local
+    ?next= path from sign-up, if any). Works in any browser: the token alone
+    identifies the account.
+    """
+    query = {'confirm': confirm_email(request.GET.get('token'))}
+    if safe_next(request.GET.get('next')):
+        query['next'] = safe_next(request.GET.get('next'))  # e.g. back to joining a course
+    return redirect(f'/login/?{urlencode(query)}')
+
+
+@api_view(['POST'])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@throttle_classes([ResendConfirmationThrottle, ResendConfirmationEmailThrottle])
+def resend_confirmation_view(request):
+    """
+    POST /api/auth/resend-confirmation/  {"email": "alice@example.com", "next": optional}
+
+    Sends a new confirmation link if the address belongs to an account that
+    is not confirmed yet. The answer is the same in every case (no way to tell
+    which addresses are registered). 400 without a valid address; 429 after
+    3 requests an hour from one IP or for one address.
+    """
+    email = normalize_email(request.data.get('email'))
+    try:
+        validate_email(email)
+    except DjangoValidationError:
+        return Response({'error': 'Введите правильный адрес почты.', 'code': 'invalid_email'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    user = User.objects.filter(email__iexact=email, email_verified=False, is_active=True).first()
+    if user is not None:
+        send_confirmation_email(user, _email_language(request), request.data.get('next'))
     return Response({
-        'user': UserSerializer(user).data,
-        'tokens': {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }
-    }, status=status.HTTP_201_CREATED)
+        'detail': 'Если этот адрес зарегистрирован и ещё не подтверждён, мы отправили на него новое письмо.',
+    })
 
 
 # =============================================================================
@@ -156,6 +243,10 @@ def login_view(request):
             "refresh": "..."
         }
     }
+
+    403 {"code": "email_not_verified", "error": "...", "email": "..."} for a
+    correct password on an unconfirmed account: the client offers to resend
+    the link (/api/auth/resend-confirmation/) to that address.
     """
     from django.contrib.auth import authenticate
 
@@ -182,6 +273,13 @@ def login_view(request):
     if not user.is_active:
         return Response(
             {'error': 'User account is disabled'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Only after the password checked out: the address is the user's own.
+    if not user.email_verified:
+        return Response(
+            {'error': 'Подтвердите адрес почты', 'code': 'email_not_verified', 'email': user.email},
             status=status.HTTP_403_FORBIDDEN
         )
 

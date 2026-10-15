@@ -7,6 +7,7 @@ the code runner (/api/run-code/, /api/run-tests/), and the course chat
 Run with: python manage.py test api
 """
 
+import re
 import subprocess
 from decimal import Decimal
 from unittest import mock
@@ -1206,57 +1207,141 @@ class CodeRunnerAccessTests(APITestCase):
         self.assertEqual((first, second, author), (200, 429, 200))
 
 
-class RegistrationRoleTests(APITestCase):
-    def register(self, username, **extra):
-        return self.client.post(
-            REGISTER_URL, {'username': username, 'password': 'Sup3r-secret-pass', **extra},
-            format='json')
+LOGIN_URL = '/api/auth/login/'
+RESEND_URL = '/api/auth/resend-confirmation/'
+CONFIRM_URL = '/api/auth/confirm-email/'
 
+
+class SignUpTestCase(APITestCase):
+    """Helpers for the sign-up tests. The rate-limit counters live in the cache,
+    so every test starts with an empty one."""
+
+    def setUp(self):
+        cache.clear()
+
+    def register(self, username='newbie', password='Sup3r-secret-pass', email=None,
+                 accept_privacy=True, **extra):
+        body = {'username': username, 'password': password,
+                'email': f'{username}@example.com' if email is None else email,
+                'accept_privacy': accept_privacy, **extra}
+        return self.client.post(REGISTER_URL, body, format='json')
+
+    def login(self, username='newbie', password='Sup3r-secret-pass'):
+        return self.client.post(LOGIN_URL, {'username': username, 'password': password}, format='json')
+
+    def link_from(self, message):
+        """The confirmation link in an email (plain text and HTML carry the same one)."""
+        link = re.search(r'https?://\S+/api/auth/confirm-email/\?token=\S+', message.body).group(0)
+        self.assertIn(link.replace('&', '&amp;'), message.alternatives[0][0])
+        return link
+
+    def open_link(self, link):
+        """Follow the link like a browser would; returns the ?confirm= result."""
+        from urllib.parse import urlsplit, parse_qs
+        path = '/' + link.split('://', 1)[1].split('/', 1)[1]
+        response = self.client_class().get(path)  # a fresh client: no session, no cookies
+        self.assertEqual(response.status_code, 302)
+        target = urlsplit(response['Location'])
+        self.assertEqual(target.path, '/login/')
+        return parse_qs(target.query)['confirm'][0]
+
+
+class RegistrationRoleTests(SignUpTestCase):
     def test_client_supplied_role_is_ignored(self):
         for username, role in [('wants_author', 'AUTHOR'), ('wants_admin', 'ADMIN'),
                                ('bogus_role', 'SUPERUSER')]:
             response = self.register(username, role=role)
 
             self.assertEqual(response.status_code, 201, role)
-            self.assertEqual(response.data['user']['role'], 'STUDENT', role)
             user = User.objects.get(username=username)
             self.assertEqual(user.role, 'STUDENT', role)
             self.assertFalse(user.is_staff or user.is_superuser, role)
 
     def test_no_role_registers_student(self):
-        response = self.register('plain')
-
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['user']['role'], 'STUDENT')
+        self.assertEqual(self.register('plain').status_code, 201)
         self.assertEqual(User.objects.get(username='plain').role, 'STUDENT')
 
 
-class RegistrationFlowTests(APITestCase):
-    """Sign-up logs the user in (same token pair as login) or explains the error."""
+class RegistrationFlowTests(SignUpTestCase):
+    """Sign-up creates an unconfirmed student and emails a link, or explains the error."""
 
-    def register(self, username='newbie', password='Sup3r-secret-pass', **extra):
-        return self.client.post(
-            REGISTER_URL, {'username': username, 'password': password, **extra}, format='json')
+    def test_success_sends_one_email_and_no_tokens(self):
+        from django.core import mail
 
-    def test_success_returns_user_and_working_token_pair(self):
-        response = self.register()
+        response = self.register(email='  NewBie@Example.COM ')
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['user']['username'], 'newbie')
-        tokens = response.data['tokens']
-        self.assertEqual(set(tokens), {'access', 'refresh'})
+        self.assertEqual(response.data['email'], 'newbie@example.com')
+        self.assertIn('newbie@example.com', response.data['detail'])
+        self.assertNotIn('tokens', response.data)
+        user = User.objects.get(username='newbie')
+        self.assertEqual(user.email, 'newbie@example.com')  # stored lowercased
+        self.assertFalse(user.email_verified)
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ['newbie@example.com'])
+        self.assertEqual(message.subject, 'Подтвердите адрес почты')
+        self.assertIn('Здравствуйте, newbie!', message.body)
+        self.assertEqual(message.alternatives[0][1], 'text/html')
+        self.link_from(message)
 
-        # The access token logs the new user in...
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {tokens['access']}")
-        me = self.client.get('/api/auth/me/')
-        self.assertEqual(me.status_code, 200)
-        self.assertEqual(me.data['username'], 'newbie')
-        # ...and the refresh token renews it, exactly as after /login/.
-        self.client.credentials()
-        refreshed = self.client.post('/api/auth/token/refresh/', {'refresh': tokens['refresh']},
-                                     format='json')
-        self.assertEqual(refreshed.status_code, 200)
-        self.assertIn('access', refreshed.data)
+    def test_consent_is_required_and_stored(self):
+        from django.conf import settings
+
+        for value in [False, None, '']:
+            self.assert_rejected(self.register(accept_privacy=value), 'privacy_required')
+        self.assertFalse(User.objects.exists())
+
+        self.assertEqual(self.register().status_code, 201)
+        user = User.objects.get(username='newbie')
+        self.assertIsNotNone(user.accepted_privacy_at)
+        self.assertEqual(user.privacy_version, settings.PRIVACY_POLICY_VERSION)
+
+    def test_email_is_required_and_validated(self):
+        response = self.register(email='')
+        self.assert_rejected(response, 'required')
+        self.assertEqual(response.data['fields'], ['email'])
+        for bad in ['not-an-email', 'a@b', 'two@at@example.com']:
+            self.assert_rejected(self.register(email=bad), 'invalid_email')
+        self.assertFalse(User.objects.exists())
+
+    def test_english_email_for_english_requests(self):
+        from django.core import mail
+
+        self.client.post(REGISTER_URL, {'username': 'newbie', 'password': 'Sup3r-secret-pass',
+                                        'email': 'newbie@example.com', 'accept_privacy': True},
+                         format='json', HTTP_ACCEPT_LANGUAGE='en')
+        self.assertEqual(mail.outbox[0].subject, 'Confirm your email address')
+        self.assertIn('Hello, newbie!', mail.outbox[0].body)
+
+    def test_duplicate_email_in_another_case_is_neutral(self):
+        from django.core import mail
+
+        User.objects.create_user(username='alice', email='alice@example.com', password='x',
+                                 email_verified=True)
+        response = self.register(username='alice2', email='ALICE@Example.com')
+
+        # Looks exactly like a successful sign-up...
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['email'], 'alice@example.com')
+        # ...but no second account; the owner is told they can log in.
+        self.assertFalse(User.objects.filter(username='alice2').exists())
+        self.assertEqual(User.objects.filter(email__iexact='alice@example.com').count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['alice@example.com'])
+        self.assertEqual(mail.outbox[0].subject, 'У вас уже есть аккаунт')
+        self.assertIn('/login/', mail.outbox[0].body)
+        self.assertNotIn('confirm-email', mail.outbox[0].body)
+
+    def test_database_refuses_a_second_account_for_the_same_address(self):
+        from django.db import IntegrityError, transaction
+
+        User.objects.create_user(username='a', email='same@example.com', password='x')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user(username='b', email='SAME@example.com', password='x')
+        # Accounts without an email are not affected.
+        User.objects.create_user(username='c', password='x')
+        User.objects.create_user(username='d', password='x')
 
     def test_stale_token_in_header_does_not_block_sign_up(self):
         self.client.credentials(HTTP_AUTHORIZATION='Bearer stale.garbage.token')
@@ -1269,10 +1354,10 @@ class RegistrationFlowTests(APITestCase):
         self.assertNotIn('tokens', response.data)
 
     def test_empty_fields(self):
-        response = self.register(username='  ', password='')
+        response = self.register(username='  ', password='', email='')
 
         self.assert_rejected(response, 'required')
-        self.assertEqual(response.data['fields'], ['username', 'password'])
+        self.assertEqual(response.data['fields'], ['username', 'email', 'password'])
         self.assertFalse(User.objects.exists())
 
     def test_username_taken(self):
@@ -1282,19 +1367,18 @@ class RegistrationFlowTests(APITestCase):
         self.assertEqual(User.objects.count(), 1)
 
     def test_username_taken_ignores_case(self):
-        User.objects.create_user(username='alice', password='Sup3r-secret-pass')
+        User.objects.create_user(username='alice', password='Sup3r-secret-pass', email_verified=True)
 
         for username in ['Alice', 'ALICE', 'aLiCe']:
             self.assert_rejected(self.register(username=username), 'username_taken')
         self.assertEqual(User.objects.count(), 1)
         # Login itself stays exact: only the stored spelling works.
-        login = lambda name: self.client.post(
-            '/api/auth/login/', {'username': name, 'password': 'Sup3r-secret-pass'}, format='json')
-        self.assertEqual(login('alice').status_code, 200)
-        self.assertEqual(login('Alice').status_code, 401)
+        self.assertEqual(self.login('alice').status_code, 200)
+        self.assertEqual(self.login('Alice').status_code, 401)
 
     def test_invalid_username(self):
-        self.assert_rejected(self.register(username='two words'), 'invalid_username')
+        self.assert_rejected(self.register(username='two words', email='x@example.com'),
+                             'invalid_username')
         self.assertFalse(User.objects.exists())
 
     def test_weak_passwords_use_the_project_validators(self):
@@ -1319,6 +1403,205 @@ class RegistrationFlowTests(APITestCase):
         self.assert_rejected(response, 'weak_password')
         self.assertEqual(response.data['codes'], ['password_too_short'])
         self.assertEqual(response.data['min_length'], 12)
+
+    def test_sign_up_is_rate_limited_per_ip(self):
+        from rest_framework.throttling import SimpleRateThrottle
+
+        with mock.patch.dict(SimpleRateThrottle.THROTTLE_RATES, {'register': '2/hour'}):
+            codes = [self.register(username=f'user{n}').status_code for n in range(3)]
+        self.assertEqual(codes, [201, 201, 429])
+
+
+class EmailConfirmationTests(SignUpTestCase):
+    """The emailed link confirms once, within 24 hours; login waits for it."""
+
+    def sign_up(self):
+        from django.core import mail
+
+        self.register()
+        return self.link_from(mail.outbox[-1])
+
+    def test_link_confirms_and_then_login_works(self):
+        link = self.sign_up()
+
+        blocked = self.login()
+        self.assertEqual(blocked.status_code, 403)
+        self.assertEqual(blocked.data['code'], 'email_not_verified')
+        self.assertEqual(blocked.data['error'], 'Подтвердите адрес почты')
+        self.assertEqual(blocked.data['email'], 'newbie@example.com')
+        self.assertNotIn('tokens', blocked.data)
+
+        # A fresh client: the link works in another browser (no session needed).
+        self.assertEqual(self.open_link(link), 'ok')
+        self.assertTrue(User.objects.get(username='newbie').email_verified)
+
+        response = self.login()
+        self.assertEqual(response.status_code, 200)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['tokens']['access']}")
+        self.assertEqual(self.client.get('/api/auth/me/').data['username'], 'newbie')
+
+    def test_link_works_only_once(self):
+        link = self.sign_up()
+        self.assertEqual(self.open_link(link), 'ok')
+        self.assertEqual(self.open_link(link), 'used')
+
+    def test_expired_link_is_rejected(self):
+        from datetime import timedelta
+        from django.core import signing
+
+        link = self.sign_up()
+        later = signing.time.time() + timedelta(hours=24, seconds=1).total_seconds()
+        with mock.patch('django.core.signing.time.time', return_value=later):
+            self.assertEqual(self.open_link(link), 'expired')
+        self.assertFalse(User.objects.get(username='newbie').email_verified)
+        self.assertEqual(self.login().status_code, 403)
+
+    def test_link_still_works_just_before_24_hours(self):
+        from datetime import timedelta
+        from django.core import signing
+
+        link = self.sign_up()
+        later = signing.time.time() + timedelta(hours=23, minutes=59).total_seconds()
+        with mock.patch('django.core.signing.time.time', return_value=later):
+            self.assertEqual(self.open_link(link), 'ok')
+
+    def test_tampered_or_missing_token_is_rejected(self):
+        link = self.sign_up()
+        token = link.split('token=')[1]
+        for bad in [token[:-1] + ('A' if token[-1] != 'A' else 'B'), token + 'x', 'garbage', '']:
+            self.assertEqual(self.open_link(f'http://testserver{CONFIRM_URL}?token={bad}'), 'invalid', bad)
+        self.assertEqual(self.open_link(f'http://testserver{CONFIRM_URL}'), 'invalid')
+        self.assertFalse(User.objects.get(username='newbie').email_verified)
+
+    def test_link_for_an_old_address_is_rejected(self):
+        link = self.sign_up()
+        User.objects.filter(username='newbie').update(email='changed@example.com')
+        self.assertEqual(self.open_link(link), 'invalid')
+
+    def test_next_path_survives_confirmation(self):
+        from urllib.parse import urlsplit, parse_qs
+        from django.core import mail
+
+        self.register(next='/enroll/123/')
+        link = self.link_from(mail.outbox[-1])
+        response = self.client_class().get('/' + link.split('://', 1)[1].split('/', 1)[1])
+        query = parse_qs(urlsplit(response['Location']).query)
+        self.assertEqual(query, {'confirm': ['ok'], 'next': ['/enroll/123/']})
+
+    def test_unsafe_next_is_dropped(self):
+        from django.core import mail
+
+        for n, bad in enumerate(['https://evil.example/', '//evil.example/x', '/\\evil.example', 'javascript:x']):
+            self.register(username=f'user{n}', next=bad)
+            self.assertNotIn('next=', mail.outbox[-1].body, bad)
+        link = self.link_from(mail.outbox[-1]) + '&next=https://evil.example/'
+        response = self.client_class().get('/' + link.split('://', 1)[1].split('/', 1)[1])
+        self.assertEqual(response['Location'], '/login/?confirm=ok')
+
+    def test_wrong_password_never_reveals_the_address(self):
+        self.sign_up()
+        response = self.login(password='wrong-password')
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn('email', response.data)
+
+
+class ResendConfirmationTests(SignUpTestCase):
+    def resend(self, email='newbie@example.com', **extra):
+        return self.client.post(RESEND_URL, {'email': email}, format='json', **extra)
+
+    def test_sends_a_new_working_link(self):
+        from django.core import mail
+
+        self.register()
+        response = self.resend('NEWBIE@example.com')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(self.open_link(self.link_from(mail.outbox[1])), 'ok')
+
+    def test_same_answer_for_unknown_and_confirmed_addresses(self):
+        from django.core import mail
+
+        User.objects.create_user(username='done', email='done@example.com', password='x',
+                                 email_verified=True)
+        self.register()
+        answers = {self.resend(email).data['detail']
+                   for email in ['nobody@example.com', 'done@example.com', 'newbie@example.com']}
+        self.assertEqual(len(answers), 1)
+        self.assertEqual(len(mail.outbox), 2)  # sign-up + the one unconfirmed address
+
+    def test_invalid_address_is_400(self):
+        self.assertEqual(self.resend('not-an-email').status_code, 400)
+        self.assertEqual(self.client.post(RESEND_URL, {}, format='json').status_code, 400)
+
+    def test_three_per_hour_per_address(self):
+        self.register()
+        codes = [self.resend(REMOTE_ADDR=f'10.0.0.{n}').status_code for n in range(4)]
+        self.assertEqual(codes, [200, 200, 200, 429])
+        # Another address from a fresh IP is not affected.
+        self.assertEqual(self.resend('other@example.com', REMOTE_ADDR='10.0.0.9').status_code, 200)
+
+    def test_three_per_hour_per_ip(self):
+        codes = [self.resend(f'user{n}@example.com', REMOTE_ADDR='10.0.0.1').status_code for n in range(4)]
+        self.assertEqual(codes, [200, 200, 200, 429])
+        # X-Forwarded-For can't be used to look like another client.
+        spoofed = self.resend('user9@example.com', REMOTE_ADDR='10.0.0.1', HTTP_X_FORWARDED_FOR='1.2.3.4')
+        self.assertEqual(spoofed.status_code, 429)
+
+    def test_counters_reset_after_an_hour(self):
+        from rest_framework.throttling import SimpleRateThrottle
+
+        for _ in range(3):
+            self.resend()
+        self.assertEqual(self.resend().status_code, 429)
+        import time
+        later = time.time() + 3601
+        with mock.patch.object(SimpleRateThrottle, 'timer', lambda *args: later):
+            self.assertEqual(self.resend().status_code, 200)
+
+
+class AccountsThatSkipConfirmationTests(APITestCase):
+    """Accounts made outside public sign-up log in without the emailed link."""
+
+    def test_createsuperuser_account_is_confirmed(self):
+        from django.core.management import call_command
+
+        call_command('createsuperuser', interactive=False, username='boss', email='boss@example.com',
+                     verbosity=0)
+        self.assertTrue(User.objects.get(username='boss').email_verified)
+        self.assertTrue(User.objects.create_superuser('boss2', 'b2@example.com', 'x').email_verified)
+
+    # seed_data accounts: api/test_seed_data.py logs them in (which needs them confirmed).
+
+    def test_admin_add_form_starts_confirmed(self):
+        admin_user = User.objects.create_superuser('boss', 'boss@example.com', 'x')
+        self.client.force_login(admin_user)
+        html = self.client.get('/admin/api/user/add/').content.decode()
+        self.assertRegex(html, r'<input type="checkbox" name="email_verified"[^>]* checked')
+        # The consent record is read-only in the admin.
+        self.assertNotIn('name="accepted_privacy_at"', html)
+        self.assertNotIn('name="privacy_version"', html)
+
+
+
+class MigrationConfirmsExistingUsersTests(TransactionTestCase):
+    """0012 marks every account that existed before it as confirmed."""
+
+    def test_existing_users_were_confirmed_by_the_migration(self):
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+
+        executor = MigrationExecutor(connection)
+        before = [('api', '0011_authorprofile_name_en')]
+        after = [('api', '0012_user_email_verification')]
+        executor.migrate(before)
+        old_apps = executor.loader.project_state(before).apps
+        old_apps.get_model('api', 'User').objects.create(username='veteran', email='Vet@Example.com')
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(after)
+
+        self.assertTrue(User.objects.get(username='veteran').email_verified)
 
 
 class StudentCannotChangeOwnRoleTests(APITestCase):

@@ -86,7 +86,7 @@ const AUTH_BASE = import.meta.env.DEV
     ? 'http://127.0.0.1:8000/api/auth'
     : '/api/auth';
 
-// Save a token pair from /auth/login/ or /auth/register/ and use it right away.
+// Save a token pair from /auth/login/ and use it right away.
 export const storeTokens = ({ access, refresh }) => {
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
@@ -99,12 +99,21 @@ export const login = async (username, password) => {
     return response;
 };
 
-// Sign up and log in with the returned token pair, the same way as login().
-// No role in the body: public registration always creates a student.
-export const register = async (username, password) => {
-    const response = await axios.post(`${AUTH_BASE}/register/`, { username, password });
-    storeTokens(response.data.tokens);
-    return response;
+// Sign up. The server emails a confirmation link and returns { detail, email };
+// no tokens: the account can log in once the address is confirmed. `next` (a
+// local path) is carried through the link back to the login page.
+export const register = async ({ username, email, password, acceptPrivacy, next }) => {
+    const response = await axios.post(`${AUTH_BASE}/register/`, {
+        username, email, password, accept_privacy: acceptPrivacy, next,
+    });
+    return response.data;
+};
+
+// Ask for a new confirmation link (the answer is the same whether or not the
+// address is registered). 429 after 3 requests an hour.
+export const resendConfirmation = async (email, next) => {
+    const response = await axios.post(`${AUTH_BASE}/resend-confirmation/`, { email, next });
+    return response.data;
 };
 
 export const logout = () => {

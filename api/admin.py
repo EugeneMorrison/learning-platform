@@ -8,10 +8,17 @@ from .models import AuthorProfile, Block, Course, Enrollment, Lesson, Progress, 
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ['username', 'email', 'role', 'is_staff', 'date_joined']
-    list_filter = ['role', 'is_staff', 'is_active']
+    list_display = ['username', 'email', 'role', 'email_verified', 'is_staff', 'date_joined']
+    list_filter = ['role', 'email_verified', 'is_staff', 'is_active']
     search_fields = ['username', 'email']
     ordering = ['-date_joined']
+    # The consent record from sign-up is shown, never edited.
+    readonly_fields = ['accepted_privacy_at', 'privacy_version']
+
+    def get_changeform_initial_data(self, request):
+        """Users added here are confirmed from the start (the box stays editable);
+        only public sign-up creates accounts that wait for the emailed link."""
+        return {'email_verified': True, **super().get_changeform_initial_data(request)}
 
 
 # =============================================================================

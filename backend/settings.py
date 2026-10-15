@@ -72,6 +72,54 @@ ALLOWED_HOSTS = ['186.246.9.251', 'localhost', '127.0.0.1'] + [
 ]
 
 
+def _env_flag(name, default='False'):
+    return os.environ.get(name, default).lower() in ('true', '1', 'yes')
+
+
+# Email (sign-up confirmation links). SMTP settings come only from the environment
+# (.env on the server, never git). Locally (DEBUG on, no EMAIL_HOST) every email
+# is printed to the runserver console, links included. Without DEBUG the server
+# refuses to start unless EMAIL_HOST, DEFAULT_FROM_EMAIL and SITE_URL are set,
+# like SECRET_KEY above. The test runner swaps in its in-memory backend anyway.
+_RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == 'test'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', '')
+# Base of the links in emails, e.g. https://example.ru (no trailing slash).
+SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT') or 587)  # empty in .env → 587
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    EMAIL_USE_TLS = _env_flag('EMAIL_USE_TLS')
+    EMAIL_USE_SSL = _env_flag('EMAIL_USE_SSL')
+    EMAIL_TIMEOUT = 15  # seconds; a stuck SMTP server must not hang sign-up
+else:
+    # Django's console backend, but with the text readable (links copyable).
+    EMAIL_BACKEND = 'api.mail_backends.ReadableConsoleEmailBackend'
+_missing_email_settings = [
+    name for name, value in [('EMAIL_HOST', EMAIL_HOST), ('DEFAULT_FROM_EMAIL', DEFAULT_FROM_EMAIL),
+                             ('SITE_URL', SITE_URL)] if not value
+]
+if _missing_email_settings and not DEBUG and not _RUNNING_TESTS:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        f"{', '.join(_missing_email_settings)} not set. Set them in the environment or .env "
+        '(see .env.example); the server does not start without them when DEBUG is off.'
+    )
+if os.environ.get('EMAIL_HOST') and _env_flag('EMAIL_USE_TLS') and _env_flag('EMAIL_USE_SSL'):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured('EMAIL_USE_TLS and EMAIL_USE_SSL are both on; set only one of them.')
+DEFAULT_FROM_EMAIL = DEFAULT_FROM_EMAIL or 'webmaster@localhost'
+SITE_URL = SITE_URL or 'http://127.0.0.1:8000'
+
+# A sign-up confirmation link is valid this long (and only until it is used).
+EMAIL_CONFIRMATION_MAX_AGE = 24 * 60 * 60  # seconds
+# Version of the personal data policy that sign-up consent refers to; stored on
+# the user with the time of consent. Change it when the policy text changes.
+PRIVACY_POLICY_VERSION = '2026-10'
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -225,10 +273,18 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
+    # Throttles identify clients by REMOTE_ADDR only: X-Forwarded-For is set by
+    # the client unless a trusted proxy is in front (then set the proxy count).
+    'NUM_PROXIES': 0,
     # Per-user limits for views that set throttle_scope (ScopedRateThrottle).
     # Counters live in the default cache (no CACHES setting → per-process LocMemCache).
     'DEFAULT_THROTTLE_RATES': {
         'code_run': '30/min',  # /api/run-code/ and /api/run-tests/ together
+        # Sign-up sends an email, so it is limited per IP too.
+        'register': '10/hour',
+        # POST /api/auth/resend-confirmation/: per client IP and per address.
+        'resend_confirmation': '3/hour',
+        'resend_confirmation_email': '3/hour',
     },
 }
 

@@ -343,11 +343,21 @@ class RunnerFailsClosedTests(APITestCase):
                 self.assertEqual(response.data['status'], 'success', response.data)
 
 
+# Everything the server needs with DEBUG off besides SECRET_KEY (no real SMTP
+# server is contacted: these tests only start Django).
+EMAIL_ENV = dict(EMAIL_HOST='smtp.example.com', DEFAULT_FROM_EMAIL='noreply@example.com',
+                 SITE_URL='https://example.com')
+STARTUP_VARS = ('SECRET_KEY', 'DEBUG', 'EMAIL_HOST', 'EMAIL_PORT', 'EMAIL_HOST_USER', 'EMAIL_HOST_PASSWORD',
+                'EMAIL_USE_TLS', 'EMAIL_USE_SSL', 'DEFAULT_FROM_EMAIL', 'SITE_URL')
+
+
 class SecretKeyStartupTests(SimpleTestCase):
     """Without DEBUG the server refuses to start unless SECRET_KEY is set."""
 
     def start(self, **env):
-        clean = {k: v for k, v in os.environ.items() if k not in ('SECRET_KEY', 'DEBUG')}
+        # Empty values, not missing ones: .env (loaded with setdefault) can't fill them in.
+        clean = {k: v for k, v in os.environ.items() if k not in STARTUP_VARS}
+        clean.update({name: '' for name in STARTUP_VARS})
         clean.update(env, DJANGO_SETTINGS_MODULE='backend.settings')
         return subprocess.run(
             [sys.executable, '-c', 'import django; django.setup(); print("started")'],
@@ -359,9 +369,35 @@ class SecretKeyStartupTests(SimpleTestCase):
         self.assertIn('SECRET_KEY is not set', result.stderr)
 
     def test_starts_with_secret_key(self):
-        result = self.start(DEBUG='False', SECRET_KEY='set-for-this-test')
+        result = self.start(DEBUG='False', SECRET_KEY='set-for-this-test', **EMAIL_ENV)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('started', result.stdout)
+
+    def test_refuses_without_email_settings_when_debug_is_off(self):
+        result = self.start(DEBUG='False', SECRET_KEY='set-for-this-test')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('EMAIL_HOST, DEFAULT_FROM_EMAIL, SITE_URL not set', result.stderr)
+
+        result = self.start(DEBUG='False', SECRET_KEY='set-for-this-test', **{**EMAIL_ENV, 'SITE_URL': ''})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('SITE_URL not set', result.stderr)
+
+    def test_refuses_tls_and_ssl_together(self):
+        result = self.start(DEBUG='False', SECRET_KEY='set-for-this-test', EMAIL_USE_TLS='True',
+                            EMAIL_USE_SSL='True', **EMAIL_ENV)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('EMAIL_USE_TLS and EMAIL_USE_SSL', result.stderr)
+
+    def test_debug_without_email_settings_prints_emails_to_the_console(self):
+        result = subprocess.run(
+            [sys.executable, '-c', 'import django; django.setup(); from django.conf import settings; '
+                                   'print(settings.EMAIL_BACKEND)'],
+            cwd=settings.BASE_DIR, capture_output=True, text=True, timeout=60,
+            env={**{k: v for k, v in os.environ.items() if k not in STARTUP_VARS},
+                 **{name: '' for name in STARTUP_VARS}, 'DEBUG': 'True',
+                 'DJANGO_SETTINGS_MODULE': 'backend.settings'})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ReadableConsoleEmailBackend', result.stdout)
 
     def test_no_key_in_the_settings_file(self):
         source = (Path(settings.BASE_DIR) / 'backend' / 'settings.py').read_text(encoding='utf-8')

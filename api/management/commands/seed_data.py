@@ -22,6 +22,7 @@ class Command(BaseCommand):
             defaults={'role': 'AUTHOR', 'email': 'john@example.com'}
         )
         author.set_password('password123')
+        author.email_verified = True  # seeded accounts log in without the emailed link
         author.save()
 
         student, _ = User.objects.get_or_create(
@@ -29,6 +30,7 @@ class Command(BaseCommand):
             defaults={'role': 'STUDENT', 'email': 'alice@example.com'}
         )
         student.set_password('password123')
+        student.email_verified = True
         student.save()
 
         # Create course

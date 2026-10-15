@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-16 01:59+0300\n"
+"POT-Creation-Date: 2026-10-16 01:38+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -16,6 +16,14 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: .\api\email_confirmation.py:97
+msgid "Подтвердите адрес почты"
+msgstr "Confirm your email address"
+
+#: .\api\email_confirmation.py:104
+msgid "У вас уже есть аккаунт"
+msgstr "You already have an account"
+
 #: .\api\serializers.py:141
 msgid "Название не может быть пустым."
 msgstr ""
@@ -23,6 +31,63 @@ msgstr ""
 #: .\api\serializers.py:144
 msgid "Название должно быть не короче 2 символов."
 msgstr ""
+
+#: .\api\templates\emails\account_exists.html:4
+#: .\api\templates\emails\account_exists.txt:1
+#: .\api\templates\emails\confirm_email.html:4
+#: .\api\templates\emails\confirm_email.txt:1
+#, python-format
+msgid "Здравствуйте, %(username)s!"
+msgstr "Hello, %(username)s!"
+
+#: .\api\templates\emails\account_exists.html:5
+#: .\api\templates\emails\account_exists.txt:3
+msgid ""
+"Кто-то пытался зарегистрироваться на нашем сайте с этим адресом почты. "
+"Аккаунт с этим адресом у вас уже есть, новый не создан."
+msgstr ""
+"Someone tried to sign up on our site with this email address. You already "
+"have an account with this address, so no new one was created."
+
+#: .\api\templates\emails\account_exists.html:6
+#: .\api\templates\emails\account_exists.txt:5
+msgid "Если это были вы, просто войдите:"
+msgstr "If it was you, simply log in:"
+
+#: .\api\templates\emails\account_exists.html:7
+#: .\backend\templates\public\base.html:51
+msgid "Войти"
+msgstr "Log in"
+
+#: .\api\templates\emails\account_exists.html:8
+#: .\api\templates\emails\account_exists.txt:9
+msgid "Если это были не вы, ничего делать не нужно."
+msgstr "If it wasn't you, there is nothing you need to do."
+
+#: .\api\templates\emails\confirm_email.html:5
+#: .\api\templates\emails\confirm_email.txt:3
+msgid "Чтобы завершить регистрацию, подтвердите адрес почты по ссылке:"
+msgstr "To finish signing up, confirm your email address with this link:"
+
+#: .\api\templates\emails\confirm_email.html:6
+msgid "Подтвердить адрес почты"
+msgstr "Confirm email address"
+
+#: .\api\templates\emails\confirm_email.html:7
+msgid "Если кнопка не работает, скопируйте ссылку в адресную строку браузера:"
+msgstr ""
+"If the button doesn't work, copy the link into your browser's address bar:"
+
+#: .\api\templates\emails\confirm_email.html:8
+#: .\api\templates\emails\confirm_email.txt:7
+msgid "Ссылка действует 24 часа и только один раз."
+msgstr "The link is valid for 24 hours and can be used only once."
+
+#: .\api\templates\emails\confirm_email.html:9
+#: .\api\templates\emails\confirm_email.txt:9
+msgid ""
+"Если вы не регистрировались на нашем сайте, просто проигнорируйте это письмо."
+msgstr "If you didn't sign up on our site, just ignore this email."
 
 #: .\api\templatetags\public_site.py:14
 msgid "Game Python"
@@ -344,10 +409,6 @@ msgstr "Site language"
 #: .\backend\templates\public\landing.html:24
 msgid "Мой кабинет"
 msgstr "My account"
-
-#: .\backend\templates\public\base.html:51
-msgid "Войти"
-msgstr "Log in"
 
 #: .\backend\templates\public\base.html:64
 msgid "[Юридическое лицо, ИНН, ОГРН]"
