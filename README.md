@@ -84,7 +84,6 @@ learning-platform/
 ├── Dockerfile                # Multi-stage build: Node → Python
 ├── docker-compose.yml        # One-command launch
 ├── .dockerignore
-├── fixtures.json             # Test data (users, courses, lessons, blocks)
 ├── requirements.txt          # Includes channels + daphne
 └── manage.py
 ```
@@ -210,8 +209,15 @@ Docker takes care of the rest:
 - Installs the Python and Node dependencies (Channels and Daphne included)
 - Builds the React frontend
 - Runs database migrations
-- Loads the test data (users, courses, lessons, blocks)
 - Starts the ASGI server on port 8000
+
+No sample data is loaded on start (production must keep only its own data).
+Add the sample accounts and course once, in a second terminal:
+
+```bash
+docker-compose exec web python manage.py seed_data
+docker-compose exec web python manage.py createsuperuser   # optional: an admin for /admin/
+```
 
 2. Open the lesson in the browser:
 
@@ -258,11 +264,12 @@ cd ..
 
 That creates `frontend/dist/`, which Django uses both as a template directory (for `index.html`) and as a static files directory (for the JS/CSS bundles).
 
-3. Django — migrations, fixtures, server:
+3. Django — migrations, sample data, server:
 
 ```bash
 python manage.py migrate
-python manage.py loaddata fixtures.json
+python manage.py seed_data          # sample accounts and a course (see "Test users")
+python manage.py createsuperuser    # optional: an admin for /admin/
 python manage.py runserver
 ```
 
@@ -480,14 +487,15 @@ Receive messages: server → client serialized `Message` JSON, broadcast to both
 
 ## Test users
 
-Loaded automatically from `fixtures.json` (both with Docker and with `loaddata`):
+Created by `python manage.py seed_data` (local development only; never run it on the production server):
 
-| Username     | Role    | Password    |
-|--------------|---------|-------------|
-| admin        | Admin   | (set yours) |
-| john_author  | AUTHOR  | password123 |
-| alice        | STUDENT | password123 |
+| Username | Role    | Password                          |
+|----------|---------|-----------------------------------|
+| john     | AUTHOR  | password123                       |
+| alice    | STUDENT | password123                       |
+| (yours)  | Admin   | set with `manage.py createsuperuser` |
 
+It also creates the course "Python Basics" (author john, alice enrolled) with one lesson.
 Test lesson URL: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
 
 > To try the chat as two people, open Alice's view in an incognito window or a different browser profile. The same browser shares `localStorage` across tabs, so otherwise both tabs end up logged in as the same user.

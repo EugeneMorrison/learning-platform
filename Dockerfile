@@ -70,7 +70,6 @@ COPY backend/ backend/
 COPY api/ api/
 COPY templates/ templates/
 COPY static/ static/
-COPY fixtures.json .
 COPY python_strings_lesson.html .
 
 # Copy React build output from stage 1
@@ -92,14 +91,16 @@ RUN chmod 0700 /app \
 # Port Django will listen on
 EXPOSE 8000
 
-# On startup: run migrations, load test data, start server.
+# On startup: run migrations, collect static files, start server. No sample
+# data is loaded here: production keeps only what is in its database volume
+# (local sample accounts and a course come from "manage.py seed_data").
+# A failed migration stops the start instead of being ignored.
 # /dev/shm and /dev/mqueue are mounted by Docker at run time (world-
 # writable), so the runner's write access is removed here, not above.
 CMD ["bash", "-c", "\
     (chmod o-w /dev/shm /dev/mqueue 2>/dev/null || true) && \
     echo 'Running migrations...' && \
     python manage.py migrate && \
-    python manage.py loaddata fixtures.json 2>/dev/null || true && \
     python manage.py collectstatic --noinput && \
     echo 'Starting server on port 8000...' && \
     exec python manage.py runserver 0.0.0.0:8000 \

@@ -84,7 +84,6 @@ learning-platform/
 ├── Dockerfile                # Многоэтапная сборка: Node → Python
 ├── docker-compose.yml        # Запуск одной командой
 ├── .dockerignore
-├── fixtures.json             # Тестовые данные (пользователи, курсы, уроки, блоки)
 ├── requirements.txt          # Включая channels и daphne
 └── manage.py
 ```
@@ -210,8 +209,15 @@ docker-compose up --build
 - Ставит зависимости Python и Node (Channels и Daphne включены)
 - Собирает React-фронтенд
 - Выполняет миграции базы
-- Загружает тестовые данные (пользователи, курсы, уроки, блоки)
 - Запускает ASGI-сервер на порту 8000
+
+При запуске тестовые данные не загружаются (на продакшене должны быть только его собственные данные).
+Тестовые аккаунты и курс добавляются один раз, во втором терминале:
+
+```bash
+docker-compose exec web python manage.py seed_data
+docker-compose exec web python manage.py createsuperuser   # по желанию: администратор для /admin/
+```
 
 2. Открыть урок в браузере:
 
@@ -258,11 +264,12 @@ cd ..
 
 Команда создаёт `frontend/dist/`, которую Django использует и как директорию шаблонов (для `index.html`), и как директорию статических файлов (для JS/CSS-бандлов).
 
-3. Django — миграции, фикстуры, сервер:
+3. Django — миграции, тестовые данные, сервер:
 
 ```bash
 python manage.py migrate
-python manage.py loaddata fixtures.json
+python manage.py seed_data          # тестовые аккаунты и курс (см. «Тестовые пользователи»)
+python manage.py createsuperuser    # по желанию: администратор для /admin/
 python manage.py runserver
 ```
 
@@ -480,14 +487,15 @@ ws://host/ws/chat/{course_id}/{other_user_id}/?token={jwt_access_token}
 
 ## Тестовые пользователи
 
-Загружаются автоматически из `fixtures.json` (и через Docker, и через `loaddata`):
+Создаются командой `python manage.py seed_data` (только для локальной разработки; на продакшен-сервере её не запускать):
 
-| Имя пользователя  | Роль    | Пароль      |
-|-------------------|---------|-------------|
-| admin             | Admin   | (свой)      |
-| john_author       | AUTHOR  | password123 |
-| alice             | STUDENT | password123 |
+| Имя пользователя | Роль    | Пароль                                  |
+|------------------|---------|-----------------------------------------|
+| john             | AUTHOR  | password123                             |
+| alice            | STUDENT | password123                             |
+| (ваш)            | Admin   | задаётся через `manage.py createsuperuser` |
 
+Команда также создаёт курс «Python Basics» (автор john, alice записана) с одним уроком.
 URL тестового урока: `http://localhost:8000/lesson/6f1c0c31-7be5-4434-ac25-c00f8031d15c/`
 
 > Чтобы проверить чат от лица двух пользователей, откройте страницу Алисы в окне инкогнито или в другом профиле браузера. Один и тот же браузер делит `localStorage` между вкладками, поэтому иначе обе вкладки будут залогинены под одним пользователем.

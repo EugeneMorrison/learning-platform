@@ -5,6 +5,10 @@ import uuid
 
 User = get_user_model()
 
+# Fixed id, so the documented test URL, iframe_test.html and the lesson viewer's
+# dev fallback (frontend LessonViewer DEV_LESSON_ID) open this lesson.
+SAMPLE_LESSON_ID = uuid.UUID('6f1c0c31-7be5-4434-ac25-c00f8031d15c')
+
 
 class Command(BaseCommand):
     help = 'Seed database with sample data'
@@ -40,6 +44,7 @@ class Command(BaseCommand):
         if created:
             # Create lesson
             lesson = Lesson.objects.create(
+                id=SAMPLE_LESSON_ID,
                 course=course,
                 title='String Methods',
                 order_index=1
