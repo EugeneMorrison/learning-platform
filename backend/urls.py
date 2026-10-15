@@ -20,7 +20,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.static import serve
 from django.conf import settings
 
-from .views import about_view, course_detail_view, landing_view
+from .views import about_view, course_detail_view, favicon_view, landing_view
 
 
 @xframe_options_exempt
@@ -48,6 +48,7 @@ urlpatterns = [
     # TEMPORARY: Django serving media is a stopgap until Caddy serves /media/.
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     path('i18n/', include('django.conf.urls.i18n')),  # set_language for the RU/EN switch
+    path('favicon.ico', favicon_view, name='favicon'),  # before the SPA catch-all
 ]
 
 # Django-rendered public pages. Russian has no prefix (/), English gets /en/.

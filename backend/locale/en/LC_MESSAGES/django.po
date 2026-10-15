@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-15 21:14+0300\n"
+"POT-Creation-Date: 2026-10-16 01:59+0300\n"
 "PO-Revision-Date: 2026-10-07 00:30+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -96,7 +96,7 @@ msgstr ""
 
 #: .\backend\templates\public\about.html:4
 #: .\backend\templates\public\about.html:36
-#: .\backend\templates\public\base.html:31
+#: .\backend\templates\public\base.html:34
 msgid "Об авторе"
 msgstr "About the author"
 
@@ -317,54 +317,51 @@ msgstr ""
 msgid "Онлайн-курсы с практикой прямо в браузере."
 msgstr "Online courses with hands-on practice right in your browser."
 
-#: .\backend\templates\public\base.html:21
+#: .\backend\templates\public\base.html:23
 msgid "Основная навигация"
 msgstr "Main navigation"
 
-#: .\backend\templates\public\base.html:23
+#: .\backend\templates\public\base.html:25
 #: .\backend\templates\public\landing.html:53
 msgid "Курсы"
 msgstr "Courses"
 
-#: .\backend\templates\public\base.html:24
-msgid "Как это устроено"
-msgstr "How it works"
-
-#: .\backend\templates\public\base.html:28
+#: .\backend\templates\public\base.html:30
+#: .\backend\templates\public\base.html:32
 #: .\backend\templates\public\landing.html:89
 msgid "Отзывы"
 msgstr "Reviews"
 
-#: .\backend\templates\public\base.html:30
-msgid "Вопросы"
-msgstr "FAQ"
+#: .\backend\templates\public\base.html:32
+msgid "(скоро)"
+msgstr "(coming soon)"
 
-#: .\backend\templates\public\base.html:37
+#: .\backend\templates\public\base.html:40
 msgid "Язык сайта"
 msgstr "Site language"
 
-#: .\backend\templates\public\base.html:48
+#: .\backend\templates\public\base.html:51
 #: .\backend\templates\public\landing.html:24
 msgid "Мой кабинет"
 msgstr "My account"
 
-#: .\backend\templates\public\base.html:48
+#: .\backend\templates\public\base.html:51
 msgid "Войти"
 msgstr "Log in"
 
-#: .\backend\templates\public\base.html:61
+#: .\backend\templates\public\base.html:64
 msgid "[Юридическое лицо, ИНН, ОГРН]"
 msgstr "[Legal entity, tax and registration numbers]"
 
-#: .\backend\templates\public\base.html:65
+#: .\backend\templates\public\base.html:68
 msgid "Публичная оферта"
 msgstr "Public offer"
 
-#: .\backend\templates\public\base.html:66
+#: .\backend\templates\public\base.html:69
 msgid "Политика обработки персональных данных"
 msgstr "Personal data processing policy"
 
-#: .\backend\templates\public\base.html:67
+#: .\backend\templates\public\base.html:70
 msgid "Контакты"
 msgstr "Contacts"
 

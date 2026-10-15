@@ -257,3 +257,47 @@
   color: var(--color-ink);
   font-weight: var(--weight-bold);
 }
+
+/* Decorative cat above the footer (landing only). Centred, its own block, so it
+   fills the space under the catalog however many courses there are. The desk
+   runs off the artwork's bottom and sides: the bottom edge sits flush on the
+   footer's top edge (no footer margin here, no inline gap under the image), the
+   two cut-off sides fade out (only the mask's alpha matters). The artwork is
+   transparent, so no blend mode is needed. */
+.landing-cat {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-5);
+  pointer-events: none;
+}
+
+.landing-cat picture,
+.landing-cat img {
+  display: block;
+}
+
+.landing-cat img {
+  width: 25rem;
+  max-width: 100%;
+  height: auto;
+  -webkit-mask-image: linear-gradient(to right, transparent, var(--color-ink) 8%, var(--color-ink) 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, var(--color-ink) 8%, var(--color-ink) 92%, transparent);
+}
+
+/* landing.css is loaded on the landing page only: the footer's usual top
+   margin (base.css) would leave a white strip under the desk. */
+.site-footer {
+  margin-top: 0;
+}
+
+@media (max-width: 64rem) {
+  .landing-cat img {
+    width: 22.5rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .landing-cat img {
+    width: 15rem;
+  }
+}

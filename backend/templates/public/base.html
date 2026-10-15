@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{% brand_title %}{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}{% translate "Онлайн-курсы с практикой прямо в браузере." %}{% endblock %}">
-  <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+  <link rel="icon" href="{% static 'public/img/favicon.ico' %}" sizes="16x16 32x32 48x48">
+  <link rel="icon" type="image/png" href="{% static 'public/img/icon-192.png' %}" sizes="192x192">
+  <link rel="apple-touch-icon" href="{% static 'public/img/apple-touch-icon.png' %}">
   <link rel="preload" href="{% static 'public/fonts/golos-text-cyrillic-400.woff2' %}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{% static 'public/css/fonts.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/tokens.css' %}">
@@ -21,13 +23,14 @@
       <nav class="site-nav" aria-label="{% translate "Основная навигация" %}">
         <ul class="site-nav__list">
           <li><a class="site-nav__link" href="{% url 'landing' %}#catalog">{% translate "Курсы" %}</a></li>
-          <li><a class="site-nav__link" href="{% url 'landing' %}#how">{% translate "Как это устроено" %}</a></li>
-          {# Shown only while the landing page has published reviews (api/templatetags/public_site.py). #}
+          {# Always listed (as in the mockup), but a link only while the landing page has published #}
+          {# reviews (api/templatetags/public_site.py); until then plain text, never a dead link.   #}
           {% reviews_published as has_reviews %}
           {% if has_reviews %}
             <li><a class="site-nav__link" href="{% url 'landing' %}#reviews">{% translate "Отзывы" %}</a></li>
+          {% else %}
+            <li><span class="site-nav__link site-nav__link--soon">{% translate "Отзывы" %}<span class="visually-hidden"> {% translate "(скоро)" %}</span></span></li>
           {% endif %}
-          <li><a class="site-nav__link" href="{% url 'landing' %}#faq">{% translate "Вопросы" %}</a></li>
           <li><a class="site-nav__link" href="{% url 'about' %}"{% if request.resolver_match.url_name == 'about' %} aria-current="page"{% endif %}>{% translate "Об авторе" %}</a></li>
         </ul>
       </nav>

@@ -111,4 +111,17 @@
       </div>
     </section>
   {% endif %}
+
+  {# Decorative cat at a desk, after the last section: the desk stands on the footer's #}
+  {# top edge (landing.css drops the footer's top margin on this page). Below the first #}
+  {# screen, so lazy; width/height reserve the 3:2 space.                                #}
+  <div class="landing-cat">
+    <picture>
+      <source type="image/webp"
+              srcset="{% static 'public/img/cat-desk-800.webp' %} 800w, {% static 'public/img/cat-desk-1200.webp' %} 1200w"
+              sizes="(max-width: 40rem) 15rem, (max-width: 64rem) 22.5rem, 25rem">
+      <img src="{% static 'public/img/cat-desk-800.webp' %}" width="800" height="533"
+           alt="" aria-hidden="true" loading="lazy" decoding="async">
+    </picture>
+  </div>
 {% endblock %}

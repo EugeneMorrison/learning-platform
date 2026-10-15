@@ -587,6 +587,60 @@ class ProductionStaticFilesTests(TestCase):
             self.assertIsNotNone(found, pattern)
             self.assertTrue(os.path.exists(os.path.join(self.static_root, found.group(1))))
 
+    def test_icons_are_linked_by_hashed_names(self):
+        import os
+
+        html = self.client.get('/').content.decode()
+        for rel, name in [('icon', r'favicon\.[0-9a-f]{12}\.ico'), ('icon', r'icon-192\.[0-9a-f]{12}\.png'),
+                          ('apple-touch-icon', r'apple-touch-icon\.[0-9a-f]{12}\.png')]:
+            found = re.search(rf'<link rel="{rel}"[^>]* href="/static/(public/img/{name})"', html)
+            self.assertIsNotNone(found, name)
+            self.assertTrue(os.path.exists(os.path.join(self.static_root, found.group(1))))
+        # The React pages link the unhashed names; WhiteNoise keeps those too.
+        for name in ['favicon.ico', 'icon-192.png', 'apple-touch-icon.png']:
+            self.assertTrue(os.path.exists(os.path.join(self.static_root, 'public', 'img', name)), name)
+
+    def test_root_favicon_with_debug_off(self):
+        response = self.client.get('/favicon.ico')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/x-icon')
+
+
+class FaviconTests(PublicPagesTestCase):
+    """/favicon.ico is the real icon (not the React index.html), and every public
+    page links the icon set."""
+
+    def test_root_favicon_is_an_icon(self):
+        from django.contrib.staticfiles import finders
+
+        response = self.client.get('/favicon.ico')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/x-icon')
+        body = b''.join(response.streaming_content)
+        self.assertEqual(body[:4], b'\x00\x00\x01\x00')  # ICO header
+        with open(finders.find('public/img/favicon.ico'), 'rb') as f:
+            self.assertEqual(body, f.read())
+
+    def test_icon_files_have_the_right_sizes(self):
+        from django.contrib.staticfiles import finders
+        from PIL import Image
+
+        with Image.open(finders.find('public/img/favicon.ico')) as ico:
+            self.assertEqual(sorted(ico.info['sizes']), [(16, 16), (32, 32), (48, 48)])
+        for name, size in [('icon-192.png', 192), ('icon-512.png', 512), ('apple-touch-icon.png', 180)]:
+            with Image.open(finders.find(f'public/img/{name}')) as im:
+                self.assertEqual(im.size, (size, size), name)
+
+    def test_public_pages_link_the_icons(self):
+        course = self.make_course('Course')
+        for url in ['/', '/en/', '/about/', f'/course/{course.slug}/']:
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertIn('<link rel="icon" href="/static/public/img/favicon.ico" sizes="16x16 32x32 48x48">', html)
+                self.assertIn('href="/static/public/img/icon-192.png" sizes="192x192">', html)
+                self.assertIn('<link rel="apple-touch-icon" href="/static/public/img/apple-touch-icon.png">', html)
+                self.assertNotIn('favicon.svg', html)
+
 
 class ReviewsSectionTests(PublicPagesTestCase):
     """"Отзывы" come from the admin (Review): hidden while empty, and /en/ falls
@@ -760,8 +814,7 @@ class AboutPageTests(PublicPagesTestCase):
             html = self.get(url)
             with self.subTest(url=url):
                 self.assertIn(f'<a class="site-nav__link" href="{href}">{label}</a>', html)
-                for anchor in ['#catalog"', '#how"', '#faq"']:  # the existing items stay
-                    self.assertIn(anchor, html)
+                self.assertIn('#catalog"', html)  # the other items stay
         self.assertIn('href="/about/" aria-current="page">Об авторе</a>', self.get('/about/'))
 
     def test_hero_links_to_the_page(self):
@@ -778,3 +831,99 @@ class AboutPageTests(PublicPagesTestCase):
                 self.assertNotIn('/media/author/me.jpg', html)
                 self.assertNotIn('Старая биография.', html)
                 self.assertNotIn('https://stepik.org/users/1', html)
+
+
+class HeaderNavTests(PublicPagesTestCase):
+    """The header nav (base.html): exactly Курсы · Отзывы · Об авторе, on every
+    public page, in RU and EN. "Отзывы" is a link only while published reviews
+    exist; before that it is plain text, never a link that leads nowhere."""
+
+    CASES = [
+        ('/', ['Курсы', 'Отзывы', 'Об авторе'], '/'),
+        ('/about/', ['Курсы', 'Отзывы', 'Об авторе'], '/'),
+        ('/en/', ['Courses', 'Reviews', 'About the author'], '/en/'),
+        ('/en/about/', ['Courses', 'Reviews', 'About the author'], '/en/'),
+    ]
+
+    def nav(self, url):
+        html = self.client.get(url).content.decode()
+        return re.search(r'<nav class="site-nav".*?</nav>', html, re.S).group(0)
+
+    def items(self, nav):
+        """Visible label of each <li>, without the screen-reader-only hint."""
+        items = re.findall(r'<li>(.*?)</li>', nav, re.S)
+        items = [re.sub(r'<span class="visually-hidden">.*?</span>', '', item, flags=re.S) for item in items]
+        return [' '.join(re.sub(r'<[^>]+>', '', item).split()) for item in items]
+
+    def test_exactly_three_items_in_order(self):
+        for url, labels, _ in self.CASES:
+            with self.subTest(url=url):
+                self.assertEqual(self.items(self.nav(url)), labels)
+
+    def test_links_go_to_the_landing_page_from_every_page(self):
+        course = self.make_course('Course')
+        for url, _, landing in self.CASES + [(f'/course/{course.slug}/', None, '/')]:
+            nav = self.nav(url)
+            with self.subTest(url=url):
+                self.assertIn(f'href="{landing}#catalog"', nav)
+                self.assertIn(f'href="{landing}about/"', nav)
+                self.assertNotRegex(nav, r'href="#')  # never a bare anchor
+
+    def test_removed_items_are_gone(self):
+        for url, _, _ in self.CASES:
+            nav = self.nav(url)
+            with self.subTest(url=url):
+                for gone in ['#how', '#faq', 'Как это устроено', 'Вопросы', 'How it works', 'FAQ']:
+                    self.assertNotIn(gone, nav)
+
+    def test_reviews_is_text_until_a_review_is_published(self):
+        from api.models import Review
+
+        for url, _, _ in self.CASES:
+            nav = self.nav(url)
+            with self.subTest(url=url):
+                self.assertNotIn('#reviews', nav)
+                self.assertIn('site-nav__link--soon', nav)
+        self.assertIn('<span class="visually-hidden"> (скоро)</span>', self.nav('/'))
+        self.assertIn('<span class="visually-hidden"> (coming soon)</span>', self.nav('/en/'))
+
+        Review.objects.create(student_name='Анна', text_ru='Отличный курс!', is_published=True)
+        for url, labels, landing in self.CASES:
+            nav = self.nav(url)
+            with self.subTest(url=url, reviews=True):
+                self.assertIn(f'<a class="site-nav__link" href="{landing}#reviews">{labels[1]}</a>', nav)
+                self.assertNotIn('site-nav__link--soon', nav)
+                self.assertEqual(self.items(nav), labels)
+
+    def test_about_is_marked_current_only_on_about(self):
+        self.assertIn('href="/about/" aria-current="page"', self.nav('/about/'))
+        self.assertIn('href="/en/about/" aria-current="page"', self.nav('/en/about/'))
+        for url in ['/', '/en/']:
+            self.assertNotIn('aria-current', self.nav(url))
+
+
+class LandingCatTests(PublicPagesTestCase):
+    """The decorative cat above the footer: landing page only."""
+
+    def test_on_the_landing_page_in_ru_and_en(self):
+        for url in ['/', '/en/']:
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                block = re.search(r'<div class="landing-cat">.*?</div>', html, re.S).group(0)
+                self.assertIn('public/img/cat-desk-800.webp 800w', block)
+                self.assertIn('public/img/cat-desk-1200.webp 1200w', block)
+                img = re.search(r'<img[^>]*>', block).group(0)
+                for attr in ['width="800" height="533"', 'alt=""', 'aria-hidden="true"', 'loading="lazy"']:
+                    self.assertIn(attr, img)
+                # After the last section, right before the footer.
+                self.assertLess(html.index('id="catalog"'), html.index('class="landing-cat"'))
+                self.assertLess(html.index('class="landing-cat"'), html.index('<footer'))
+                self.assertNotIn('landing-cat', html[html.index('<footer'):])
+
+    def test_not_on_other_pages(self):
+        course = self.make_course('Course')
+        for url in ['/about/', '/en/about/', f'/course/{course.slug}/']:
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertNotIn('landing-cat', html)
+                self.assertNotIn('cat-desk', html)

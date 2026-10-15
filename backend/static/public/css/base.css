@@ -193,6 +193,13 @@ a {
   color: var(--color-accent);
 }
 
+/* "Отзывы" before any review is published: plain text, not a link. */
+.site-nav__link--soon,
+.site-nav__link--soon:hover {
+  color: var(--color-muted);
+  cursor: default;
+}
+
 .site-header__actions {
   display: flex;
   flex-wrap: wrap;

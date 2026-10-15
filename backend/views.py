@@ -5,7 +5,9 @@ Templates live in backend/templates/public/, styles in backend/static/public/.
 The React app is served separately by spa_view / lesson_view in backend/urls.py.
 """
 
+from django.contrib.staticfiles import finders
 from django.db.models import Count, Q
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import translation
 
@@ -55,6 +57,18 @@ def about_view(request):
     return render(request, 'public/about.html', {
         'author_photo_url': author.photo.url if author else None,
     })
+
+
+def favicon_view(request):
+    """/favicon.ico at the site root: browsers request it without any <link>, and
+    the React catch-all would otherwise answer with index.html. Serves the same
+    file the pages link by its hashed static name (public/img/favicon.ico)."""
+    path = finders.find('public/img/favicon.ico')
+    if not path:
+        raise Http404
+    response = FileResponse(open(path, 'rb'), content_type='image/x-icon')
+    response['Cache-Control'] = 'public, max-age=86400'  # a day: the name never changes
+    return response
 
 
 def course_detail_view(request, slug):
