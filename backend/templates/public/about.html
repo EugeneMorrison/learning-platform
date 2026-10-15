@@ -1,0 +1,110 @@
+{% extends "public/base.html" %}
+{% load i18n static public_site %}
+
+{% block title %}{% translate "Об авторе" %} — {% brand_name %}{% endblock %}
+{% block meta_description %}{% translate "Людмила Колесникова — преподаватель, методист и автор курсов: опыт, ученики, результаты и награды." %}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/about.css' %}">
+{% endblock %}
+
+{# The author's own text (source: design-src/about-author.md), word for word. Each #}
+{# paragraph is translatable as a whole, markup included; no English yet, so /en/ #}
+{# shows the Russian text.                                                          #}
+{% block content %}
+  <article class="about" aria-labelledby="about-title">
+    <div class="container about__inner">
+
+      <header class="about__header">
+        {# At the top of the page: not lazy-loaded. The uploaded photo (admin) when there #}
+        {# is one, otherwise the hero's cut-out. width/height give the box ratio (3:4).  #}
+        <div class="about__photo">
+          {% if author_photo_url %}
+            <img src="{{ author_photo_url }}" width="360" height="480" alt="{% translate "Колесникова Людмила Сергеевна" %}">
+          {% else %}
+            <picture>
+              <source type="image/webp"
+                      srcset="{% static 'public/img/hero-author-432.webp' %} 432w, {% static 'public/img/hero-author-864.webp' %} 864w"
+                      sizes="(min-width: 40rem) 15rem, 12rem">
+              <img src="{% static 'public/img/hero-author.png' %}" width="864" height="1120"
+                   alt="{% translate "Колесникова Людмила Сергеевна" %}">
+            </picture>
+          {% endif %}
+        </div>
+
+        <div class="about__intro">
+          <h1 id="about-title" class="about__title">{% translate "Об авторе" %}</h1>
+          <h2 class="about__name">{% translate "Колесникова Людмила Сергеевна" %}</h2>
+          <p class="about__role"><em>{% translate "Преподаватель, методист и автор курсов. Руководитель с 10-летним стажем." %}</em></p>
+          <p class="about__honors"><strong>{% translate "Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников Сколково." %}</strong></p>
+        </div>
+      </header>
+
+      <div class="about__body">
+        <section aria-labelledby="about-me">
+          <h2 id="about-me">{% translate "Немного обо мне" %}</h2>
+          <p>{% blocktranslate trimmed %}За моими плечами <strong>11 лет преподавания, 10 лет руководства подразделениями в онлайн-школе программирования, 11 000+ проведённых занятий, 20+ авторских курсов и более 100 победителей и призёров олимпиад.</strong>{% endblocktranslate %}</p>
+          <p>{% translate "Но когда-то мне самой учёба давалась нелегко." %}</p>
+          <p>{% translate "Я пошла в школу в 5 лет, когда моим одноклассникам было уже по 7-8." %}</p>
+          <p>{% translate "Казалось бы, разница небольшая, но учиться наравне с ними мне было непросто. Я медленнее читала, писала и считала. То, что другим давалось легко, мне приходилось разбирать снова и снова." %}</p>
+          <p>{% translate "Постепенно я нашла свой способ учиться: искать понятные объяснения и примеры, не зубрить, а пробовать, ошибаться и пробовать снова." %}</p>
+          <p><strong>{% translate "Сегодня именно так я учу своих учеников." %}</strong></p>
+          <p>{% translate "Я знаю, каково это — не понимать то, что другим кажется очевидным. И знаю, что это вовсе не означает отсутствие способностей." %}</p>
+          <p>{% translate "Неважно, семь пядей у тебя во лбу или нет. И не так уж важно, какие у тебя оценки и любят ли тебя учителя." %}</p>
+          <p><strong>{% translate "Гораздо важнее другое: хватит ли у тебя терпения и желания разобраться в том, что пока не получается." %}</strong></p>
+        </section>
+
+        <section aria-labelledby="about-students">
+          <h2 id="about-students">{% translate "Мои ученики и результаты" %}</h2>
+          <ul>
+            <li>{% blocktranslate trimmed %}Подготовила более <strong>100 победителей и призёров олимпиад:</strong> ВсОШ, НТО GameDev, НТО АБП, НТО.Junior и других.{% endblocktranslate %}</li>
+            <li><strong>{% translate "100% новых учеников приходят по рекомендациям." %}</strong></li>
+            <li>{% blocktranslate trimmed %}Более <strong>90% учеников</strong> проходят со мной полный образовательный цикл — вплоть до поступления в вуз.{% endblocktranslate %}</li>
+            <li>{% blocktranslate trimmed %}Мои выпускники учатся в <strong>Московском Политехе, ВШЭ, ИТМО</strong> и других ведущих вузах России.{% endblocktranslate %}</li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="about-experience">
+          <h2 id="about-experience">{% translate "Профессиональный опыт" %}</h2>
+          <ul>
+            <li>{% translate "Разрабатывала образовательные программы, учебные материалы и методики преподавания." %}</li>
+            <li>{% translate "Занималась организацией обучения и руководством подразделениями онлайн-школы программирования." %}</li>
+            <li>{% blocktranslate trimmed %}Прошла более <strong>30 профильных курсов</strong> по наставничеству и управлению проектами.{% endblocktranslate %}</li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="about-awards">
+          <h2 id="about-awards">{% translate "Награды и достижения" %}</h2>
+          <ul>
+            <li>{% blocktranslate trimmed %}<strong>Заслуженный наставник кружкового движения НТИ</strong> (2023, 2024).{% endblocktranslate %}</li>
+            <li>{% blocktranslate trimmed %}<strong>Эксперт Школы наставников Сколково</strong> (2020, 2021).{% endblocktranslate %}</li>
+            <li>{% blocktranslate trimmed %}<strong>Эксперт Международной Scratch-Олимпиады по креативному программированию</strong> (2018–2023).{% endblocktranslate %}</li>
+            <li>{% blocktranslate trimmed %}<strong>Победитель Stepik Birthday Hack</strong> в номинации «Самый социально значимый проект» (2023).{% endblocktranslate %}</li>
+            <li>{% translate "Благодарности от организаторов олимпиад, конкурсов и хакатонов за подготовку учеников." %}</li>
+          </ul>
+          <p>{% translate "Также прошла повышение квалификации по направлениям:" %}</p>
+          <ul>
+            <li>{% blocktranslate trimmed %}<strong>Искусственный интеллект</strong> — МГПУ (2020).{% endblocktranslate %}</li>
+            <li>{% blocktranslate trimmed %}<strong>Технологии дополненной реальности в образовании</strong> (2022).{% endblocktranslate %}</li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="about-personal">
+          <h2 id="about-personal">{% translate "Немного личного" %}</h2>
+          <p>{% translate "Люблю придумывать небольшие забавные стишки и создавать необычные задания." %}</p>
+          <p>{% blocktranslate trimmed %}Верю, что <strong>ошибки — это часть обучения, а не повод останавливаться.</strong>{% endblocktranslate %}</p>
+        </section>
+
+        {# External links open in a new tab; noopener noreferrer keeps them from #}
+        {# reaching back into this page.                                         #}
+        <section aria-labelledby="about-contact">
+          <h2 id="about-contact">{% translate "Связаться со мной" %}</h2>
+          <p>{% blocktranslate trimmed %}По вопросам сотрудничества — <a href="https://t.me/kolesnikova1995" target="_blank" rel="noopener noreferrer">Telegram</a>.{% endblocktranslate %}</p>
+          <p>{% blocktranslate trimmed %}<strong>Мои сообщества:</strong> <a href="https://m.vk.com/ohota_na_python" target="_blank" rel="noopener noreferrer">ВКонтакте</a> · <a href="https://t.me/ohota_na_python" target="_blank" rel="noopener noreferrer">Telegram</a>{% endblocktranslate %}</p>
+          <p>{% blocktranslate trimmed %}<strong>Мои курсы:</strong> <a href="https://stepik.org/users/32005180/profile" target="_blank" rel="noopener noreferrer">Профиль на Stepik</a>{% endblocktranslate %}</p>
+        </section>
+      </div>
+
+    </div>
+  </article>
+{% endblock %}

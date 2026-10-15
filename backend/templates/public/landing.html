@@ -23,6 +23,7 @@
           <a class="btn btn-secondary" id="hero-auth-link" href="/login/"
              data-account-href="/dashboard/" data-account-label="{% translate "Мой кабинет" %}">{% translate "Войти в аккаунт" %}</a>
         </div>
+        <p class="hero__more"><a href="{% url 'about' %}">{% translate "Подробнее обо мне →" %}</a></p>
       </div>
 
       {# Two layers: the wide violet illustration (decorative) behind the author's #}
@@ -81,33 +82,7 @@
     </div>
   </section>
 
-  {# Author and reviews: content from the Django admin (AuthorProfile, Review). #}
-  {# Each section is left out entirely while it has nothing to show.          #}
-  {% if author %}
-    <section id="author" class="author" aria-labelledby="author-title">
-      <div class="container">
-       <div class="author__inner">
-        {% if author.photo %}
-          <img class="author__photo" src="{{ author.photo.url }}" alt="{{ author.display_name }}"
-               width="320" height="320" loading="lazy">
-        {% endif %}
-        <div class="author__text">
-          <h2 id="author-title" class="author__title">{% translate "Об авторе" %}</h2>
-          <p class="author__name">{{ author.display_name }}</p>
-          {% if author.bio %}
-            {# Escaped; blank lines split paragraphs, a short standalone line becomes a #}
-            {# subheading (api/templatetags/public_site.py). Never |safe.               #}
-            <div class="author__bio">{{ author.bio|paragraphs_with_subheadings }}</div>
-          {% endif %}
-          {% if author.stepik_url %}
-            <a class="btn btn-secondary" href="{{ author.stepik_url }}" rel="noopener">{% translate "Профиль на Stepik" %}</a>
-          {% endif %}
-        </div>
-       </div>
-      </div>
-    </section>
-  {% endif %}
-
+  {# Reviews: content from the Django admin (Review); left out while there are none. #}
   {% if reviews %}
     <section id="reviews" class="reviews" aria-labelledby="reviews-title">
       <div class="container">

@@ -28,6 +28,7 @@
             <li><a class="site-nav__link" href="{% url 'landing' %}#reviews">{% translate "Отзывы" %}</a></li>
           {% endif %}
           <li><a class="site-nav__link" href="{% url 'landing' %}#faq">{% translate "Вопросы" %}</a></li>
+          <li><a class="site-nav__link" href="{% url 'about' %}"{% if request.resolver_match.url_name == 'about' %} aria-current="page"{% endif %}>{% translate "Об авторе" %}</a></li>
         </ul>
       </nav>
 

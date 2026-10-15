@@ -34,21 +34,26 @@ def landing_view(request):
     for course in courses:
         add_price_labels(course)
 
-    # Author and reviews are edited in the Django admin. Each section is hidden
-    # while it has no content; /en/ shows the *_en text, falling back to Russian.
+    # Reviews are edited in the Django admin; the section is hidden while there
+    # are none. /en/ shows the English text, falling back to Russian.
     lang = translation.get_language()
-    author = AuthorProfile.objects.first()
-    if author:
-        author.display_name = author.name_for(lang)
-        author.bio = author.bio_for(lang)
     reviews = list(Review.objects.filter(is_published=True).select_related('course'))
     for review in reviews:
         review.text = review.text_for(lang)
 
     return render(request, 'public/landing.html', {
         'courses': courses,
-        'author': author,
         'reviews': reviews,
+    })
+
+
+def about_view(request):
+    """"Об авторе": the author's bio lives in the template (public/about.html).
+    The photo is the one uploaded in the admin (AuthorProfile.photo) when there
+    is one; otherwise the template shows the static cut-out from the hero."""
+    author = AuthorProfile.objects.exclude(photo='').first()
+    return render(request, 'public/about.html', {
+        'author_photo_url': author.photo.url if author else None,
     })
 
 

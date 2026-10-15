@@ -54,6 +54,13 @@
   gap: var(--space-3);
 }
 
+/* "Подробнее обо мне →": a plain text link under the buttons, not a third button. */
+.hero__more {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
 /* The picture: two layers measured from the mockup, in % of .hero__media.
    Front: the author's cut-out, 70% wide, right of centre; it sets the box
    height and its bottom is the hero's bottom edge (no bottom padding).
@@ -202,76 +209,6 @@
   padding-top: var(--space-3);
 }
 
-/* About the author */
-.author {
-  padding: var(--space-7) 0;
-  scroll-margin-top: var(--space-4);
-}
-
-/* Photo beside the text, both top-aligned; stacked on phones (see below). */
-.author__inner {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-7);
-  padding: var(--space-6);
-  border-radius: var(--radius-card);
-  background: var(--color-soft);
-}
-
-.author__photo {
-  flex: 0 0 var(--author-photo);
-  width: var(--author-photo);
-  height: auto;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
-  border-radius: var(--radius-card);
-}
-
-.author__text {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.author__title {
-  margin-bottom: var(--space-3);
-}
-
-.author__name {
-  margin-bottom: var(--space-5);
-  font-family: var(--font-heading);
-  font-size: var(--text-xl);
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-tight);
-}
-
-/* Long text: limited line length, a step larger, full-contrast ink. */
-.author__bio {
-  max-width: var(--measure);
-  margin-bottom: var(--space-6);
-  color: var(--color-ink);
-  font-size: var(--text-lg);
-  line-height: var(--leading-normal);
-  overflow-wrap: anywhere;
-}
-
-.author__bio p {
-  margin: 0 0 var(--space-5);
-}
-
-.author__bio > :last-child {
-  margin-bottom: 0;
-}
-
-.author__subheading {
-  margin: var(--space-6) 0 var(--space-3);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-}
-
-.author__bio > .author__subheading:first-child {
-  margin-top: 0;
-}
-
 /* Reviews */
 .reviews {
   padding: var(--space-7) 0;
@@ -319,33 +256,4 @@
 .review-card__name {
   color: var(--color-ink);
   font-weight: var(--weight-bold);
-}
-
-/* Tablets: photo stays beside the text, a little smaller. */
-@media (max-width: 64rem) {
-  .author__inner {
-    gap: var(--space-6);
-  }
-
-  .author__photo {
-    flex-basis: var(--author-photo-tablet);
-    width: var(--author-photo-tablet);
-  }
-}
-
-/* Narrow screens */
-@media (max-width: 40rem) {
-  /* Author: photo on top, full width up to a sensible max. */
-  .author__inner {
-    flex-direction: column;
-    align-items: stretch;  /* text takes the panel width and wraps */
-    padding: var(--space-5);
-  }
-
-  .author__photo {
-    align-self: flex-start;
-    flex-basis: auto;
-    width: 100%;
-    max-width: var(--author-photo-phone-max);
-  }
 }
