@@ -471,6 +471,7 @@ function QuizFields({ content, setContent }) {
                     onClick={() => setContent(c => ({ ...c, options: [...c.options, ''] }))}
                     style={{ ...ghostBtn, padding: '6px 12px' }}
                 >+ Вариант</button>
+                <BulkOptions setContent={setContent} />
             </Field>
 
             <Field label="Пояснение (показывается при верном ответе)">
@@ -483,6 +484,91 @@ function QuizFields({ content, setContent }) {
                 />
             </Field>
         </>
+    );
+}
+
+// Turns pasted text into quiz options: one non-empty line = one option.
+// A line starting with "* " (asterisk + space) is marked as the correct answer;
+// "*args" without a space stays a normal option.
+// Returns { options, correct } where correct is an index or null.
+function parseBulkOptions(text) {
+    const options = [];
+    let correct = null;
+    for (const raw of text.split(/\r?\n/)) {
+        let line = raw.trim();
+        if (!line) continue;
+        const marked = /^\*\s+/.test(line);
+        if (marked) {
+            line = line.replace(/^\*\s+/, '');
+            if (correct === null) correct = options.length;
+        }
+        options.push(line);
+    }
+    return { options, correct };
+}
+
+function BulkOptions({ setContent }) {
+    const [open, setOpen] = useState(false);
+    const [text, setText] = useState('');
+    const [note, setNote] = useState('');
+    const { options, correct } = parseBulkOptions(text);
+
+    const apply = (mode) => {
+        if (options.length === 0) return;
+        setContent(c => {
+            const kept = mode === 'append' ? c.options.filter(o => o.trim()) : [];
+            const next = [...kept, ...options];
+            while (next.length < 2) next.push('');
+            let correct_answer;
+            if (correct !== null) correct_answer = kept.length + correct;
+            else if (mode === 'append' && c.options[c.correct_answer]?.trim())
+                correct_answer = kept.indexOf(c.options[c.correct_answer]);
+            else correct_answer = 0;
+            return { ...c, options: next, correct_answer: Math.max(0, correct_answer) };
+        });
+        setNote(correct !== null
+            ? `Добавлено вариантов: ${options.length}. Правильный ответ отмечен.`
+            : `Добавлено вариантов: ${options.length}. Отметьте кружком правильный.`);
+        setText('');
+    };
+
+    if (!open) {
+        return (
+            <button
+                type="button"
+                onClick={() => { setOpen(true); setNote(''); }}
+                style={{ ...ghostBtn, padding: '6px 12px', marginLeft: 8 }}
+            >📋 Вставить списком</button>
+        );
+    }
+
+    return (
+        <div style={{ marginTop: 12, padding: 12, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+                Каждый вариант — с новой строки. Пустые строки пропускаются.
+                Начните строку с <b>*&nbsp;</b> (звёздочка и пробел), чтобы сразу отметить правильный ответ.
+            </div>
+            <textarea
+                value={text}
+                onChange={e => setText(e.target.value)}
+                rows={6}
+                autoFocus
+                placeholder={'True\n* False\nNone\nTypeError'}
+                style={{ ...input, fontFamily: "'JetBrains Mono', Consolas, monospace", resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <button type="button" onClick={() => apply('replace')} disabled={!options.length} style={{ ...saveBtn, padding: '6px 14px' }}>
+                    Заменить варианты{options.length ? ` (${options.length})` : ''}
+                </button>
+                <button type="button" onClick={() => apply('append')} disabled={!options.length} style={{ ...ghostBtn, padding: '6px 14px' }}>
+                    Добавить к имеющимся
+                </button>
+                <button type="button" onClick={() => { setOpen(false); setText(''); }} style={{ ...iconBtn }}>
+                    Свернуть
+                </button>
+                {note && <span style={{ fontSize: 12, color: '#16a34a' }}>{note}</span>}
+            </div>
+        </div>
     );
 }
 
