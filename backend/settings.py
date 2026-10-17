@@ -67,10 +67,13 @@ if not SECRET_KEY:
 
 # Always allowed: the production IP and local access. ALLOWED_HOSTS in the
 # environment (comma-separated) adds more hosts, it never removes these.
-ALLOWED_HOSTS = ['186.246.9.251', 'localhost', '127.0.0.1'] + [
+ALLOWED_HOSTS = ['185.186.140.57', 'localhost', '127.0.0.1'] + [
     h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()
 ]
 
+# HTTPS via nginx (reverse proxy in front of Django)
+CSRF_TRUSTED_ORIGINS = ['https://uchebus.ru', 'https://www.uchebus.ru']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Application definition
 
