@@ -514,20 +514,27 @@ class RunnerSlotUserTests(unittest.TestCase):
         self.assertEqual(os.listdir(sandbox.WORK_BASE), [])
 
     def test_no_network(self):
+        # Each probe in a thread with a deadline: a lookup that hangs counts
+        # as blocked instead of running into the wall-clock limit.
         result = run("""
-            import json, socket
-            out = {}
-            try:
-                socket.getaddrinfo('example.com', 443)
-                out['dns'] = 'ALLOWED'
-            except OSError as exc:
-                out['dns'] = type(exc).__name__
-            try:
-                socket.create_connection(('1.1.1.1', 443), timeout=2).close()
-                out['internet'] = 'ALLOWED'
-            except OSError as exc:
-                out['internet'] = type(exc).__name__
-            print(json.dumps(out))
+            import json, os, socket, threading
+            out = {'dns': 'no answer', 'internet': 'no answer'}
+            def probe(name, attempt):
+                try:
+                    attempt()
+                    out[name] = 'ALLOWED'
+                except OSError as exc:
+                    out[name] = type(exc).__name__
+            threads = [
+                threading.Thread(target=probe, args=('dns', lambda: socket.getaddrinfo('example.com', 443)), daemon=True),
+                threading.Thread(target=probe, args=('internet', lambda: socket.create_connection(('1.1.1.1', 443), timeout=2).close()), daemon=True),
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(2.5)
+            print(json.dumps(out), flush=True)
+            os._exit(0)
         """)
         self.assertEqual(result.returncode, 0, result.stderr)
         out = json.loads(result.stdout)
