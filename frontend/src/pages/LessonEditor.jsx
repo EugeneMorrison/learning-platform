@@ -34,16 +34,60 @@ function defaultContent(type) {
 // `visible` flag, the first DEFAULT_VISIBLE_TESTS are shown to students.
 const DEFAULT_VISIBLE_TESTS = 2;
 
-// Give every dict test an explicit `visible` flag so the "Показывать ученику"
-// checkboxes show what students see now; saving then stores explicit flags.
+// Tests as the form edits them: each {input, expected, visible}.
+// - A legacy string test means "expected output, empty stdin"
+//   (block_content.normalize_test): it becomes {input: '', expected: <string>},
+//   so saving keeps how it's graded (before, such blocks couldn't be saved).
+// - `visible` is what students see now (block_content.test_visibility): with
+//   any explicit flag, only dict tests flagged true; otherwise the first
+//   DEFAULT_VISIBLE_TESTS. The "Показывать ученику" checkboxes show it, and
+//   saving stores explicit flags.
 function withVisibleFlags(content) {
     const tests = content.tests || [];
-    if (tests.some(t => typeof t === 'object' && t !== null && 'visible' in t)) return content;
+    const isDict = t => typeof t === 'object' && t !== null;
+    const explicit = tests.some(t => isDict(t) && 'visible' in t);
     return {
         ...content,
-        tests: tests.map((t, i) =>
-            typeof t === 'object' && t !== null ? { ...t, visible: i < DEFAULT_VISIBLE_TESTS } : t),
+        tests: tests.map((t, i) => {
+            const visible = explicit ? isDict(t) && t.visible === true : i < DEFAULT_VISIBLE_TESTS;
+            if (!isDict(t)) return { input: '', expected: t || '', visible };
+            return { ...t, input: t.input || '', expected: t.expected || '', visible };
+        }),
     };
+}
+
+// The main text of each type (rich text in all four): kept on a type change.
+const MAIN_TEXT = { TEXT: 'html', QUIZ: 'question', CODE: 'prompt', FILL: 'prompt' };
+
+// The «Тип блока» selector.
+const TYPE_CHOICES = [['TEXT', 'Теория'], ['QUIZ', 'Тест'], ['CODE', 'Код'], ['FILL', 'Пропуски']];
+
+// Whether a type change would drop something the author entered (beyond the
+// main text, which is kept): options, tests, code, template, explanation.
+function hasTypeSpecificContent(type, content) {
+    const filled = s => typeof s === 'string' && stripHtml(s) !== '';
+    if (type === 'QUIZ') {
+        return (content.options || []).some(o => (o || '').trim()) || filled(content.explanation);
+    }
+    if (type === 'CODE') {
+        const starter = (content.starter_code || '').trim();
+        return [content.header, content.footer, content.solution].some(s => (s || '').trim())
+            || (starter !== '' && starter !== defaultContent('CODE').starter_code.trim())
+            || (content.tests || []).some(t => (typeof t === 'string'
+                ? t.trim() : (t.input || '').trim() || (t.expected || '').trim()));
+    }
+    if (type === 'FILL') return (content.template || '').trim() !== '' || filled(content.explanation);
+    return false;
+}
+
+// "N учеников уже отвечали…", with the right Russian plural.
+function answersResetWarning(n) {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    const one = mod10 === 1 && mod100 !== 11;
+    const few = mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20);
+    const who = one ? `${n} ученик уже отвечал` : few ? `${n} ученика уже отвечали` : `${n} учеников уже отвечали`;
+    return `${who} на этот блок — ${one ? 'его' : 'их'} результаты по нему будут сброшены.`;
 }
 
 function stripHtml(html) {
@@ -65,9 +109,12 @@ function LessonEditor() {
     const [error, setError] = useState(null);
 
     // The block currently open in the form: { id: string|null, type, content,
-    // baseline }. id === null means we're creating a new block; baseline is
-    // the content as opened (JSON), to tell unsaved changes.
+    // baseline, savedType, insertBefore }. id === null means we're creating a
+    // new block (at the end, or in insertBefore's place); baseline is type +
+    // content as opened (JSON), to tell unsaved changes; savedType is the
+    // stored type (a change resets students' answers).
     const [draft, setDraft] = useState(null);
+    const [insertMenu, setInsertMenu] = useState(null); // «+ Вставить блок» open above this block id
     const [lastSavedId, setLastSavedId] = useState(null); // "Предпросмотр" returns here
     const scrollToFormRef = useRef(null); // block id whose form to scroll into view
     const [saving, setSaving] = useState(false);
@@ -141,21 +188,41 @@ function LessonEditor() {
         return Math.max(...blocks.map(b => b.order_index)) + 1;
     }
 
-    function startAdd(type) {
+    // A new block: at the end, or (insertBefore) in that block's place.
+    function startAdd(type, insertBefore = null) {
         setFormError('');
+        setInsertMenu(null);
         const content = defaultContent(type);
-        setDraft({ id: null, type, content, baseline: JSON.stringify(content) });
+        setDraft({ id: null, type, content, baseline: JSON.stringify({ type, content }),
+                   savedType: null, insertBefore });
     }
 
     function startEdit(block) {
         setFormError('');
+        setInsertMenu(null);
         // Deep-ish clone so editing doesn't mutate state until save.
         let content = JSON.parse(JSON.stringify(block.content));
         if (block.type === 'CODE') content = withVisibleFlags(content);
-        setDraft({ id: block.id, type: block.type, content, baseline: JSON.stringify(content) });
+        setDraft({ id: block.id, type: block.type, content,
+                   baseline: JSON.stringify({ type: block.type, content }), savedType: block.type });
     }
 
-    const hasUnsavedChanges = Boolean(draft) && JSON.stringify(draft.content) !== draft.baseline;
+    // A type change counts as an unsaved change too.
+    const hasUnsavedChanges = Boolean(draft)
+        && JSON.stringify({ type: draft.type, content: draft.content }) !== draft.baseline;
+
+    // «Тип блока»: the new type's defaults, keeping the main text.
+    function changeType(type) {
+        if (type === draft.type) return;
+        if (hasTypeSpecificContent(draft.type, draft.content)
+            && !window.confirm('Сменить тип блока? Варианты ответов, тесты и другие настройки этого типа будут удалены.')) return;
+        setFormError('');
+        setDraft(d => ({
+            ...d,
+            type,
+            content: { ...defaultContent(type), [MAIN_TEXT[type]]: d.content[MAIN_TEXT[d.type]] || '' },
+        }));
+    }
 
     // Unsaved changes are never lost without asking:
     // - leaving this page inside the app (any link or button, Back / Forward):
@@ -226,35 +293,46 @@ function LessonEditor() {
         return '';
     }
 
+    // Any error, before or after the request, ends in the form's message:
+    // a save never fails silently.
     async function handleSave() {
         const { id, type } = draft;
-        let content = draft.content;
-
-        // Clean up before saving.
-        if (type === 'QUIZ') {
-            const options = content.options.map(o => o.trim()).filter(Boolean);
-            // Keep correct_answer pointing at the same option after trimming/removal.
-            const correctText = content.options[content.correct_answer];
-            const correct_answer = Math.max(0, options.indexOf((correctText || '').trim()));
-            content = { ...content, options, correct_answer };
-        } else if (type === 'CODE') {
-            const tests = (content.tests || [])
-                .filter(t => t.input.trim() !== '' || t.expected.trim() !== '');
-            content = { ...content, tests };
-        }
-
-        const err = validate(type, content);
-        if (err) { setFormError(err); return; }
-
-        setSaving(true);
         setFormError('');
+        setSaving(true);
         try {
+            let content = draft.content;
+
+            // Clean up before saving.
+            if (type === 'QUIZ') {
+                const options = content.options.map(o => o.trim()).filter(Boolean);
+                // Keep correct_answer pointing at the same option after trimming/removal.
+                const correctText = content.options[content.correct_answer];
+                const correct_answer = Math.max(0, options.indexOf((correctText || '').trim()));
+                content = { ...content, options, correct_answer };
+            } else if (type === 'CODE') {
+                const tests = (content.tests || [])
+                    .filter(t => t.input.trim() !== '' || t.expected.trim() !== '');
+                content = { ...content, tests };
+            }
+
+            const err = validate(type, content);
+            if (err) { setFormError(err); return; }
+
+            // A new type is a different task: the server resets the block's
+            // answers. Warn when students (not the author) have any.
+            if (id !== null && type !== draft.savedType) {
+                const { data } = await api.get(`/blocks/${id}/answered/`);
+                if (data.students > 0 && !window.confirm(answersResetWarning(data.students))) return;
+            }
+
             if (id === null) {
                 const res = await api.post('/blocks/', {
                     lesson: lessonId,
                     type,
                     order_index: nextOrderIndex(),
                     content,
+                    // «+ Вставить блок»: the server puts it in this block's place.
+                    ...(draft.insertBefore ? { insert_before: draft.insertBefore } : {}),
                 });
                 setLastSavedId(res.data.id);
             } else {
@@ -383,10 +461,31 @@ function LessonEditor() {
             {blocks.map((block, index) => (
                 // scroll-margin: the form scrolls clear of the sticky app header.
                 <div key={block.id} id={`edit-block-${block.id}`} style={{ scrollMarginTop: 'calc(var(--space-8) + var(--space-4))' }}>
+                    {/* Above each block: a new block inserted in its place. Hidden
+                        while a form is open, like «Добавить блок» below. */}
+                    {draft?.id === null && draft.insertBefore === block.id ? (
+                        <BlockForm
+                            draft={draft}
+                            setContent={setContent}
+                            onChangeType={changeType}
+                            onSave={handleSave}
+                            onCancel={cancelDraft}
+                            saving={saving}
+                            formError={formError}
+                        />
+                    ) : !draft && (
+                        <InsertControl
+                            open={insertMenu === block.id}
+                            onOpen={() => setInsertMenu(block.id)}
+                            onPick={type => startAdd(type, block.id)}
+                            onCancel={() => setInsertMenu(null)}
+                        />
+                    )}
                     {draft?.id === block.id ? (
                         <BlockForm
                             draft={draft}
                             setContent={setContent}
+                            onChangeType={changeType}
                             onSave={handleSave}
                             onCancel={cancelDraft}
                             saving={saving}
@@ -415,11 +514,12 @@ function LessonEditor() {
                 </div>
             ))}
 
-            {/* New block form */}
-            {draft?.id === null && (
+            {/* New block form (at the end) */}
+            {draft?.id === null && !draft.insertBefore && (
                 <BlockForm
                     draft={draft}
                     setContent={setContent}
+                    onChangeType={changeType}
                     onSave={handleSave}
                     onCancel={cancelDraft}
                     saving={saving}
@@ -456,13 +556,44 @@ function blockPreview(block) {
 // BLOCK FORM (per-type fields)
 // =============================================================================
 
-function BlockForm({ draft, setContent, onSave, onCancel, saving, formError }) {
+// «+ Вставить блок» above a block: a slim muted line until clicked, then the
+// four type buttons right there.
+function InsertControl({ open, onOpen, onPick, onCancel }) {
+    if (!open) {
+        return (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4, marginBottom: -8 }}>
+                <button onClick={onOpen} style={insertBtn}>+ Вставить блок</button>
+            </div>
+        );
+    }
+    return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, padding: 12, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
+            <span style={{ fontWeight: 600, color: '#334155' }}>Вставить здесь:</span>
+            {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
+                <button key={type} onClick={() => onPick(type)} style={addBtn}>
+                    {TYPE_LABELS[type]}
+                </button>
+            ))}
+            <button onClick={onCancel} style={ghostBtn}>Отмена</button>
+        </div>
+    );
+}
+
+function BlockForm({ draft, setContent, onChangeType, onSave, onCancel, saving, formError }) {
     const { type, content } = draft;
 
     return (
         <div style={{ ...blockCard, borderLeft: '4px solid #0C4B33', background: '#fbfdfc' }}>
-            <div style={{ fontWeight: 700, marginBottom: 14 }}>
-                {draft.id === null ? 'Новый блок' : 'Редактирование'}: {TYPE_LABELS[type]}
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <div style={{ fontWeight: 700 }}>
+                    {draft.id === null ? 'Новый блок' : 'Редактирование'}: {TYPE_LABELS[type]}
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155', fontWeight: 600 }}>
+                    Тип блока
+                    <select value={type} onChange={e => onChangeType(e.target.value)} style={{ ...input, width: 'auto' }}>
+                        {TYPE_CHOICES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                </label>
             </div>
 
             {type === 'TEXT' && (
@@ -904,6 +1035,12 @@ const ghostBtn = {
 const addBtn = {
     padding: '10px 18px', background: 'white', color: '#0C4B33',
     border: '1px solid #0C4B33', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+};
+
+// «+ Вставить блок»: quiet, so a long block list stays easy to scan.
+const insertBtn = {
+    padding: '2px 10px', background: 'none', color: '#94a3b8',
+    border: 'none', cursor: 'pointer', fontSize: 12,
 };
 
 const iconBtn = {

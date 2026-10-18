@@ -521,6 +521,207 @@ class BlockDuplicateTests(APITestCase):
         self.assertEqual(self.lesson_order(), before)
 
 
+class BlockInsertAndRetypeTests(APITestCase):
+    """POST /api/blocks/ with insert_before (the editor's «+ Вставить блок»),
+    a block's type change (answers reset), GET /api/blocks/{id}/answered/."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.other_author = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.student2 = User.objects.create_user(username='student2', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Course', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=cls.course, title='Lesson', order_index=1)
+        other_course = Course.objects.create(title='Other', author=cls.other_author, is_published=True)
+        cls.other_lesson = Lesson.objects.create(course=other_course, title='Other', order_index=1)
+        cls.other_block = Block.objects.create(lesson=cls.other_lesson, type='TEXT', order_index=1,
+                                               content={'html': 'theirs'})
+        for student in (cls.student, cls.student2):
+            Enrollment.objects.create(student=student, course=cls.course)
+        # Five TEXT blocks, with a gap in order_index (gaps must not matter).
+        cls.blocks = [
+            Block.objects.create(lesson=cls.lesson, type='TEXT', order_index=index,
+                                 content={'html': f'<p>{n}</p>'})
+            for n, index in enumerate([1, 2, 3, 7, 8], start=1)
+        ]
+
+    def setUp(self):
+        self.client.force_authenticate(self.author)
+
+    def lesson_order(self, lesson=None):
+        return list(Block.objects.filter(lesson=lesson or self.lesson)
+                    .order_by('order_index').values_list('id', 'order_index'))
+
+    def insert(self, before, content=None, type_='CODE', lesson=None):
+        return self.client.post('/api/blocks/', {
+            'lesson': str((lesson or self.lesson).id), 'type': type_, 'order_index': 1,
+            'content': content if content is not None else {'prompt': '<p>new</p>', 'starter_code': ''},
+            'insert_before': str(before.id) if hasattr(before, 'id') else before,
+        }, format='json')
+
+    def ids(self):
+        return [str(i) for i, _ in self.lesson_order()]
+
+    def assert_unique_and_ordered(self):
+        indexes = [o for _, o in self.lesson_order()]
+        self.assertEqual(indexes, sorted(set(indexes)))
+
+    # --- insert ---------------------------------------------------------------
+
+    def test_insert_in_the_middle_takes_the_anchors_place(self):
+        b = self.blocks
+        response = self.insert(b[3])  # after block 3, before block 4
+        self.assertEqual(response.status_code, 201, response.data)
+        new = response.data['id']
+        self.assertEqual(self.ids(), [str(x.id) for x in b[:3]] + [str(new)] + [str(x.id) for x in b[3:]])
+        # Above: unchanged; the new block in the anchor's index; below: +1.
+        self.assertEqual([o for _, o in self.lesson_order()], [1, 2, 3, 7, 8, 9])
+        self.assertEqual(response.data['order_index'], 7)
+        self.assert_unique_and_ordered()
+
+    def test_insert_at_the_top(self):
+        response = self.insert(self.blocks[0], type_='TEXT', content={'html': '<p>top</p>'})
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(self.ids()[0], str(response.data['id']))
+        self.assertEqual([o for _, o in self.lesson_order()], [1, 2, 3, 4, 8, 9])
+        self.assert_unique_and_ordered()
+
+    def test_insert_at_the_end_is_a_plain_create(self):
+        response = self.client.post('/api/blocks/', {
+            'lesson': str(self.lesson.id), 'type': 'TEXT', 'order_index': 9,
+            'content': {'html': '<p>end</p>'}}, format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(self.ids()[-1], str(response.data['id']))
+        self.assert_unique_and_ordered()
+
+    def test_insert_ignores_the_clients_order_index(self):
+        # order_index 1 is taken: with insert_before it doesn't matter.
+        response = self.insert(self.blocks[2])
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['order_index'], 3)
+
+    def test_failed_validation_moves_nothing(self):
+        before = self.lesson_order()
+        response = self.insert(self.blocks[1], type_='QUIZ', content={'question': 'no options'})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('content', response.data)
+        self.assertEqual(self.lesson_order(), before)
+
+    def test_bad_anchor_is_refused(self):
+        before = self.lesson_order()
+        for anchor in [self.other_block, 'not-a-uuid', '00000000-0000-0000-0000-000000000000']:
+            with self.subTest(anchor=anchor):
+                self.assertEqual(self.insert(anchor).status_code, 400)
+        self.assertEqual(self.lesson_order(), before)
+
+    def test_students_and_other_authors_are_refused(self):
+        before = self.lesson_order()
+        other_before = self.lesson_order(self.other_lesson)
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.insert(self.blocks[1]).status_code, 403)
+        # Another author, into this lesson: 403 (ParentOwnerMixin), nothing moved.
+        self.client.force_authenticate(self.other_author)
+        self.assertEqual(self.insert(self.blocks[1]).status_code, 403)
+        # This author, into another author's lesson: 403 too.
+        self.client.force_authenticate(self.author)
+        self.assertEqual(self.insert(self.other_block, lesson=self.other_lesson).status_code, 403)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.insert(self.blocks[1]).status_code, 401)
+        self.assertEqual(self.lesson_order(), before)
+        self.assertEqual(self.lesson_order(self.other_lesson), other_before)
+
+    # --- type change ---------------------------------------------------------
+
+    def answer(self, user, block):
+        Progress.objects.create(student=user, lesson=self.lesson, block=block,
+                                answer={'x': 1}, is_correct=True, completed=True)
+        Attempt.objects.create(student=user, block=block, answer={'x': 1}, is_correct=True)
+
+    def retype(self, block, type_, content, method='put'):
+        body = {'type': type_, 'content': content}
+        if method == 'put':
+            body.update(lesson=str(self.lesson.id), order_index=block.order_index)
+        return getattr(self.client, method)(f'/api/blocks/{block.id}/', body, format='json')
+
+    QUIZ = {'question': '<p>1</p>', 'options': ['a', 'b'], 'correct_answer': 0}
+
+    def test_type_change_resets_this_blocks_answers_only(self):
+        changed, kept = self.blocks[0], self.blocks[1]
+        for user in (self.student, self.student2, self.author):
+            self.answer(user, changed)
+        self.answer(self.student, kept)
+
+        response = self.retype(changed, 'QUIZ', self.QUIZ)
+        self.assertEqual(response.status_code, 200, response.data)
+        changed.refresh_from_db()
+        self.assertEqual((changed.type, changed.content), ('QUIZ', self.QUIZ))
+        # Everyone's rows for this block go, the author's too; other blocks keep theirs.
+        self.assertFalse(Progress.objects.filter(block=changed).exists())
+        self.assertFalse(Attempt.objects.filter(block=changed).exists())
+        self.assertEqual(Progress.objects.filter(block=kept).count(), 1)
+        self.assertEqual(Attempt.objects.filter(block=kept).count(), 1)
+
+    def test_patch_of_type_alone_resets_answers(self):
+        block = self.blocks[0]
+        Block.objects.filter(pk=block.pk).update(content=dict(self.QUIZ, html='<p>1</p>'))
+        self.answer(self.student, block)
+        response = self.client.patch(f'/api/blocks/{block.id}/', {'type': 'QUIZ'}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(Progress.objects.filter(block=block).exists())
+        self.assertFalse(Attempt.objects.filter(block=block).exists())
+
+    def test_same_type_keeps_answers(self):
+        block = self.blocks[0]
+        self.answer(self.student, block)
+        response = self.retype(block, 'TEXT', {'html': '<p>edited</p>'})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Progress.objects.filter(block=block).count(), 1)
+        self.assertEqual(Attempt.objects.filter(block=block).count(), 1)
+
+    def test_new_type_content_is_validated_and_nothing_is_deleted(self):
+        block = self.blocks[0]
+        self.answer(self.student, block)
+        # TEXT content saved as a QUIZ: no question/options → 400, block unchanged.
+        response = self.retype(block, 'QUIZ', {'html': '<p>1</p>'})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('content', response.data)
+        block.refresh_from_db()
+        self.assertEqual(block.type, 'TEXT')
+        self.assertEqual(Progress.objects.filter(block=block).count(), 1)
+        self.assertEqual(Attempt.objects.filter(block=block).count(), 1)
+
+    # --- answered ------------------------------------------------------------
+
+    def answered(self, block):
+        return self.client.get(f'/api/blocks/{block.id}/answered/')
+
+    def test_answered_counts_distinct_students(self):
+        block = self.blocks[0]
+        self.answer(self.student, block)
+        Attempt.objects.create(student=self.student, block=block, answer={}, is_correct=False)
+        Attempt.objects.create(student=self.student2, block=block, answer={}, is_correct=False)
+        response = self.answered(block)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {'students': 2})
+        self.assertEqual(self.answered(self.blocks[1]).data, {'students': 0})
+
+    def test_answered_ignores_the_course_author(self):
+        block = self.blocks[0]
+        self.answer(self.author, block)  # the author testing her own task
+        self.assertEqual(self.answered(block).data, {'students': 0})
+
+    def test_answered_access(self):
+        block = self.blocks[0]
+        # A GET passes IsAuthor; the author-only queryset makes it a 404.
+        self.client.force_authenticate(self.student)
+        self.assertEqual(self.answered(block).status_code, 404)
+        self.client.force_authenticate(self.other_author)
+        self.assertEqual(self.answered(block).status_code, 404)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.answered(block).status_code, 401)
+
+
 class ParentOwnershipTests(APITestCase):
     """Lessons and blocks may only be created in, or moved into, the requesting
     author's own course / lesson (403 otherwise). The owner is unaffected."""

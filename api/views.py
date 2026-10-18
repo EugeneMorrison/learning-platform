@@ -716,6 +716,9 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
     - Authors can create/edit blocks in THEIR courses only: another author's
       block is a 404 (get_queryset); a lesson they don't own, as the block's
       lesson on create or update, is a 403 (ParentOwnerMixin).
+
+    Create takes an optional `insert_before: <block id>` (see create()).
+    Changing a block's type deletes its Progress and Attempts (perform_update).
     """
 
     queryset = Block.objects.all()
@@ -758,6 +761,76 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
 
         return queryset
 
+    def create(self, request, *args, **kwargs):
+        """
+        POST /api/blocks/ — at the end of the lesson (the client's order_index),
+        or, with `insert_before: <block id>`, in that block's place: it and
+        every block below move down by one (the editor's «+ Вставить блок»).
+        A block id, not a position, so the block lands where the author saw
+        it even if the list changed meanwhile.
+
+        One transaction, as in duplicate(): validation and the lesson-owner
+        check run first (with a free temporary order_index), so nothing moves
+        unless the block can be created; any failure rolls everything back.
+        An insert_before block of another lesson (or unknown) → 400.
+        """
+        anchor_id = request.data.get('insert_before')
+        if not anchor_id:
+            return super().create(request, *args, **kwargs)
+
+        with transaction.atomic():
+            try:
+                anchor = Block.objects.get(pk=uuid.UUID(str(anchor_id)))
+            except (ValueError, Block.DoesNotExist):
+                anchor = None
+            if anchor is None or str(anchor.lesson_id) != str(request.data.get('lesson')):
+                raise ParseError('insert_before must be a block of the same lesson.')
+            siblings = list(
+                Block.objects.select_for_update()
+                .filter(lesson_id=anchor.lesson_id)
+                .order_by('order_index')
+            )
+            data = {key: request.data.get(key) for key in ('lesson', 'type', 'content')}
+            data['order_index'] = siblings[-1].order_index + 1  # free until the shift
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            self.check_parent_owner(serializer)
+            position = next(i for i, b in enumerate(siblings) if b.pk == anchor.pk)
+            shift_down(siblings[position:])
+            serializer.save(order_index=anchor.order_index)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def perform_update(self, serializer):
+        """A new type is a different task: the answers to the old one go
+        (everyone's, the author's own test answers included), in the same
+        transaction as the save. Also for a PATCH of `type` alone."""
+        old_type = serializer.instance.type
+        with transaction.atomic():
+            super().perform_update(serializer)
+            block = serializer.instance
+            if block.type != old_type:
+                Progress.objects.filter(block=block).delete()
+                Attempt.objects.filter(block=block).delete()
+
+    @action(detail=True, methods=['get'])
+    def answered(self, request, pk=None):
+        """
+        GET /api/blocks/{id}/answered/ → {"students": N}: how many students
+        have answered this block (Progress or Attempt), so the editor can warn
+        before a type change resets them. The course's author is not counted
+        (record_answer() also records her own test answers).
+
+        Only the block's author: anyone else gets 404 (GET passes IsAuthor;
+        get_queryset() has only the author's own blocks for this action).
+        """
+        block = self.get_object()
+        author_id = block.lesson.course.author_id
+        students = set(Progress.objects.filter(block=block)
+                       .exclude(student_id=author_id).values_list('student_id', flat=True))
+        students |= set(Attempt.objects.filter(block=block)
+                        .exclude(student_id=author_id).values_list('student_id', flat=True))
+        return Response({'students': len(students)})
+
     @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):
         """
@@ -783,10 +856,7 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
                 .order_by('order_index')
             )
             position = next(i for i, b in enumerate(siblings) if b.pk == original.pk)
-            # Everything below moves down by one, bottom first: each block steps
-            # into a free order_index, so unique (lesson, order_index) never clashes.
-            for block in reversed(siblings[position + 1:]):
-                Block.objects.filter(pk=block.pk).update(order_index=block.order_index + 1)
+            shift_down(siblings[position + 1:])
             # Same validation as a block created in the editor; a failure here
             # rolls the shift back.
             serializer = self.get_serializer(data={
@@ -798,6 +868,14 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+def shift_down(blocks):
+    """Move `blocks` (one lesson's, in order, locked) down by one. Bottom
+    first: each block steps into a free order_index, so the unique
+    (lesson, order_index) never clashes."""
+    for block in reversed(blocks):
+        Block.objects.filter(pk=block.pk).update(order_index=block.order_index + 1)
 
 
 def lesson_viewer(request):
