@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useBlocker } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
@@ -96,54 +96,188 @@ function stripHtml(html) {
     return (tmp.textContent || tmp.innerText || '').trim();
 }
 
+// =============================================================================
+// Drafts: every block is open for editing at once, each with its own draft
+// =============================================================================
+//
+// A draft: { key, id, type, content, baseline, savedType, insertBefore, seq,
+// dirty, saving, error }.
+// - key: the block id, or "new-<n>" for a block not saved yet (id === null);
+//   a new block shows above insertBefore (a block id), or at the end.
+// - baseline: JSON of {type, content} as last saved; dirty = differs from it
+//   (recomputed on every change, so counting dirty blocks stays cheap).
+// - savedType: the stored type (a change resets students' answers).
+
+function draftFromBlock(block) {
+    // Deep-ish clone so editing never mutates the server list.
+    let content = JSON.parse(JSON.stringify(block.content));
+    if (block.type === 'CODE') content = withVisibleFlags(content);
+    return {
+        key: block.id, id: block.id, type: block.type, content,
+        baseline: JSON.stringify({ type: block.type, content }), savedType: block.type,
+        insertBefore: null, seq: 0, dirty: false, saving: false, error: '',
+    };
+}
+
+function newDraft(key, seq, type, insertBefore) {
+    const content = defaultContent(type);
+    return {
+        key, id: null, type, content, baseline: JSON.stringify({ type, content }), savedType: null,
+        insertBefore, seq, dirty: false, saving: false, error: '',
+    };
+}
+
+// The draft with `changes`; `dirty` follows type / content / baseline.
+function withChanges(draft, changes) {
+    const next = { ...draft, ...changes };
+    if ('type' in changes || 'content' in changes || 'baseline' in changes) {
+        next.dirty = JSON.stringify({ type: next.type, content: next.content }) !== next.baseline;
+    }
+    return next;
+}
+
+/**
+ * The drafts after the block list was (re)loaded from the server. Never
+ * overwrites another block's unsaved draft:
+ * - a block with a draft keeps it, as it is (dirty or not);
+ * - `saved` ({key, block, startedFrom}): the block just saved or created gets
+ *   the server's version, unless the author typed on while it was saving:
+ *   then her text stays, against the saved version as the new baseline;
+ * - a block new on the server (a copy) gets a fresh draft; a deleted one's
+ *   draft goes;
+ * - new, unsaved blocks stay; one whose anchor block is gone moves to the end.
+ */
+function mergeDrafts(prev, list, saved = null) {
+    const next = {};
+    const ids = new Set(list.map(b => b.id));
+    for (const block of list) {
+        if (saved && block.id === saved.block.id) {
+            const fresh = draftFromBlock(saved.block);
+            const current = prev[saved.key];
+            const typedOn = current
+                && JSON.stringify({ type: current.type, content: current.content }) !== saved.startedFrom;
+            next[block.id] = typedOn
+                ? withChanges({ ...current, key: block.id, id: block.id, savedType: fresh.savedType,
+                                insertBefore: null, saving: false, error: '' }, { baseline: fresh.baseline })
+                : fresh;
+        } else {
+            next[block.id] = prev[block.id] || draftFromBlock(block);
+        }
+    }
+    for (const [key, draft] of Object.entries(prev)) {
+        if (draft.id !== null || key === saved?.key) continue;
+        next[key] = draft.insertBefore && !ids.has(draft.insertBefore) ? { ...draft, insertBefore: null } : draft;
+    }
+    return next;
+}
+
+// "Несохранённые изменения в N блоках…": в 1 / 21 блоке, в 2 / 5 блоках.
+function leaveWarning(n) {
+    const one = n % 10 === 1 && n % 100 !== 11;
+    return `Несохранённые изменения в ${n} ${one ? 'блоке' : 'блоках'}. Уйти без сохранения?`;
+}
+
+function validate(type, content) {
+    if (type === 'TEXT') {
+        if (!stripHtml(content.html)) return 'Добавьте текст теории.';
+    } else if (type === 'QUIZ') {
+        if (!stripHtml(content.question)) return 'Введите вопрос.';
+        const filled = content.options.filter(o => o.trim());
+        if (filled.length < 2) return 'Нужно минимум два варианта ответа.';
+        if (content.correct_answer == null || !content.options[content.correct_answer]?.trim())
+            return 'Отметьте правильный вариант ответа.';
+    } else if (type === 'CODE') {
+        if (!stripHtml(content.prompt)) return 'Опишите условие задачи.';
+        if (!content.starter_code.trim()) return 'Добавьте стартовый код.';
+    } else if (type === 'FILL') {
+        const blanks = (content.template || '').match(/\{\{(.*?)\}\}/g) || [];
+        const hasAnswer = blanks.some(b => b.replace(/\{\{|\}\}/g, '').trim());
+        if (!hasAnswer) return 'Добавьте шаблон хотя бы с одним пропуском, например: print({{8}})';
+    }
+    return '';
+}
+
+// Content as sent to the server: QUIZ options trimmed, empty CODE tests dropped.
+function cleanContent(type, content) {
+    if (type === 'QUIZ') {
+        const options = content.options.map(o => o.trim()).filter(Boolean);
+        // Keep correct_answer pointing at the same option after trimming/removal.
+        const correctText = content.options[content.correct_answer];
+        const correct_answer = Math.max(0, options.indexOf((correctText || '').trim()));
+        return { ...content, options, correct_answer };
+    }
+    if (type === 'CODE') {
+        const tests = (content.tests || [])
+            .filter(t => t.input.trim() !== '' || t.expected.trim() !== '');
+        return { ...content, tests };
+    }
+    return content;
+}
+
 function LessonEditor() {
     const { lessonId } = useParams();
     const navigate = useNavigate();
-    // ?block=<id>: open that block's form on load ("✎ Изменить" on the lesson page).
+    // ?block=<id> ("✎ Изменить" on the lesson page): scroll to that block.
     const [searchParams, setSearchParams] = useSearchParams();
 
     const [lesson, setLesson] = useState(null);
-    const [blocks, setBlocks] = useState([]);
+    const [blocks, setBlocks] = useState([]); // the server's list, in order
+    const [drafts, setDrafts] = useState({}); // key → draft (see above)
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // The block currently open in the form: { id: string|null, type, content,
-    // baseline, savedType, insertBefore }. id === null means we're creating a
-    // new block (at the end, or in insertBefore's place); baseline is type +
-    // content as opened (JSON), to tell unsaved changes; savedType is the
-    // stored type (a change resets students' answers).
-    const [draft, setDraft] = useState(null);
     const [insertMenu, setInsertMenu] = useState(null); // «+ Вставить блок» open above this block id
     const [lastSavedId, setLastSavedId] = useState(null); // "Предпросмотр" returns here
-    const scrollToFormRef = useRef(null); // block id whose form to scroll into view
-    const [saving, setSaving] = useState(false);
-    const [formError, setFormError] = useState('');
     const [busy, setBusy] = useState(false); // reorder/delete/copy in flight
-    const [copiedId, setCopiedId] = useState(null); // new copy, briefly highlighted
+    const [flashId, setFlashId] = useState(null); // a new copy or a ?block= target, briefly highlighted
     const [copyStatus, setCopyStatus] = useState(''); // for screen readers
+    const scrollToRef = useRef(null); // ?block= target, scrolled to once rendered
     const copyingRef = useRef(false); // a double click must not make two copies
+    const newSeqRef = useRef(0); // numbers new blocks: keys "new-1", "new-2", …
+    const reloadSeqRef = useRef(0); // only the latest block list is shown
+
+    // Stable callbacks for the (memoized) cards read the current handlers and
+    // state from here. Only to READ: every state change is a functional update.
+    const latest = useRef(null);
+    useEffect(() => {
+        latest.current = { drafts, blocks, handleSave, handleDelete, handleDuplicate, moveBlock };
+    });
 
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lessonId]);
 
-    // The highlight on a fresh copy goes away after a moment.
+    // The highlight goes away after a moment.
     useEffect(() => {
-        if (!copiedId) return undefined;
-        const timer = setTimeout(() => setCopiedId(null), 2500);
+        if (!flashId) return undefined;
+        const timer = setTimeout(() => setFlashId(null), 2500);
         return () => clearTimeout(timer);
-    }, [copiedId]);
+    }, [flashId]);
 
-    // A form opened from ?block=<id>: scroll it into view once it's rendered.
+    // ?block=<id>: scroll to that card once the cards are on the page. The
+    // cards above it are still growing while their editors render, so keep it
+    // in place until the layout settles (2 s), or the author scrolls herself.
     useEffect(() => {
-        const id = scrollToFormRef.current;
-        const el = id && draft?.id === id && document.getElementById(`edit-block-${id}`);
-        if (!el) return;
-        scrollToFormRef.current = null;
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, [draft, loading]);
+        const id = scrollToRef.current;
+        const el = id && document.getElementById(`edit-block-${id}`);
+        if (!el) return undefined;
+        scrollToRef.current = null;
+        const scroll = () => el.scrollIntoView({ block: 'start' });
+        scroll();
+        const observer = new ResizeObserver(scroll);
+        observer.observe(document.body);
+        const userEvents = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+        const stop = () => {
+            observer.disconnect();
+            clearTimeout(timer);
+            userEvents.forEach(type => window.removeEventListener(type, stop));
+        };
+        const timer = setTimeout(stop, 2000);
+        userEvents.forEach(type => window.addEventListener(type, stop, { passive: true }));
+        return stop;
+    }, [loading]);
 
     async function load() {
         try {
@@ -155,15 +289,15 @@ function LessonEditor() {
             setUser(meRes.data);
             setLesson(lessonRes.data);
             setBlocks(blocksRes.data);
+            setDrafts(prev => mergeDrafts(prev, blocksRes.data));
 
-            // An unknown id is ignored: the editor opens as usual. The parameter
-            // goes (replace, not push), so Back and a reload behave normally.
+            // An unknown id is ignored. The parameter goes (replace, not
+            // push), so Back and a reload behave normally.
             const blockId = searchParams.get('block');
             if (blockId) {
-                const block = blocksRes.data.find(b => b.id === blockId);
-                if (block) {
-                    scrollToFormRef.current = block.id;
-                    startEdit(block);
+                if (blocksRes.data.some(b => b.id === blockId)) {
+                    scrollToRef.current = blockId;
+                    setFlashId(blockId);
                 }
                 setSearchParams(params => {
                     params.delete('block');
@@ -178,9 +312,15 @@ function LessonEditor() {
         }
     }
 
-    async function reloadBlocks() {
+    // The list from the server, merged into the drafts (mergeDrafts: other
+    // blocks' unsaved drafts are never touched). Several reloads may be in
+    // flight (saves of different blocks): an older list is not shown over a
+    // newer one, but its saved block's draft is still updated.
+    async function reloadBlocks(saved = null) {
+        const seq = ++reloadSeqRef.current;
         const res = await api.get(`/blocks/?lesson=${lessonId}`);
-        setBlocks(res.data);
+        if (seq === reloadSeqRef.current) setBlocks(res.data);
+        setDrafts(prev => mergeDrafts(prev, res.data, saved));
     }
 
     function nextOrderIndex() {
@@ -188,41 +328,15 @@ function LessonEditor() {
         return Math.max(...blocks.map(b => b.order_index)) + 1;
     }
 
-    // A new block: at the end, or (insertBefore) in that block's place.
+    // A new, unsaved block: at the end, or (insertBefore) above that block.
     function startAdd(type, insertBefore = null) {
-        setFormError('');
         setInsertMenu(null);
-        const content = defaultContent(type);
-        setDraft({ id: null, type, content, baseline: JSON.stringify({ type, content }),
-                   savedType: null, insertBefore });
+        const seq = ++newSeqRef.current;
+        const key = `new-${seq}`;
+        setDrafts(prev => ({ ...prev, [key]: newDraft(key, seq, type, insertBefore) }));
     }
 
-    function startEdit(block) {
-        setFormError('');
-        setInsertMenu(null);
-        // Deep-ish clone so editing doesn't mutate state until save.
-        let content = JSON.parse(JSON.stringify(block.content));
-        if (block.type === 'CODE') content = withVisibleFlags(content);
-        setDraft({ id: block.id, type: block.type, content,
-                   baseline: JSON.stringify({ type: block.type, content }), savedType: block.type });
-    }
-
-    // A type change counts as an unsaved change too.
-    const hasUnsavedChanges = Boolean(draft)
-        && JSON.stringify({ type: draft.type, content: draft.content }) !== draft.baseline;
-
-    // «Тип блока»: the new type's defaults, keeping the main text.
-    function changeType(type) {
-        if (type === draft.type) return;
-        if (hasTypeSpecificContent(draft.type, draft.content)
-            && !window.confirm('Сменить тип блока? Варианты ответов, тесты и другие настройки этого типа будут удалены.')) return;
-        setFormError('');
-        setDraft(d => ({
-            ...d,
-            type,
-            content: { ...defaultContent(type), [MAIN_TEXT[type]]: d.content[MAIN_TEXT[d.type]] || '' },
-        }));
-    }
+    const dirtyCount = Object.values(drafts).filter(d => d.dirty).length;
 
     // Unsaved changes are never lost without asking:
     // - leaving this page inside the app (any link or button, Back / Forward):
@@ -230,93 +344,50 @@ function LessonEditor() {
     // - tab close, reload, plain links to Django pages (the header): the
     //   browser's own dialog (beforeunload; browsers don't allow custom text).
     const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-        hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname);
+        dirtyCount > 0 && currentLocation.pathname !== nextLocation.pathname);
 
     useEffect(() => {
         if (blocker.state !== 'blocked') return;
-        if (window.confirm('Вы уверены, что хотите выйти? Все несохранённые изменения будут потеряны.')) {
+        if (window.confirm(leaveWarning(dirtyCount))) {
             blocker.proceed();
         } else {
             blocker.reset();
         }
-    }, [blocker]);
+    }, [blocker, dirtyCount]);
 
     useEffect(() => {
-        if (!hasUnsavedChanges) return undefined;
+        if (dirtyCount === 0) return undefined;
         function onBeforeUnload(event) {
             event.preventDefault();
             event.returnValue = ''; // older browsers
         }
         window.addEventListener('beforeunload', onBeforeUnload);
         return () => window.removeEventListener('beforeunload', onBeforeUnload);
-    }, [hasUnsavedChanges]);
+    }, [dirtyCount]);
 
-    // "✎ Изменить" on another block while the open form has unsaved changes.
-    function switchTo(block) {
-        if (hasUnsavedChanges
-            && !window.confirm('В открытом блоке есть несохранённые изменения. Открыть другой блок без сохранения?')) return;
-        startEdit(block);
-    }
-
-    // Back to the lesson at the block being edited, else the last one saved.
+    // Back to the lesson at the last block saved.
     function previewPath() {
-        const blockId = draft?.id || lastSavedId;
-        return blockId ? `/lesson/${lessonId}/#block-${blockId}` : `/lesson/${lessonId}/`;
+        return lastSavedId ? `/lesson/${lessonId}/#block-${lastSavedId}` : `/lesson/${lessonId}/`;
     }
 
-    function cancelDraft() {
-        setDraft(null);
-        setFormError('');
+    // One block's draft, from the previous state; no-op once it's gone.
+    function updateDraft(key, fn) {
+        setDrafts(prev => (prev[key] ? { ...prev, [key]: fn(prev[key]) } : prev));
     }
 
-    function setContent(updater) {
-        setDraft(d => ({ ...d, content: updater(d.content) }));
-    }
-
-    function validate(type, content) {
-        if (type === 'TEXT') {
-            if (!stripHtml(content.html)) return 'Добавьте текст теории.';
-        } else if (type === 'QUIZ') {
-            if (!stripHtml(content.question)) return 'Введите вопрос.';
-            const filled = content.options.filter(o => o.trim());
-            if (filled.length < 2) return 'Нужно минимум два варианта ответа.';
-            if (content.correct_answer == null || !content.options[content.correct_answer]?.trim())
-                return 'Отметьте правильный вариант ответа.';
-        } else if (type === 'CODE') {
-            if (!stripHtml(content.prompt)) return 'Опишите условие задачи.';
-            if (!content.starter_code.trim()) return 'Добавьте стартовый код.';
-        } else if (type === 'FILL') {
-            const blanks = (content.template || '').match(/\{\{(.*?)\}\}/g) || [];
-            const hasAnswer = blanks.some(b => b.replace(/\{\{|\}\}/g, '').trim());
-            if (!hasAnswer) return 'Добавьте шаблон хотя бы с одним пропуском, например: print({{8}})';
-        }
-        return '';
-    }
-
-    // Any error, before or after the request, ends in the form's message:
-    // a save never fails silently.
-    async function handleSave() {
+    // Saves one block; the others are not touched. Any error, before or after
+    // the request, ends in that block's message: a save never fails silently.
+    async function handleSave(key) {
+        const draft = drafts[key];
+        if (!draft || draft.saving || !draft.dirty) return;
         const { id, type } = draft;
-        setFormError('');
-        setSaving(true);
+        // What this save started from: text typed on meanwhile stays (mergeDrafts).
+        const startedFrom = JSON.stringify({ type, content: draft.content });
+        updateDraft(key, d => ({ ...d, saving: true, error: '' }));
         try {
-            let content = draft.content;
-
-            // Clean up before saving.
-            if (type === 'QUIZ') {
-                const options = content.options.map(o => o.trim()).filter(Boolean);
-                // Keep correct_answer pointing at the same option after trimming/removal.
-                const correctText = content.options[content.correct_answer];
-                const correct_answer = Math.max(0, options.indexOf((correctText || '').trim()));
-                content = { ...content, options, correct_answer };
-            } else if (type === 'CODE') {
-                const tests = (content.tests || [])
-                    .filter(t => t.input.trim() !== '' || t.expected.trim() !== '');
-                content = { ...content, tests };
-            }
-
+            const content = cleanContent(type, draft.content);
             const err = validate(type, content);
-            if (err) { setFormError(err); return; }
+            if (err) { updateDraft(key, d => ({ ...d, error: err })); return; }
 
             // A new type is a different task: the server resets the block's
             // answers. Warn when students (not the author) have any.
@@ -325,33 +396,30 @@ function LessonEditor() {
                 if (data.students > 0 && !window.confirm(answersResetWarning(data.students))) return;
             }
 
+            let res;
             if (id === null) {
-                const res = await api.post('/blocks/', {
+                const anchor = draft.insertBefore && blocks.some(b => b.id === draft.insertBefore)
+                    ? draft.insertBefore : null;
+                res = await api.post('/blocks/', {
                     lesson: lessonId,
                     type,
                     order_index: nextOrderIndex(),
                     content,
                     // «+ Вставить блок»: the server puts it in this block's place.
-                    ...(draft.insertBefore ? { insert_before: draft.insertBefore } : {}),
+                    ...(anchor ? { insert_before: anchor } : {}),
                 });
-                setLastSavedId(res.data.id);
             } else {
-                const existing = blocks.find(b => b.id === id);
-                await api.put(`/blocks/${id}/`, {
-                    lesson: lessonId,
-                    type,
-                    order_index: existing.order_index,
-                    content,
-                });
-                setLastSavedId(id);
+                // PATCH without order_index: a move of another block, in flight
+                // at the same time, can't make it stale.
+                res = await api.patch(`/blocks/${id}/`, { type, content });
             }
-            await reloadBlocks();
-            setDraft(null);
+            setLastSavedId(res.data.id);
+            await reloadBlocks({ key, block: res.data, startedFrom });
         } catch (e) {
             console.error('Failed to save block:', e);
-            setFormError('Не удалось сохранить блок. Проверьте поля.');
+            updateDraft(key, d => ({ ...d, error: 'Не удалось сохранить блок. Проверьте поля.' }));
         } finally {
-            setSaving(false);
+            updateDraft(key, d => ({ ...d, saving: false }));
         }
     }
 
@@ -360,7 +428,6 @@ function LessonEditor() {
         setBusy(true);
         try {
             await api.delete(`/blocks/${block.id}/`);
-            if (draft?.id === block.id) setDraft(null);
             await reloadBlocks();
         } catch (e) {
             console.error('Failed to delete block:', e);
@@ -370,9 +437,9 @@ function LessonEditor() {
         }
     }
 
-    // "Копировать": the server puts the copy right below the original and moves
-    // the blocks below down by one (one transaction). Mirror that locally: no
-    // reload, no scroll jump, and the edit form stays closed.
+    // "Копировать": the server copies the SAVED block right below the original
+    // and moves the blocks below down by one (one transaction). Mirror that
+    // locally: no reload, no scroll jump; the copy gets its own draft.
     async function handleDuplicate(block) {
         if (copyingRef.current) return;
         copyingRef.current = true;
@@ -386,7 +453,8 @@ function LessonEditor() {
                 const below = prev.slice(i + 1).map(b => ({ ...b, order_index: b.order_index + 1 }));
                 return [...prev.slice(0, i + 1), copy, ...below];
             });
-            setCopiedId(copy.id);
+            setDrafts(prev => ({ ...prev, [copy.id]: draftFromBlock(copy) }));
+            setFlashId(copy.id);
             setCopyStatus('Блок скопирован, копия ниже.');
         } catch (e) {
             console.error('Failed to copy block:', e);
@@ -399,9 +467,10 @@ function LessonEditor() {
 
     // Swap order_index with the neighbour. Uses a temporary free index to dodge
     // the (lesson, order_index) unique constraint during the swap.
-    async function moveBlock(index, dir) {
+    async function moveBlock(id, dir) {
+        const index = blocks.findIndex(b => b.id === id);
         const target = index + dir;
-        if (target < 0 || target >= blocks.length) return;
+        if (index < 0 || target < 0 || target >= blocks.length) return;
         setBusy(true);
         try {
             const a = blocks[index];
@@ -420,11 +489,74 @@ function LessonEditor() {
         }
     }
 
+    // What the cards call: stable, so typing in one card re-renders only it.
+    // Each change is computed from the previous state (functional update);
+    // `latest` is only read, to ask before a change or to start a request.
+    const actions = useMemo(() => ({
+        setContent: (key, updater) => setDrafts(prev => (prev[key]
+            ? { ...prev, [key]: withChanges(prev[key], { content: updater(prev[key].content) }) }
+            : prev)),
+        // «Тип блока»: the new type's defaults, keeping the main text.
+        changeType: (key, type) => {
+            const current = latest.current.drafts[key];
+            if (!current || type === current.type) return;
+            if (hasTypeSpecificContent(current.type, current.content)
+                && !window.confirm('Сменить тип блока? Варианты ответов, тесты и другие настройки этого типа будут удалены.')) return;
+            setDrafts(prev => (prev[key] ? {
+                ...prev,
+                [key]: withChanges(prev[key], {
+                    type,
+                    content: { ...defaultContent(type), [MAIN_TEXT[type]]: prev[key].content[MAIN_TEXT[prev[key].type]] || '' },
+                    error: '',
+                }),
+            } : prev));
+        },
+        // «Отменить изменения»: back to the saved version.
+        revert: key => {
+            if (!latest.current.drafts[key]?.dirty) return;
+            if (!window.confirm('Отменить изменения в этом блоке?')) return;
+            setDrafts(prev => {
+                if (!prev[key]) return prev;
+                const { type, content } = JSON.parse(prev[key].baseline);
+                return { ...prev, [key]: withChanges(prev[key], { type, content, error: '' }) };
+            });
+        },
+        // «Убрать»: a new block that was never saved.
+        remove: key => {
+            if (latest.current.drafts[key]?.dirty && !window.confirm('Убрать новый блок? Введённый текст будет потерян.')) return;
+            setDrafts(prev => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+            });
+        },
+        save: key => latest.current.handleSave(key),
+        move: (id, dir) => latest.current.moveBlock(id, dir),
+        duplicate: id => latest.current.handleDuplicate(latest.current.blocks.find(b => b.id === id)),
+        delete: id => latest.current.handleDelete(latest.current.blocks.find(b => b.id === id)),
+    }), []);
+
     if (loading) return <p style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Загрузка...</p>;
     if (error) return <p style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>{error}</p>;
     if (user?.role !== 'AUTHOR') {
         return <p style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Только автор курса может редактировать урок.</p>;
     }
+
+    // New, unsaved blocks: above their anchor block, or at the end.
+    const newDrafts = Object.values(drafts).filter(d => d.id === null).sort((a, b) => a.seq - b.seq);
+    const newAbove = id => newDrafts.filter(d => d.insertBefore === id);
+    const newAtEnd = newDrafts.filter(d => !d.insertBefore);
+    const renderCard = (draft, index = -1) => (
+        <BlockCard
+            key={draft.key}
+            draft={draft}
+            actions={actions}
+            busy={busy}
+            canMoveUp={index > 0}
+            canMoveDown={index >= 0 && index < blocks.length - 1}
+            flash={flashId !== null && flashId === draft.id}
+        />
+    );
 
     return (
         <div className="page">
@@ -453,107 +585,44 @@ function LessonEditor() {
             <hr style={{ margin: '20px 0' }} />
             <p className="visually-hidden" role="status">{copyStatus}</p>
 
-            {/* Existing blocks */}
-            {blocks.length === 0 && !draft && (
+            {blocks.length === 0 && newDrafts.length === 0 && (
                 <p style={{ color: '#64748b' }}>В этом уроке пока нет блоков. Добавьте первый блок ниже.</p>
             )}
 
-            {blocks.map((block, index) => (
-                // scroll-margin: the form scrolls clear of the sticky app header.
-                <div key={block.id} id={`edit-block-${block.id}`} style={{ scrollMarginTop: 'calc(var(--space-8) + var(--space-4))' }}>
-                    {/* Above each block: a new block inserted in its place. Hidden
-                        while a form is open, like «Добавить блок» below. */}
-                    {draft?.id === null && draft.insertBefore === block.id ? (
-                        <BlockForm
-                            draft={draft}
-                            setContent={setContent}
-                            onChangeType={changeType}
-                            onSave={handleSave}
-                            onCancel={cancelDraft}
-                            saving={saving}
-                            formError={formError}
-                        />
-                    ) : !draft && (
-                        <InsertControl
-                            open={insertMenu === block.id}
-                            onOpen={() => setInsertMenu(block.id)}
-                            onPick={type => startAdd(type, block.id)}
-                            onCancel={() => setInsertMenu(null)}
-                        />
-                    )}
-                    {draft?.id === block.id ? (
-                        <BlockForm
-                            draft={draft}
-                            setContent={setContent}
-                            onChangeType={changeType}
-                            onSave={handleSave}
-                            onCancel={cancelDraft}
-                            saving={saving}
-                            formError={formError}
-                        />
-                    ) : (
-                        <div style={{ ...blockCard, ...(copiedId === block.id ? copiedCard : null) }}>
-                            {/* Wraps on narrow screens: the buttons go under the preview. */}
-                            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                                <div style={{ minWidth: 0, flex: '1 1 var(--card-min-width)' }}>
-                                    <span style={badge}>{TYPE_LABELS[block.type]}</span>
-                                    <div style={{ marginTop: 8, color: '#475569', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 520 }}>
-                                        {blockPreview(block)}
-                                    </div>
-                                </div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                    <button title="Вверх" disabled={busy || index === 0} onClick={() => moveBlock(index, -1)} style={iconBtn}>↑</button>
-                                    <button title="Вниз" disabled={busy || index === blocks.length - 1} onClick={() => moveBlock(index, 1)} style={iconBtn}>↓</button>
-                                    <button disabled={busy} onClick={() => switchTo(block)} style={iconBtn}>✎ Изменить</button>
-                                    <button disabled={busy} onClick={() => handleDuplicate(block)} style={iconBtn} title="Копия появится ниже">⧉ Копировать</button>
-                                    <button disabled={busy} onClick={() => handleDelete(block)} style={deleteBtn}>Удалить</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
+            {/* Every block open for editing. Above each: «+ Вставить блок» and
+                the new blocks inserted there. */}
+            {blocks.map((block, index) => drafts[block.id] && (
+                <Fragment key={block.id}>
+                    <InsertControl
+                        open={insertMenu === block.id}
+                        onOpen={() => setInsertMenu(block.id)}
+                        onPick={type => startAdd(type, block.id)}
+                        onCancel={() => setInsertMenu(null)}
+                    />
+                    {newAbove(block.id).map(draft => renderCard(draft))}
+                    {renderCard(drafts[block.id], index)}
+                </Fragment>
             ))}
 
-            {/* New block form (at the end) */}
-            {draft?.id === null && !draft.insertBefore && (
-                <BlockForm
-                    draft={draft}
-                    setContent={setContent}
-                    onChangeType={changeType}
-                    onSave={handleSave}
-                    onCancel={cancelDraft}
-                    saving={saving}
-                    formError={formError}
-                />
-            )}
+            {newAtEnd.map(draft => renderCard(draft))}
 
             {/* Add block buttons */}
-            {!draft && (
-                <div style={{ marginTop: 24, padding: 16, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 10, color: '#334155' }}>Добавить блок:</div>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
-                            <button key={type} onClick={() => startAdd(type)} style={addBtn}>
-                                {TYPE_LABELS[type]}
-                            </button>
-                        ))}
-                    </div>
+            <div style={{ marginTop: 24, padding: 16, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
+                <div style={{ fontWeight: 600, marginBottom: 10, color: '#334155' }}>Добавить блок:</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
+                        <button key={type} onClick={() => startAdd(type)} style={addBtn}>
+                            {TYPE_LABELS[type]}
+                        </button>
+                    ))}
                 </div>
-            )}
+            </div>
         </div>
     );
 }
 
-function blockPreview(block) {
-    if (block.type === 'TEXT') return stripHtml(block.content.html) || '(пусто)';
-    if (block.type === 'QUIZ') return stripHtml(block.content.question) || '(без вопроса)';
-    if (block.type === 'CODE') return stripHtml(block.content.prompt) || '(без условия)';
-    if (block.type === 'FILL') return block.content.template || stripHtml(block.content.prompt) || '(пустой шаблон)';
-    return '';
-}
-
 // =============================================================================
-// BLOCK FORM (per-type fields)
+// BLOCK CARD (per-type fields)
 // =============================================================================
 
 // «+ Вставить блок» above a block: a slim muted line until clicked, then the
@@ -579,60 +648,97 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
     );
 }
 
-function BlockForm({ draft, setContent, onChangeType, onSave, onCancel, saving, formError }) {
-    const { type, content } = draft;
+// One block, always open for editing. Memoized: it re-renders only when its
+// own draft (or busy / position / highlight) changes, not when another block
+// is typed in.
+const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, canMoveDown, flash }) {
+    const { key, id, type, content, dirty, saving, error } = draft;
+    const isNew = id === null;
+    const setContent = useCallback(updater => actions.setContent(key, updater), [actions, key]);
 
     return (
-        <div style={{ ...blockCard, borderLeft: '4px solid #0C4B33', background: '#fbfdfc' }}>
+        // scroll-margin: ?block= scrolls the card clear of the sticky app header.
+        <div
+            id={isNew ? `edit-new-${key}` : `edit-block-${id}`}
+            style={{
+                ...blockCard,
+                borderLeft: `4px solid ${dirty ? '#d97706' : '#0C4B33'}`,
+                scrollMarginTop: 'calc(var(--space-8) + var(--space-4))',
+                ...(flash ? copiedCard : null),
+            }}
+        >
+            {/* Wraps on narrow screens. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                <div style={{ fontWeight: 700 }}>
-                    {draft.id === null ? 'Новый блок' : 'Редактирование'}: {TYPE_LABELS[type]}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+                    <span style={badge}>{isNew ? 'Новый блок: ' : ''}{TYPE_LABELS[type]}</span>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155', fontWeight: 600 }}>
+                        Тип блока
+                        <select value={type} onChange={e => actions.changeType(key, e.target.value)} style={{ ...input, width: 'auto' }}>
+                            {TYPE_CHOICES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                        </select>
+                    </label>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155', fontWeight: 600 }}>
-                    Тип блока
-                    <select value={type} onChange={e => onChangeType(e.target.value)} style={{ ...input, width: 'auto' }}>
-                        {TYPE_CHOICES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                </label>
+                {!isNew && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        <button title="Вверх" disabled={busy || !canMoveUp} onClick={() => actions.move(id, -1)} style={iconBtn}>↑</button>
+                        <button title="Вниз" disabled={busy || !canMoveDown} onClick={() => actions.move(id, 1)} style={iconBtn}>↓</button>
+                        <button
+                            disabled={busy}
+                            onClick={() => actions.duplicate(id)}
+                            style={iconBtn}
+                            title={dirty
+                                ? 'Копируется сохранённая версия блока, без несохранённых изменений. Копия появится ниже.'
+                                : 'Копируется сохранённая версия блока. Копия появится ниже.'}
+                        >⧉ Копировать</button>
+                        <button disabled={busy} onClick={() => actions.delete(id)} style={deleteBtn}>Удалить</button>
+                    </div>
+                )}
             </div>
 
             {type === 'TEXT' && (
                 <Field label="Текст теории">
-                    <RichTextEditor
-                        value={content.html}
-                        onChange={(html) => setContent(c => ({ ...c, html }))}
-                        placeholder="Напишите теорию урока..."
-                    />
+                    <RichField field="html" value={content.html} setContent={setContent} placeholder="Напишите теорию урока..." />
                 </Field>
             )}
 
-            {type === 'QUIZ' && <QuizFields content={content} setContent={setContent} />}
+            {type === 'QUIZ' && <QuizFields uid={key} content={content} setContent={setContent} />}
 
             {type === 'CODE' && <CodeFields content={content} setContent={setContent} />}
 
             {type === 'FILL' && <FillFields content={content} setContent={setContent} />}
 
-            {formError && <p style={{ color: '#dc2626', marginTop: 8 }}>{formError}</p>}
+            {error && <p style={{ color: '#dc2626', marginTop: 8 }}>{error}</p>}
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                <button onClick={onSave} disabled={saving} style={saveBtn}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 16 }}>
+                <button
+                    onClick={() => actions.save(key)}
+                    disabled={!dirty || saving}
+                    style={{ ...saveBtn, ...(!dirty || saving ? disabledBtn : null) }}
+                >
                     {saving ? 'Сохранение...' : 'Сохранить'}
                 </button>
-                <button onClick={onCancel} disabled={saving} style={ghostBtn}>Отмена</button>
+                {isNew ? (
+                    <button onClick={() => actions.remove(key)} disabled={saving} style={ghostBtn}>Убрать</button>
+                ) : (
+                    <button
+                        onClick={() => actions.revert(key)}
+                        disabled={!dirty || saving}
+                        style={{ ...ghostBtn, ...(!dirty || saving ? disabledBtn : null) }}
+                    >Отменить изменения</button>
+                )}
+                <span style={{ fontSize: 13, color: dirty ? '#b45309' : '#64748b' }} aria-live="polite">
+                    {dirty ? 'Есть изменения' : isNew ? 'Новый блок — не сохранён' : 'Сохранено'}
+                </span>
             </div>
         </div>
     );
-}
+});
 
-function QuizFields({ content, setContent }) {
+function QuizFields({ uid, content, setContent }) {
     return (
         <>
             <Field label="Вопрос" hint="Используйте «Код-блок» для кода и кнопку «Картинка» для изображений и формул.">
-                <RichTextEditor
-                    value={content.question}
-                    onChange={(html) => setContent(c => ({ ...c, question: html }))}
-                    placeholder="Что выведет этот код?"
-                />
+                <RichField field="question" value={content.question} setContent={setContent} placeholder="Что выведет этот код?" />
             </Field>
 
             <Field label="Варианты ответа" hint="Отметьте кружком правильный вариант.">
@@ -640,7 +746,7 @@ function QuizFields({ content, setContent }) {
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <input
                             type="radio"
-                            name="correct"
+                            name={`correct-${uid}`}
                             checked={content.correct_answer === i}
                             onChange={() => setContent(c => ({ ...c, correct_answer: i }))}
                             title="Правильный ответ"
@@ -782,35 +888,15 @@ function CodeFields({ content, setContent }) {
     return (
         <>
             <Field label="Условие задачи">
-                <RichTextEditor
-                    value={content.prompt}
-                    onChange={(html) => setContent(c => ({ ...c, prompt: html }))}
-                    placeholder="Опишите, что нужно сделать..."
-                />
+                <RichField field="prompt" value={content.prompt} setContent={setContent} placeholder="Опишите, что нужно сделать..." />
             </Field>
 
             <Field label="Скрытый код ДО решения (HEADER)" hint="Выполняется перед кодом ученика. Ученик его не видит: импорты, классы, данные.">
-                <div style={cmWrap}>
-                    <CodeMirror
-                        value={content.header || ''}
-                        height="120px"
-                        theme="none"
-                        extensions={[python(), pycharmDarcula]}
-                        onChange={(val) => setContent(c => ({ ...c, header: val }))}
-                    />
-                </div>
+                <CodeField field="header" value={content.header || ''} setContent={setContent} />
             </Field>
 
             <Field label="Стартовый код">
-                <div style={cmWrap}>
-                    <CodeMirror
-                        value={content.starter_code}
-                        height="120px"
-                        theme="none"
-                        extensions={[python(), pycharmDarcula]}
-                        onChange={(val) => setContent(c => ({ ...c, starter_code: val }))}
-                    />
-                </div>
+                <CodeField field="starter_code" value={content.starter_code} setContent={setContent} />
             </Field>
 
             <Field
@@ -820,27 +906,11 @@ function CodeFields({ content, setContent }) {
                     Кнопка «Запустить» использует сохранённый HEADER/FOOTER — сохраните блок перед проверкой.
                 </>}
             >
-                <div style={cmWrap}>
-                    <CodeMirror
-                        value={content.footer || ''}
-                        height="120px"
-                        theme="none"
-                        extensions={[python(), pycharmDarcula]}
-                        onChange={(val) => setContent(c => ({ ...c, footer: val }))}
-                    />
-                </div>
+                <CodeField field="footer" value={content.footer || ''} setContent={setContent} />
             </Field>
 
             <Field label="Решение (необязательно, студентам не показывается)">
-                <div style={cmWrap}>
-                    <CodeMirror
-                        value={content.solution || ''}
-                        height="120px"
-                        theme="none"
-                        extensions={[python(), pycharmDarcula]}
-                        onChange={(val) => setContent(c => ({ ...c, solution: val }))}
-                    />
-                </div>
+                <CodeField field="solution" value={content.solution || ''} setContent={setContent} />
             </Field>
 
             <Field label="Тесты" hint="Ввод подаётся в stdin, ожидаемый вывод сравнивается со stdout. Пустые тесты игнорируются. Решение проверяется на всех тестах; ученик видит только отмеченные «Показывать ученику», об остальных — лишь «пройден / не пройден».">
@@ -910,9 +980,10 @@ function FillFields({ content, setContent }) {
     return (
         <>
             <Field label="Описание (условие)" hint="Текст и код над пропусками. Можно оставить пустым.">
-                <RichTextEditor
+                <RichField
+                    field="prompt"
                     value={content.prompt}
-                    onChange={(html) => setContent(c => ({ ...c, prompt: html }))}
+                    setContent={setContent}
                     placeholder="Например: Модуль подключили так… Напишите строку, которая выведет факториал числа 8."
                 />
             </Field>
@@ -969,6 +1040,24 @@ function FillFields({ content, setContent }) {
     );
 }
 
+// The rich-text and code fields of a card: memoized, with a stable onChange
+// per field, so typing elsewhere in the card doesn't re-render them, and
+// @uiw/react-codemirror (which reconfigures the whole editor whenever its
+// onChange prop changes) never reconfigures while the author types.
+const RichField = memo(function RichField({ field, value, setContent, placeholder }) {
+    const onChange = useCallback(html => setContent(c => ({ ...c, [field]: html })), [field, setContent]);
+    return <RichTextEditor value={value} onChange={onChange} placeholder={placeholder} />;
+});
+
+const CodeField = memo(function CodeField({ field, value, setContent }) {
+    const onChange = useCallback(val => setContent(c => ({ ...c, [field]: val })), [field, setContent]);
+    return (
+        <div style={cmWrap}>
+            <CodeMirror value={value} height="120px" theme="none" extensions={PY_EXTENSIONS} onChange={onChange} />
+        </div>
+    );
+});
+
 function Field({ label, hint, children }) {
     return (
         <div style={{ marginBottom: 16 }}>
@@ -982,6 +1071,10 @@ function Field({ label, hint, children }) {
 // =============================================================================
 // Inline styles
 // =============================================================================
+
+// One extensions array for every code editor: a new array on each render
+// would make CodeMirror reconfigure itself whenever its card re-renders.
+const PY_EXTENSIONS = [python(), pycharmDarcula];
 
 const blockCard = {
     border: '1px solid #e2e8f0',
@@ -1042,6 +1135,9 @@ const insertBtn = {
     padding: '2px 10px', background: 'none', color: '#94a3b8',
     border: 'none', cursor: 'pointer', fontSize: 12,
 };
+
+// «Сохранить» / «Отменить изменения» with nothing to save.
+const disabledBtn = { opacity: 0.45, cursor: 'not-allowed' };
 
 const iconBtn = {
     padding: '6px 10px', background: 'white', color: '#475569',
