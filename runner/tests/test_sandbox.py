@@ -356,6 +356,17 @@ class RunnerSlotUserTests(unittest.TestCase):
     def setUpClass(cls):
         sandbox.lock_shared_dirs()   # what server.main() does at start
 
+    def test_run_directory_is_the_slot_users_alone(self):
+        result = run("""
+            import os, stat
+            st = os.stat('.')
+            print(st.st_uid, st.st_gid, oct(stat.S_IMODE(st.st_mode)))
+        """)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        uid, gid, mode = result.stdout.split()
+        # Owned by the slot user; the server's group may only enter it.
+        self.assertEqual((int(uid), int(gid), mode), (SLOT_UIDS[0], os.getegid(), '0o710'))
+
     def test_runs_as_the_slot_user(self):
         for slot, uid in enumerate(SLOT_UIDS):
             with self.subTest(slot=slot):

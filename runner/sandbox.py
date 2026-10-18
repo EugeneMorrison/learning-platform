@@ -302,7 +302,13 @@ def run_python(code, stdin='', version='', header='', footer='', slot=None):
             uid, gid = account
             for name in files:
                 os.chown(os.path.join(workdir, name), uid, gid)
-            os.chown(workdir, uid, gid)
+            # Popen enters `cwd` BEFORE it switches to the slot user, and
+            # root here has no CAP_DAC_OVERRIDE: the directory keeps the
+            # server's group with search-only access (0710), so root can
+            # enter it but not list it, and other slot users get nothing.
+            # chmod first: once chown-ed, root no longer owns it.
+            os.chmod(workdir, 0o710)
+            os.chown(workdir, uid, os.getegid())
             kwargs.update(user=uid, group=gid, extra_groups=[])
 
         # Unnamed files the child writes through its stdout/stderr only.
