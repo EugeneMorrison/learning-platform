@@ -34,7 +34,7 @@ from rest_framework.views import APIView
 
 from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed
-from .runner import RunnerUnavailable, run_python
+from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
@@ -175,8 +175,7 @@ class RunCodeView(CodeRunnerAccessMixin, APIView):
         if not code.strip():
             return Response({'error': 'No code provided'}, status=400)
 
-        # api/runner.py: empty environment, own temp dir, resource limits,
-        # unprivileged user in Docker.
+        # api/runner.py: the code runs in the runner container, not here.
         try:
             result = run_python(code, stdin=stdin, version=version, **self.hidden_code(block))
             return Response({
@@ -186,6 +185,8 @@ class RunCodeView(CodeRunnerAccessMixin, APIView):
             })
         except subprocess.TimeoutExpired:
             return Response({'error': 'Time limit exceeded (5s)'}, status=408)
+        except RunnerBusy:
+            return Response({'error': 'Code runner is busy, try again'}, status=503)
         except RunnerUnavailable:
             return Response({'error': 'Code runner is not available'}, status=503)
         except Exception as e:
@@ -221,6 +222,8 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
 
         try:
             outcome = self.run_all(code, version, tests, **self.hidden_code(block))
+        except RunnerBusy:
+            return Response({'error': 'Code runner is busy, try again'}, status=503)
         except RunnerUnavailable:
             return Response({'error': 'Code runner is not available'}, status=503)
         except Exception as e:
@@ -255,7 +258,8 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
         for i, test in enumerate(tests):
             stdin, expected = normalize_test(test)
             try:
-                # A fresh run per test (api/runner.py): nothing carries over.
+                # A fresh run per test (api/runner.py): nothing carries over,
+                # and the expected output never leaves this process.
                 proc = run_python(code, stdin=stdin, version=version,
                                   header=header, footer=footer)
             except subprocess.TimeoutExpired:

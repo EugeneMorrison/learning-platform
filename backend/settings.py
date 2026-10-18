@@ -235,6 +235,15 @@ REST_FRAMEWORK = {
     },
 }
 
+# Code runner (runner/server.py, its own container): student code never runs in
+# this process; api/runner.py sends each run to RUNNER_URL with RUNNER_TOKEN.
+# Empty RUNNER_URL: with DEBUG on, code runs in-process via runner/sandbox.py
+# (local development); with DEBUG off, the run endpoints answer 503.
+# RUNNER_TIMEOUT (seconds) covers the runner's queue wait, the run and cleanup.
+RUNNER_URL = os.environ.get('RUNNER_URL', '')
+RUNNER_TOKEN = os.environ.get('RUNNER_TOKEN', '')
+RUNNER_TIMEOUT = float(os.environ.get('RUNNER_TIMEOUT') or 30)
+
 # Custom user model
 AUTH_USER_MODEL = 'api.User'
 

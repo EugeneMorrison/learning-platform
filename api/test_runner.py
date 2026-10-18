@@ -1,442 +1,265 @@
 """
-The code runner's interim lockdown (api/runner.py), with REAL interpreters.
+The web side of the code runner: api/runner.py (the HTTP client and the local
+development fallback) and the run endpoints, against a REAL runner server.
 
-Which tests run where:
-- everywhere (Windows dev included): empty environment, isolated mode, own
-  temp dir, wall-clock timeout, normal code / stdin / run-tests, the
-  SECRET_KEY start-up check;
-- Linux/macOS: resource limits (memory, output size, leftover processes);
-- only as root with the "runner" user, i.e. inside the Docker image: the
-  unprivileged user, file permissions, process limit (fork bomb), no
-  writable directory outside the run directory.
+The runner's own tests (sandbox limits, slot users, HTTP server) are in
+runner/tests/. Here the runner is runner/server.py started in a thread on a
+free local port; where the runner/ folder isn't there (the web image), the
+end-to-end tests use the real runner from RUNNER_URL / RUNNER_TOKEN instead,
+and skip without one.
 
-In the container (see the report for the full command):
-    docker compose run --rm -e SECRET_KEY=test web python manage.py test api.test_runner -v 2
+    python manage.py test api.test_runner -v 2
 """
 
 import json
 import os
-import re
+import socket
 import subprocess
 import sys
-import textwrap
-import time
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APITestCase
 
-from . import runner
-from .models import Block, Course, Enrollment, Lesson, User
-from .runner import CHILD_ENV, PYTHON_BINARIES, RUNNER_USER, RunnerUnavailable, run_python
+from .models import Attempt, Block, Course, Enrollment, Lesson, Progress, User
+from .runner import RunnerBusy, RunnerUnavailable, run_python
 
-POSIX = os.name == 'posix'
+try:
+    from runner import sandbox as runner_sandbox, server as runner_server
+except ImportError:   # the web image has no runner/ folder
+    runner_sandbox = runner_server = None
 
-
-def _runner_uid():
-    if not POSIX or os.geteuid() != 0:
-        return None
-    import pwd
-    try:
-        return pwd.getpwnam(RUNNER_USER).pw_uid
-    except KeyError:
-        return None
+TOKEN = 'test-token-0123456789abcdef'
+VERSIONS = ['Python 3.10', 'Python 3.12']
 
 
-RUNNER_UID = _runner_uid()
-needs_posix = unittest.skipUnless(POSIX, 'resource limits exist on Linux/macOS only')
-needs_runner_user = unittest.skipUnless(
-    RUNNER_UID is not None, f'needs root and the "{RUNNER_USER}" user (the Docker image)')
-
-VERSIONS = list(PYTHON_BINARIES)
+needs_runner_folder = unittest.skipUnless(runner_server is not None, 'needs the runner/ folder')
 
 
-def run(code, stdin='', version='Python 3.12', header='', footer=''):
-    return run_python(textwrap.dedent(code), stdin=stdin, version=version,
-                      header=textwrap.dedent(header), footer=textwrap.dedent(footer))
+def start_runner(slots=2, queue_wait=10):
+    """runner/server.py in a thread, without access logs; returns (server, url)."""
+    httpd = runner_server.RunnerHTTPServer(('127.0.0.1', 0), TOKEN, slots, queue_wait=queue_wait)
+    httpd.RequestHandlerClass = type('QuietHandler', (runner_server.RunHandler,),
+                                     {'log_message': lambda self, *args: None})
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd, f'http://127.0.0.1:{httpd.server_address[1]}/run'
 
 
-def runner_processes():
-    """PIDs owned by the runner user (Linux /proc)."""
-    pids = []
-    for entry in Path('/proc').iterdir():
-        if entry.name.isdigit():
-            try:
-                if entry.stat().st_uid == RUNNER_UID:
-                    pids.append(int(entry.name))
-            except FileNotFoundError:
+def stop_runner(httpd):
+    httpd.shutdown()
+    httpd.server_close()
+
+
+class FakeRunner:
+    """A stand-in runner that gives every request the same (status, body)
+    answer and records what it received."""
+
+    def __init__(self, status=200, body=b'{}'):
+        fake = self
+        self.status, self.body, self.requests = status, body, []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                length = int(self.headers.get('Content-Length') or 0)
+                fake.requests.append({'path': self.path, 'headers': dict(self.headers),
+                                      'body': self.rfile.read(length)})
+                self.send_response(fake.status)
+                self.send_header('Content-Length', str(len(fake.body)))
+                self.end_headers()
+                self.wfile.write(fake.body)
+
+            def log_message(self, *args):
                 pass
-    return pids
+
+        self.httpd = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+        self.url = f'http://127.0.0.1:{self.httpd.server_address[1]}/run'
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.httpd.shutdown()
+        self.httpd.server_close()
 
 
-class RunnerBasicsTests(SimpleTestCase):
-    """Normal student code still works; nothing of the server leaks in."""
+class LiveRunnerMixin:
+    """The tests in this class talk to a real runner: runner/server.py in a
+    thread, or else the configured one (RUNNER_URL), or they skip."""
 
-    def test_code_and_stdin_on_both_versions(self):
-        code = """
-            import sys
-            a, b = int(input()), int(input())
-            print(a + b)
-            print('Привет')
-            print(sys.version_info[:2])
-        """
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                result = run(code, stdin='2\n3\n', version=version)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                lines = result.stdout.splitlines()
-                self.assertEqual(lines[:2], ['5', 'Привет'])
-                # Where the image's interpreters exist, each version really runs.
-                if os.path.exists(PYTHON_BINARIES[version]):
-                    expected = tuple(int(n) for n in version.split()[1].split('.'))
-                    self.assertEqual(lines[2], str(expected))
+    @classmethod
+    def setUpClass(cls):
+        cls.runner_httpd = None
+        if runner_server is not None:
+            cls.runner_httpd, url = start_runner()
+            token = TOKEN
+        elif settings.RUNNER_URL and settings.RUNNER_TOKEN:
+            url, token = settings.RUNNER_URL, settings.RUNNER_TOKEN
+        else:
+            raise unittest.SkipTest('no runner: no runner/ folder and no RUNNER_URL')
+        cls.runner_settings = override_settings(RUNNER_URL=url, RUNNER_TOKEN=token)
+        cls.runner_settings.enable()
+        super().setUpClass()
 
-    def test_errors_come_back_as_stderr(self):
-        result = run('print(1 / 0)')
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.runner_settings.disable()
+        if cls.runner_httpd is not None:
+            stop_runner(cls.runner_httpd)
+
+
+# --- api/runner.py ------------------------------------------------------------
+
+class RunnerClientTests(LiveRunnerMixin, SimpleTestCase):
+    """run_python() over HTTP: the same results as when code ran in-process."""
+
+    def test_output_and_returncode(self):
+        result = run_python('print(int(input()) + 1)\nprint("Привет")', stdin='41\n')
+        self.assertIsInstance(result, subprocess.CompletedProcess)
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, '42\nПривет\n', ''))
+
+    def test_error(self):
+        result = run_python('print(1 / 0)')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('ZeroDivisionError', result.stderr)
 
-    def test_child_sees_no_server_environment(self):
-        marker = {'SECRET_KEY': 'super-secret-for-test', 'RUNNER_TEST_MARKER': 'leak',
-                  'PYTHONPATH': '/somewhere', 'PYTHONSTARTUP': '/evil.py'}
-        with mock.patch.dict(os.environ, marker):
-            result = run("""
-                import json, os, sys
-                print(json.dumps({'env': dict(os.environ), 'isolated': sys.flags.isolated}))
-            """)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        data = json.loads(result.stdout)
-        self.assertNotIn('SECRET_KEY', data['env'])
-        self.assertNotIn('RUNNER_TEST_MARKER', data['env'])
-        self.assertNotIn('super-secret-for-test', json.dumps(data['env']))
-        # Only what the runner passes (plus what an OS adds on its own).
-        self.assertLessEqual(set(data['env']) - set(CHILD_ENV),
-                             {'__CF_USER_TEXT_ENCODING', 'LC_CTYPE', 'SYSTEMROOT', 'COMSPEC'})
-        self.assertEqual(data['isolated'], 1)
+    def test_hidden_code(self):
+        result = run_python('def f(x):\n    return x * 2\n', header='n = 21', footer='print(f(n))')
+        self.assertEqual(result.stdout, '42\n')
 
-    def test_runs_in_a_fresh_temp_dir_that_is_deleted(self):
-        result = run("""
-            import os
-            open('note.txt', 'w').write('mine')
-            print(os.getcwd())
-            print(sorted(os.listdir('.')))
-        """)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        workdir, listing = result.stdout.splitlines()
-        self.assertEqual(listing, str(['main.py', 'note.txt']))
-        self.assertFalse(os.path.exists(workdir))
-        self.assertNotEqual(Path(workdir).resolve(), Path(settings.BASE_DIR).resolve())
-        # The next run starts empty.
-        again = run("import os; print(sorted(os.listdir('.')))")
-        self.assertEqual(again.stdout.strip(), str(['main.py']))
+    def test_fields_must_be_strings(self):
+        for kwargs in ({'code': 5}, {'code': 'x', 'stdin': None}, {'code': 'x', 'header': []}):
+            with self.subTest(kwargs=kwargs), self.assertRaises(TypeError):
+                run_python(**kwargs)
 
-    def test_infinite_loop_is_stopped(self):
-        started = time.monotonic()
+    def test_requests_never_use_a_proxy(self):
+        bogus = 'http://127.0.0.1:9'
+        with mock.patch.dict(os.environ, {'HTTP_PROXY': bogus, 'http_proxy': bogus, 'NO_PROXY': '', 'no_proxy': ''}):
+            self.assertEqual(run_python('print(1)').stdout, '1\n')
+
+
+@needs_runner_folder
+class RunnerClientErrorTests(SimpleTestCase):
+    """How the runner's answers and failures map to exceptions."""
+
+    def test_sends_only_the_run_fields_with_the_token(self):
+        answer = json.dumps({'returncode': 0, 'stdout': 'ok', 'stderr': '', 'timed_out': False})
+        with FakeRunner(body=answer.encode()) as fake, \
+                override_settings(RUNNER_URL=fake.url, RUNNER_TOKEN=TOKEN):
+            result = run_python('code', stdin='in', version='Python 3.10', header='h', footer='f')
+        self.assertEqual((result.returncode, result.stdout), (0, 'ok'))
+        [sent] = fake.requests
+        self.assertEqual(sent['path'], '/run')
+        self.assertEqual(sent['headers']['Authorization'], f'Bearer {TOKEN}')
+        self.assertEqual(json.loads(sent['body']), {
+            'code': 'code', 'stdin': 'in', 'version': 'Python 3.10', 'header': 'h', 'footer': 'f'})
+
+    def test_timed_out_run_raises_timeout_expired(self):
+        answer = json.dumps({'returncode': None, 'stdout': '', 'stderr': '', 'timed_out': True})
+        with FakeRunner(body=answer.encode()) as fake, \
+                override_settings(RUNNER_URL=fake.url, RUNNER_TOKEN=TOKEN):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                run_python('x')
+
+    def test_timeout_with_the_real_runner(self):
+        httpd, url = start_runner()
         try:
-            result = run('while True:\n    pass')
-        except subprocess.TimeoutExpired:
-            result = None
-        # Either the wall clock (TimeoutExpired) or the CPU limit stops it.
-        if result is not None:
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('Time limit exceeded', result.stderr)
-        self.assertLess(time.monotonic() - started, runner.TIMEOUT_SECONDS + 5)
-
-    def test_sleeping_code_is_stopped_by_the_wall_clock(self):
-        with self.assertRaises(subprocess.TimeoutExpired):
-            run('import time\ntime.sleep(60)')
-
-
-def same_run_dir(text):
-    """Tracebacks of two runs differ only in the temporary directory's name."""
-    return re.sub(r'run-[^\\/"]+', 'run-X', text)
-
-
-class RunnerHiddenCodeTests(SimpleTestCase):
-    """A CODE block's header / footer (runner.LAUNCHER): one program, one
-    namespace, and errors never show the hidden source. Each test runs on
-    every interpreter offered (both exist only in the Docker image)."""
-
-    SECRET = 'MARK-HIDDEN-SOURCE'
-    HEADER = f"""
-        import math
-        class Point:
-            def __init__(self, x, y):
-                self.x, self.y = x, y  # {SECRET}
-    """  # 5 lines: the leading blank line counts
-
-    def test_header_code_footer_share_one_namespace(self):
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                result = run("""
-                    def dist(p):
-                        return math.hypot(p.x, p.y)
-                """, header=self.HEADER, footer='print(dist(Point(3, 4)))', version=version)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, '5.0\n')
-
-    def test_student_error_reports_their_own_line(self):
-        code = 'x = 1\nprint(1 / 0)\n'
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                result = run(code, header=self.HEADER, version=version)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn('main.py", line 2, in <module>', result.stderr)
-                self.assertIn('print(1 / 0)', result.stderr)
-                # The very traceback a run without hidden code prints.
-                plain = run(code, version=version)
-                self.assertEqual(same_run_dir(result.stderr), same_run_dir(plain.stderr))
-
-    def test_student_syntax_error_reports_their_own_line(self):
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                result = run('x = 1\ndef f(:\n', header=self.HEADER,
-                             footer='print("footer ran")', version=version)
-                self.assertIn('main.py", line 2', result.stderr)
-                self.assertIn('SyntaxError', result.stderr)
-                self.assertEqual(result.stdout, '')  # nothing runs
-
-    def test_footer_error_hides_its_source_and_the_launcher(self):
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                result = run("""
-                    def area(p):
-                        return p.x / p.y
-                """, header=self.HEADER, footer=f"""
-                    print(area(Point(1, 2)))
-                    print(area(Point(1, 0)))  # {self.SECRET}
-                """, version=version)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertEqual(result.stdout, '0.5\n')
-                stderr = result.stderr
-                self.assertIn('ZeroDivisionError', stderr)
-                # The checker's frame (no source), then the student's (with source).
-                self.assertIn('File "<hidden>", line 3, in <module>', stderr)
-                self.assertIn('main.py", line 3, in area', stderr)
-                self.assertIn('return p.x / p.y', stderr)
-                self.assertNotIn(self.SECRET, stderr)
-                self.assertNotIn('print(area', stderr)
-                for launcher in ('_launch', 'exec(', '<string>', 'hidden.json'):
-                    self.assertNotIn(launcher, stderr)
-
-    def test_hidden_exception_chain_hides_every_source_line(self):
-        result = run('pass', footer=f"""
-            try:
-                {{}}['key']  # {self.SECRET}
-            except KeyError as exc:
-                raise ValueError('checker failed') from exc  # {self.SECRET}
-        """)
-        self.assertIn('KeyError', result.stderr)
-        self.assertIn('ValueError: checker failed', result.stderr)
-        self.assertNotIn(self.SECRET, result.stderr)
-
-    def test_hidden_syntax_error_hides_the_line(self):
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                result = run('print("student")', header=f'def broken(:  # {self.SECRET}\n',
-                             version=version)
-                self.assertIn('SyntaxError', result.stderr)
-                self.assertIn('File "<hidden>", line 1', result.stderr)
-                self.assertNotIn(self.SECRET, result.stderr)
-                self.assertNotIn('broken', result.stderr)
-                self.assertEqual(result.stdout, '')
-
-    def test_program_sees_what_a_plain_run_sees(self):
-        probe = """
-            import json, os, sys, __main__
-            print(json.dumps([sorted(globals()), __name__, os.path.basename(__file__),
-                              sys.argv, type(__loader__).__name__, __spec__, __cached__,
-                              __main__.__dict__ is globals(), sorted(os.listdir('.'))]))
-        """
-        for version in VERSIONS:
-            with self.subTest(version=version):
-                hidden = run(probe, header='x_from_header = 1', version=version)
-                plain = run('x_from_header = 1\n' + textwrap.dedent(probe), version=version)
-                self.assertEqual(hidden.returncode, 0, hidden.stderr)
-                # Same globals, __main__, argv, loader; hidden.json already gone.
-                self.assertEqual(json.loads(hidden.stdout), json.loads(plain.stdout))
-
-    def test_exit_ends_the_program_before_the_footer(self):
-        result = run('import sys\nprint("student")\nsys.exit(3)', footer='print("footer")')
-        self.assertEqual(result.returncode, 3)
-        self.assertEqual(result.stdout, 'student\n')
-        self.assertEqual(result.stderr, '')
-
-    def test_stdin_reaches_the_program(self):
-        result = run('n = int(input())', header='data = [1, 2, 3]',
-                     footer='print(data[n])', stdin='2\n')
-        self.assertEqual(result.stdout, '3\n')
-
-    def test_timeout_covers_the_whole_run(self):
-        with self.assertRaises(subprocess.TimeoutExpired):
-            run('print("student")', footer='import time\ntime.sleep(60)')
-
-    def test_without_hidden_code_nothing_changes(self):
-        code = 'import os\nprint(sorted(os.listdir(".")))\nprint(1 / 0)\n'
-        before = run(code)
-        after = run(code, header='', footer='')
-        # The very same command: python main.py, no launcher.
-        self.assertEqual(before.args, after.args)
-        self.assertNotIn(runner.LAUNCHER, ' '.join(after.args))
-        self.assertIn('main.py', after.args[-1])
-        self.assertEqual(same_run_dir(after.stderr), same_run_dir(before.stderr))
-        self.assertEqual(after.stdout, "['main.py']\n")
-
-
-@needs_posix
-class RunnerLimitsTests(SimpleTestCase):
-    """Resource limits (Linux/macOS)."""
-
-    def test_memory_hog_is_stopped(self):
-        result = run('data = bytearray(1024 ** 3)\nprint("allocated")')
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn('allocated', result.stdout)
-        self.assertIn('MemoryError', result.stderr)
-
-    def test_output_flood_is_capped(self):
-        result = run("while True:\n    print('x' * 1000)")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertLessEqual(len(result.stdout), runner.FILE_BYTES)
-        # A clear reason, not the raw EFBIG traceback the cap causes.
-        self.assertIn('Output limit exceeded', result.stderr)
-        self.assertNotIn('Errno 27', result.stderr)
-        self.assertNotIn('Traceback', result.stderr)
-
-    def test_large_file_is_capped(self):
-        result = run("open('big.bin', 'wb').write(b'x' * (5 * 1024 ** 2))\nprint('written')")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertNotIn('written', result.stdout)
-        self.assertIn('File size limit exceeded', result.stderr)
-
-    def test_forked_children_do_not_outlive_the_run(self):
-        result = run("""
-            import os, time
-            pid = os.fork()
-            if pid == 0:
-                time.sleep(60)
-                os._exit(0)
-            print(pid)
-        """)
-        child = int(result.stdout.strip())
-        time.sleep(0.2)
-        with self.assertRaises(ProcessLookupError):
-            os.kill(child, 0)
-
-
-@needs_runner_user
-class RunnerUserTests(SimpleTestCase):
-    """The unprivileged user and the image's file permissions (Docker only)."""
-
-    def test_runs_as_the_runner_user(self):
-        result = run('import os; print(os.getuid(), os.getgid(), os.getgroups())')
-        uid, gid, groups = result.stdout.split(maxsplit=2)
-        self.assertEqual(int(uid), RUNNER_UID)
-        self.assertNotEqual(int(uid), 0)
-        self.assertEqual(groups.strip(), '[]')
-
-    def test_cannot_read_database_code_media_or_env(self):
-        # The REAL production paths. Not settings.DATABASES: during tests
-        # Django replaces its NAME with the in-memory test database.
-        app = Path(settings.BASE_DIR)
-        files = {
-            'database': Path(settings.DB_DIR) / 'db.sqlite3',
-            'code': app / 'backend' / 'settings.py',
-            'env': app / '.env',
-            'media_file': Path(settings.MEDIA_ROOT) / 'runner-probe.txt',
-            'pid1_environ': Path('/proc/1/environ'),
-        }
-        dirs = {'app': app, 'db_dir': Path(settings.DB_DIR), 'media': Path(settings.MEDIA_ROOT)}
-
-        # Something real to read: dummies where the test container has none
-        # (removed afterwards; existing files are never touched).
-        created = []
-        for name in ('database', 'env', 'media_file'):
-            path = files[name]
-            if not path.exists():
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(b'dummy for test_cannot_read_database_code_media_or_env')
-                created.append(path)
-        try:
-            probes = {name: ('read', str(p)) for name, p in files.items()}
-            probes.update({name: ('list', str(p)) for name, p in dirs.items()})
-            result = run(f"""
-                import json, os
-                out = {{}}
-                for name, (how, path) in {probes!r}.items():
-                    try:
-                        if how == 'read':
-                            open(path, 'rb').read(1)
-                        else:
-                            os.listdir(path)
-                        out[name] = 'ALLOWED'
-                    except Exception as exc:
-                        out[name] = type(exc).__name__
-                print(json.dumps(out))
-            """)
+            with override_settings(RUNNER_URL=url, RUNNER_TOKEN=TOKEN), \
+                    mock.patch.object(runner_sandbox, 'TIMEOUT_SECONDS', 1):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    run_python('import time\ntime.sleep(30)')
         finally:
-            for path in created:
-                path.unlink()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        out = json.loads(result.stdout)
-        self.assertEqual(set(out), set(probes))
-        # Every item, not just the first failure: all mismatches at once.
-        failures = {name: f'{outcome} ({probes[name][0]} {probes[name][1]})'
-                    for name, outcome in out.items() if outcome != 'PermissionError'}
-        self.assertEqual(failures, {})
+            stop_runner(httpd)
 
-    def test_cannot_write_outside_its_run_directory(self):
-        result = run("""
-            import json, os
-            here = os.getcwd()
-            writable = []
-            def walk(path):
-                try:
-                    entries = list(os.scandir(path))
-                except OSError:
-                    return
-                for e in entries:
-                    if e.is_dir(follow_symlinks=False) and e.path not in ('/proc', '/sys'):
-                        if os.access(e.path, os.W_OK) and not e.path.startswith(here):
-                            writable.append(e.path)
-                        walk(e.path)
-            walk('/')
-            # And really try the usual suspects.
-            for d in ('/tmp', '/var/tmp', '/dev/shm', '/run/lock', '/app', '/var/lib/runner'):
-                try:
-                    open(os.path.join(d, 'probe.txt'), 'w').write('x')
-                    writable.append('WROTE ' + d)
-                except OSError:
-                    pass
-            print(json.dumps(writable))
-        """)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), [])
-
-    def test_fork_bomb_is_stopped_and_cleaned_up(self):
-        started = time.monotonic()
+    def test_busy_runner_raises_runner_busy(self):
+        httpd, url = start_runner(slots=1, queue_wait=0.3)
         try:
-            run("""
-                import os
-                while True:
-                    try:
-                        os.fork()
-                    except OSError:
-                        pass
-            """)
-        except subprocess.TimeoutExpired:
-            pass
-        self.assertLess(time.monotonic() - started, runner.TIMEOUT_SECONDS + 5)
-        time.sleep(0.5)
-        self.assertEqual(runner_processes(), [])
-        # The runner still works afterwards.
-        self.assertEqual(run('print("ok")').stdout.strip(), 'ok')
+            with override_settings(RUNNER_URL=url, RUNNER_TOKEN=TOKEN):
+                slow = threading.Thread(target=run_python, args=('import time\ntime.sleep(2)',))
+                slow.start()
+                threading.Event().wait(0.5)   # the slow run holds the only slot
+                try:
+                    with self.assertRaises(RunnerBusy):
+                        run_python('print(1)')
+                finally:
+                    slow.join()
+        finally:
+            stop_runner(httpd)
+
+    def test_failures_raise_runner_unavailable(self):
+        cases = [
+            (503, b'{"error": "unavailable"}'),
+            (500, b'{"error": "internal"}'),
+            (401, b'{"error": "unauthorized"}'),
+            (502, b'<html>bad gateway</html>'),
+            (200, b'not json'),
+            (200, b'[1, 2]'),
+            (200, b'{"returncode": 0, "stderr": "", "timed_out": false}'),
+            (200, b'{"returncode": "0", "stdout": "", "stderr": "", "timed_out": false}'),
+            (200, b'{"returncode": true, "stdout": "", "stderr": "", "timed_out": false}'),
+        ]
+        for status, body in cases:
+            with self.subTest(status=status, body=body), FakeRunner(status, body) as fake, \
+                    override_settings(RUNNER_URL=fake.url, RUNNER_TOKEN=TOKEN):
+                with self.assertRaises(RunnerUnavailable) as cm:
+                    run_python('x')
+                self.assertNotIsInstance(cm.exception, RunnerBusy)
+
+    def test_wrong_token_with_the_real_runner(self):
+        httpd, url = start_runner()
+        try:
+            with override_settings(RUNNER_URL=url, RUNNER_TOKEN='wrong-token-0123456789abcdef'):
+                with self.assertRaises(RunnerUnavailable):
+                    run_python('print(1)')
+        finally:
+            stop_runner(httpd)
+
+    def test_runner_not_listening(self):
+        with socket.socket() as s:
+            s.bind(('127.0.0.1', 0))
+            port = s.getsockname()[1]
+        with override_settings(RUNNER_URL=f'http://127.0.0.1:{port}/run', RUNNER_TOKEN=TOKEN):
+            with self.assertRaises(RunnerUnavailable):
+                run_python('print(1)')
+
+    def test_token_is_required(self):
+        with FakeRunner() as fake, override_settings(RUNNER_URL=fake.url, RUNNER_TOKEN=''):
+            with self.assertRaises(RunnerUnavailable):
+                run_python('print(1)')
+        self.assertEqual(fake.requests, [])
 
 
-class RunnerFailsClosedTests(APITestCase):
-    """As root without the runner user, code is never run (503)."""
+class InProcessFallbackTests(SimpleTestCase):
+    """No RUNNER_URL: in-process only for local development (DEBUG on)."""
+
+    @override_settings(DEBUG=False, RUNNER_URL='')
+    def test_production_without_runner_url_refuses(self):
+        with self.assertRaises(RunnerUnavailable):
+            run_python('print(1)')
+
+    @needs_runner_folder
+    @override_settings(DEBUG=True, RUNNER_URL='')
+    def test_development_runs_in_process(self):
+        result = run_python('print(int(input()) * 2)', stdin='21')
+        self.assertEqual((result.returncode, result.stdout), (0, '42\n'))
+
+    @override_settings(DEBUG=True, RUNNER_URL='')
+    def test_development_without_runner_folder_refuses(self):
+        # As in the web image: no runner/ to import.
+        with mock.patch.dict(sys.modules, {'runner': None, 'runner.sandbox': None}):
+            with self.assertRaises(RunnerUnavailable):
+                run_python('print(1)')
+
+
+# --- the run endpoints ----------------------------------------------------------
+
+class RunEndpointsTestData:
 
     @classmethod
     def setUpTestData(cls):
@@ -450,38 +273,82 @@ class RunnerFailsClosedTests(APITestCase):
         Enrollment.objects.create(student=cls.student, course=course)
 
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()  # runner throttle counters
         self.client.force_authenticate(self.student)
 
-    @unittest.skipUnless(POSIX, 'root/user lookup is POSIX only')
-    def test_root_without_runner_user_refuses(self):
-        import pwd
-        with mock.patch('api.runner.os.geteuid', return_value=0), \
-                mock.patch.object(pwd, 'getpwnam', side_effect=KeyError(RUNNER_USER)):
-            with self.assertRaises(RunnerUnavailable):
-                run('print(1)')
+    def post(self, url, code='a = int(input())\nb = int(input())\nprint(a + b)', **extra):
+        return self.client.post(url, {'block_id': str(self.block.id), 'code': code,
+                                      'stdin': '7\n8\n', 'version': 'Python 3.12', **extra}, format='json')
 
-    def test_api_returns_503_when_the_runner_is_unavailable(self):
-        with mock.patch('api.runner._runner_account', side_effect=RunnerUnavailable('test')):
+
+class RunnerBusyAndUnavailableTests(RunEndpointsTestData, APITestCase):
+    """503 when code couldn't run; nothing is recorded."""
+
+    def test_busy(self):
+        with mock.patch('api.views.run_python', side_effect=RunnerBusy()):
             for url in ('/api/run-code/', '/api/run-tests/'):
-                response = self.client.post(url, {'block_id': str(self.block.id), 'code': 'print(1)',
-                                                  'stdin': '', 'version': 'Python 3.12'}, format='json')
+                response = self.post(url)
                 self.assertEqual(response.status_code, 503, url)
+                self.assertEqual(response.data, {'error': 'Code runner is busy, try again'})
+        self.assertEqual((Progress.objects.count(), Attempt.objects.count()), (0, 0))
 
-    def test_run_code_and_run_tests_end_to_end(self):
-        code = 'a = int(input())\nb = int(input())\nprint(a + b)'
+    def test_busy_between_tests_records_nothing(self):
+        passed = subprocess.CompletedProcess([], 0, '5\n', '')
+        with mock.patch('api.views.run_python', side_effect=[passed, RunnerBusy()]):
+            response = self.post('/api/run-tests/')
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual((Progress.objects.count(), Attempt.objects.count()), (0, 0))
+
+    def test_unavailable(self):
+        with mock.patch('api.views.run_python', side_effect=RunnerUnavailable('test')):
+            for url in ('/api/run-code/', '/api/run-tests/'):
+                response = self.post(url)
+                self.assertEqual(response.status_code, 503, url)
+                self.assertEqual(response.data, {'error': 'Code runner is not available'})
+        self.assertEqual((Progress.objects.count(), Attempt.objects.count()), (0, 0))
+
+    @override_settings(DEBUG=False, RUNNER_URL='')
+    def test_production_without_runner_url_is_unavailable(self):
+        for url in ('/api/run-code/', '/api/run-tests/'):
+            self.assertEqual(self.post(url).status_code, 503, url)
+
+
+class RunEndpointsEndToEndTests(LiveRunnerMixin, RunEndpointsTestData, APITestCase):
+    """The run endpoints through a real runner."""
+
+    def test_run_code_and_run_tests(self):
         for version in VERSIONS:
             with self.subTest(version=version):
-                response = self.client.post('/api/run-code/', {
-                    'block_id': str(self.block.id), 'code': code, 'stdin': '7\n8\n',
-                    'version': version}, format='json')
+                response = self.post('/api/run-code/', version=version)
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.data['stdout'].strip(), '15')
-                response = self.client.post('/api/run-tests/', {
-                    'block_id': str(self.block.id), 'code': code, 'version': version}, format='json')
+                response = self.post('/api/run-tests/', version=version)
                 self.assertEqual(response.data['status'], 'success', response.data)
+        self.assertTrue(Progress.objects.get(student=self.student, block=self.block).is_correct)
+
+    def test_wrong_answer_is_graded_here(self):
+        response = self.post('/api/run-tests/', code='print(5)')
+        self.assertEqual((response.data['status'], response.data['test_number']), ('wrong_answer', 2))
+        self.assertFalse(Progress.objects.get(student=self.student, block=self.block).is_correct)
+
+    def test_expected_outputs_never_reach_the_runner(self):
+        sent = []
+        real = run_python
+
+        def spy(code, **kwargs):
+            sent.append((code, kwargs))
+            return real(code, **kwargs)
+
+        with mock.patch('api.views.run_python', side_effect=spy):
+            self.post('/api/run-tests/')
+        self.assertEqual(len(sent), 2)
+        for code, kwargs in sent:
+            self.assertEqual(set(kwargs), {'stdin', 'version', 'header', 'footer'})
+            self.assertNotIn('expected', json.dumps(kwargs))
 
 
-class HiddenCodeEndToEndTests(APITestCase):
+class HiddenCodeEndToEndTests(LiveRunnerMixin, APITestCase):
     """/api/run-tests/ and /api/run-code/ with a block's hidden header / footer,
     real interpreters (Stepik-style task: the footer calls the student's code)."""
 
@@ -502,6 +369,8 @@ class HiddenCodeEndToEndTests(APITestCase):
         Enrollment.objects.create(student=cls.student, course=course)
 
     def setUp(self):
+        from django.core.cache import cache
+        cache.clear()  # runner throttle counters
         self.client.force_authenticate(self.student)
 
     def post(self, url, code, **extra):
