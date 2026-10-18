@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import AppHeader from './components/AppHeader';
 import LessonViewer from './pages/LessonViewer';
 import LoginPage from './pages/LoginPage';
@@ -9,23 +9,39 @@ import StudentProgressPage from './pages/StudentProgressPage';
 import LessonEditor from './pages/LessonEditor';
 import EnrollPage from './pages/EnrollPage';
 
-function App() {
+// The header on every page, the page below it.
+function Layout() {
     return (
-        <BrowserRouter>
+        <>
             <AppHeader />
-            <Routes>
-                <Route path="/login/" element={<LoginPage />} />
-                <Route path="/register/" element={<RegisterPage />} />
-                <Route path="/dashboard/" element={<DashboardPage />} />
-                <Route path="/enroll/:courseId/" element={<EnrollPage />} />
-                <Route path="/lesson/:lessonId/edit/" element={<LessonEditor />} />
-                <Route path="/lesson/:lessonId/" element={<LessonViewer />} />
-                <Route path="/" element={<Navigate to="/login/" />} />
-                <Route path="/courses/:courseId/" element={<CoursePage />} />
-                <Route path="/courses/:courseId/students/:studentId/" element={<StudentProgressPage />} />
-            </Routes>
-        </BrowserRouter>
+            <Outlet />
+        </>
     );
+}
+
+// A data router (not <BrowserRouter>): the lesson editor's useBlocker needs one.
+const router = createBrowserRouter([
+    {
+        element: <Layout />,
+        children: [
+            { path: '/login/', element: <LoginPage /> },
+            { path: '/register/', element: <RegisterPage /> },
+            { path: '/dashboard/', element: <DashboardPage /> },
+            { path: '/enroll/:courseId/', element: <EnrollPage /> },
+            { path: '/lesson/:lessonId/edit/', element: <LessonEditor /> },
+            { path: '/lesson/:lessonId/', element: <LessonViewer /> },
+            { path: '/', element: <Navigate to="/login/" /> },
+            { path: '/courses/:courseId/', element: <CoursePage /> },
+            { path: '/courses/:courseId/students/:studentId/', element: <StudentProgressPage /> },
+            // Unknown path: the header and an empty page, as <Routes> did
+            // (not the data router's own 404 screen).
+            { path: '*', element: null },
+        ],
+    },
+]);
+
+function App() {
+    return <RouterProvider router={router} />;
 }
 
 export default App;

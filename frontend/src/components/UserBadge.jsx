@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api, { logout } from '../api';
 import './UserBadge.css';
 
@@ -13,9 +13,28 @@ import './UserBadge.css';
  */
 function UserBadge({ user: userProp }) {
     const navigate = useNavigate();
+    const location = useLocation();
     const [fetchedUser, setFetchedUser] = useState(null);
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
+    // «Выйти» clicked: the location key it was clicked on, until the next navigation.
+    const logoutFromRef = useRef(null);
+
+    // Log out only once the router has really reached /login/. A page may
+    // block leaving (the lesson editor with unsaved changes); if the author
+    // stays, she must stay logged in, so «Сохранить» still works.
+    useEffect(() => {
+        const from = logoutFromRef.current;
+        if (from === null || location.key === from) return;
+        logoutFromRef.current = null;
+        if (location.pathname === '/login/') {
+            logout();
+            // Hide the badge right away: the header re-renders only on the next
+            // navigation, and the tokens it reads are gone now.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setFetchedUser(null);
+        }
+    }, [location]);
 
     // Only fetch when the page didn't already hand us a user.
     useEffect(() => {
@@ -44,7 +63,8 @@ function UserBadge({ user: userProp }) {
     const roleLabel = user.role === 'AUTHOR' ? 'Автор' : user.role === 'ADMIN' ? 'Админ' : 'Студент';
 
     function handleLogout() {
-        logout();
+        setOpen(false);
+        logoutFromRef.current = location.key;
         navigate('/login/');
     }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useBlocker } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
@@ -157,10 +157,38 @@ function LessonEditor() {
 
     const hasUnsavedChanges = Boolean(draft) && JSON.stringify(draft.content) !== draft.baseline;
 
-    // "Предпросмотр" / "← Назад к курсу": confirm first when the open form has changes.
-    function leaveTo(path) {
-        if (hasUnsavedChanges && !window.confirm('Есть несохранённые изменения. Уйти без сохранения?')) return;
-        navigate(path);
+    // Unsaved changes are never lost without asking:
+    // - leaving this page inside the app (any link or button, Back / Forward):
+    //   useBlocker; only a different page counts, so dropping ?block= never asks;
+    // - tab close, reload, plain links to Django pages (the header): the
+    //   browser's own dialog (beforeunload; browsers don't allow custom text).
+    const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+        hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname);
+
+    useEffect(() => {
+        if (blocker.state !== 'blocked') return;
+        if (window.confirm('Вы уверены, что хотите выйти? Все несохранённые изменения будут потеряны.')) {
+            blocker.proceed();
+        } else {
+            blocker.reset();
+        }
+    }, [blocker]);
+
+    useEffect(() => {
+        if (!hasUnsavedChanges) return undefined;
+        function onBeforeUnload(event) {
+            event.preventDefault();
+            event.returnValue = ''; // older browsers
+        }
+        window.addEventListener('beforeunload', onBeforeUnload);
+        return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }, [hasUnsavedChanges]);
+
+    // "✎ Изменить" on another block while the open form has unsaved changes.
+    function switchTo(block) {
+        if (hasUnsavedChanges
+            && !window.confirm('В открытом блоке есть несохранённые изменения. Открыть другой блок без сохранения?')) return;
+        startEdit(block);
     }
 
     // Back to the lesson at the block being edited, else the last one saved.
@@ -322,7 +350,7 @@ function LessonEditor() {
 
     return (
         <div className="page">
-            <button className="btn btn-ghost btn-sm page__back" onClick={() => leaveTo(`/courses/${lesson.course}/`)}>
+            <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${lesson.course}/`)}>
                 ← Назад к курсу
             </button>
 
@@ -340,7 +368,7 @@ function LessonEditor() {
                         }}
                     />
                 </div>
-                <button onClick={() => leaveTo(previewPath())} style={ghostBtn}>
+                <button onClick={() => navigate(previewPath())} style={ghostBtn}>
                     👁 Предпросмотр
                 </button>
             </div>
@@ -377,7 +405,7 @@ function LessonEditor() {
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                     <button title="Вверх" disabled={busy || index === 0} onClick={() => moveBlock(index, -1)} style={iconBtn}>↑</button>
                                     <button title="Вниз" disabled={busy || index === blocks.length - 1} onClick={() => moveBlock(index, 1)} style={iconBtn}>↓</button>
-                                    <button disabled={busy} onClick={() => startEdit(block)} style={iconBtn}>✎ Изменить</button>
+                                    <button disabled={busy} onClick={() => switchTo(block)} style={iconBtn}>✎ Изменить</button>
                                     <button disabled={busy} onClick={() => handleDuplicate(block)} style={iconBtn} title="Копия появится ниже">⧉ Копировать</button>
                                     <button disabled={busy} onClick={() => handleDelete(block)} style={deleteBtn}>Удалить</button>
                                 </div>
