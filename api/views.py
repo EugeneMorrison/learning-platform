@@ -153,12 +153,22 @@ class CodeRunnerAccessMixin:
             raise ParseError(gettext('Код можно запускать только в блоке с задачей.'))
         return block
 
+    @staticmethod
+    def hidden_code(block):
+        """The block's stored header / footer as run_python() keywords. Never
+        taken from the request: students must not see or replace them."""
+        content = block.content or {}
+        return {'header': content.get('header') or '', 'footer': content.get('footer') or ''}
+
 
 class RunCodeView(CodeRunnerAccessMixin, APIView):
-    """Execute Python code and return stdout/stderr (body: block_id, code, stdin, version)"""
+    """
+    Execute Python code and return stdout/stderr (body: block_id, code, stdin,
+    version). Runs the block's stored hidden header / footer around the code.
+    """
 
     def post(self, request):
-        self.check_block_access(request)
+        block = self.check_block_access(request)
         code = request.data.get('code', '')
         stdin = request.data.get('stdin', '')
         version = request.data.get('version', '')
@@ -168,7 +178,7 @@ class RunCodeView(CodeRunnerAccessMixin, APIView):
         # api/runner.py: empty environment, own temp dir, resource limits,
         # unprivileged user in Docker.
         try:
-            result = run_python(code, stdin=stdin, version=version)
+            result = run_python(code, stdin=stdin, version=version, **self.hidden_code(block))
             return Response({
                 'stdout': result.stdout,
                 'stderr': result.stderr,
@@ -187,8 +197,10 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
     Grade code against the BLOCK'S stored tests (body: block_id, code, version).
 
     Any `tests` sent by the browser are ignored. All stored tests run, hidden
-    ones included, stopping at the first failure (as before). The server decides
-    is_correct and records Progress + Attempt (see record_answer).
+    ones included, stopping at the first failure (as before). Each run is the
+    block's hidden header + code + footer; the footer's output is part of the
+    compared stdout. The server decides is_correct and records Progress +
+    Attempt (see record_answer) with the student's code only.
 
     Results reveal input / expected / actual output (or stderr) only for tests
     visible to students (block_content.test_visibility); hidden tests report only
@@ -208,7 +220,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
             return Response({'error': 'No tests provided'}, status=400)
 
         try:
-            outcome = self.run_all(code, version, tests)
+            outcome = self.run_all(code, version, tests, **self.hidden_code(block))
         except RunnerUnavailable:
             return Response({'error': 'Code runner is not available'}, status=503)
         except Exception as e:
@@ -221,7 +233,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
         return Response(outcome)
 
     @staticmethod
-    def run_all(code, version, tests):
+    def run_all(code, version, tests, header='', footer=''):
         visible = test_visibility(tests)
         total = len(tests)
         results = []
@@ -244,7 +256,8 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
             stdin, expected = normalize_test(test)
             try:
                 # A fresh run per test (api/runner.py): nothing carries over.
-                proc = run_python(code, stdin=stdin, version=version)
+                proc = run_python(code, stdin=stdin, version=version,
+                                  header=header, footer=footer)
             except subprocess.TimeoutExpired:
                 return stop('error', i, input=stdin, stderr='Time limit exceeded (5s)')
 

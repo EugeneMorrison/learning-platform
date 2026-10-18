@@ -22,7 +22,7 @@ function defaultContent(type) {
         case 'QUIZ':
             return { question: '', options: ['', ''], correct_answer: 0, explanation: '' };
         case 'CODE':
-            return { prompt: '', starter_code: '# Ваш код здесь\n', solution: '', tests: [{ input: '', expected: '', visible: true }] };
+            return { prompt: '', header: '', starter_code: '# Ваш код здесь\n', footer: '', solution: '', tests: [{ input: '', expected: '', visible: true }] };
         case 'FILL':
             return { prompt: '', template: '', case_sensitive: false, explanation: '' };
         default:
@@ -583,6 +583,18 @@ function CodeFields({ content, setContent }) {
                 />
             </Field>
 
+            <Field label="Скрытый код ДО решения (HEADER)" hint="Выполняется перед кодом ученика. Ученик его не видит: импорты, классы, данные.">
+                <div style={cmWrap}>
+                    <CodeMirror
+                        value={content.header || ''}
+                        height="120px"
+                        theme="none"
+                        extensions={[python(), pycharmDarcula]}
+                        onChange={(val) => setContent(c => ({ ...c, header: val }))}
+                    />
+                </div>
+            </Field>
+
             <Field label="Стартовый код">
                 <div style={cmWrap}>
                     <CodeMirror
@@ -591,6 +603,24 @@ function CodeFields({ content, setContent }) {
                         theme="none"
                         extensions={[python(), pycharmDarcula]}
                         onChange={(val) => setContent(c => ({ ...c, starter_code: val }))}
+                    />
+                </div>
+            </Field>
+
+            <Field
+                label="Скрытый код ПОСЛЕ решения (FOOTER)"
+                hint={<>
+                    Выполняется после кода ученика. Ученик его не видит: вызовы функций, вывод для тестов.<br />
+                    Кнопка «Запустить» использует сохранённый HEADER/FOOTER — сохраните блок перед проверкой.
+                </>}
+            >
+                <div style={cmWrap}>
+                    <CodeMirror
+                        value={content.footer || ''}
+                        height="120px"
+                        theme="none"
+                        extensions={[python(), pycharmDarcula]}
+                        onChange={(val) => setContent(c => ({ ...c, footer: val }))}
                     />
                 </div>
             </Field>

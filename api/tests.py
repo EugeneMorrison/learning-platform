@@ -848,7 +848,7 @@ def fake_program(outputs, errors=None):
     stdin in `errors` exits with that stderr. Unknown stdin prints nothing."""
     errors = errors or {}
 
-    def run(code, stdin='', version=''):
+    def run(code, stdin='', version='', header='', footer=''):
         if stdin in errors:
             return subprocess.CompletedProcess([], 1, stdout='', stderr=errors[stdin])
         return subprocess.CompletedProcess([], 0, stdout=outputs.get(stdin, '') + '\n', stderr='')
@@ -1009,6 +1009,53 @@ class StudentContentAndGradingTests(APITestCase):
         self.assertTrue(progress.is_correct)
         self.assertEqual(progress.answer, {'code': 'print(1)'})
         self.assertEqual(Attempt.objects.filter(student=self.student, block=self.code).count(), 1)
+
+    def test_run_tests_runs_the_blocks_hidden_code(self):
+        self.as_user(self.student)
+        with fake_program({'in1': 'out1', 'in2': 'out2', self.HIDDEN_IN: self.HIDDEN_OUT}) as run:
+            response = self.run_tests(header='print("evil")', footer='print("evil")')
+
+        self.assertEqual(response.data['status'], 'success')
+        # Every test: the block's stored header / footer, never the request's.
+        self.assertEqual([(c.args, c.kwargs) for c in run.call_args_list], [
+            (('print(1)',), {'stdin': stdin, 'version': 'Python 3.12',
+                             'header': self.HEADER, 'footer': self.FOOTER})
+            for stdin in ['in1', 'in2', self.HIDDEN_IN]])
+        # Progress / Attempt keep the student's code only.
+        self.assertEqual(Progress.objects.get(student=self.student, block=self.code).answer,
+                         {'code': 'print(1)'})
+        self.assertEqual(Attempt.objects.get(student=self.student, block=self.code).answer,
+                         {'code': 'print(1)'})
+
+    def test_run_code_uses_stored_hidden_code_and_ignores_the_request(self):
+        for user in [self.student, self.author]:
+            with self.subTest(user=user.username):
+                self.as_user(user)
+                with fake_run(stdout='ok\n') as run:
+                    response = self.client.post(RUN_CODE_URL, {
+                        'block_id': str(self.code.id), 'code': 'print(1)', 'stdin': '5',
+                        'version': 'Python 3.12', 'header': 'print("evil")', 'footer': ''},
+                        format='json')
+
+                self.assertEqual(response.status_code, 200)
+                run.assert_called_once_with('print(1)', stdin='5', version='Python 3.12',
+                                            header=self.HEADER, footer=self.FOOTER)
+                for marker in [self.HEADER, self.FOOTER]:
+                    self.assertNotIn(marker, response.content.decode())
+
+    def test_block_without_hidden_code_runs_as_before(self):
+        self.code.content.pop('header')
+        self.code.content.pop('footer')
+        self.code.save()
+        self.as_user(self.student)
+        with fake_program({'in1': 'out1', 'in2': 'out2', self.HIDDEN_IN: self.HIDDEN_OUT}) as run:
+            self.run_tests()
+        with fake_run() as run_code:
+            self.client.post(RUN_CODE_URL, {'block_id': str(self.code.id), 'code': 'print(1)',
+                                            'stdin': '', 'version': 'Python 3.12'}, format='json')
+
+        for call in run.call_args_list + run_code.call_args_list:
+            self.assertEqual((call.kwargs['header'], call.kwargs['footer']), ('', ''))
 
     def test_failing_hidden_test_reveals_nothing(self):
         self.as_user(self.student)

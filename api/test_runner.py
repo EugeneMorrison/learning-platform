@@ -481,6 +481,57 @@ class RunnerFailsClosedTests(APITestCase):
                 self.assertEqual(response.data['status'], 'success', response.data)
 
 
+class HiddenCodeEndToEndTests(APITestCase):
+    """/api/run-tests/ and /api/run-code/ with a block's hidden header / footer,
+    real interpreters (Stepik-style task: the footer calls the student's code)."""
+
+    SECRET = 'MARK-FOOTER-SOURCE'
+
+    @classmethod
+    def setUpTestData(cls):
+        author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        course = Course.objects.create(title='C', author=author, is_published=True)
+        lesson = Lesson.objects.create(course=course, title='L', order_index=1)
+        cls.block = Block.objects.create(lesson=lesson, type='CODE', order_index=1, content={
+            'prompt': 'p', 'starter_code': 'def dist(p):\n    pass\n',
+            'header': 'class Point:\n    def __init__(self, x, y):\n        self.x, self.y = x, y\n',
+            'footer': f'x, y = map(int, input().split())\nprint(dist(Point(x, y)))  # {cls.SECRET}\n',
+            'tests': [{'input': '3 4', 'expected': '5.0', 'visible': True},
+                      {'input': '6 8', 'expected': '10.0', 'visible': True}]})
+        Enrollment.objects.create(student=cls.student, course=course)
+
+    def setUp(self):
+        self.client.force_authenticate(self.student)
+
+    def post(self, url, code, **extra):
+        return self.client.post(url, {'block_id': str(self.block.id), 'code': code,
+                                      'version': 'Python 3.12', **extra}, format='json')
+
+    def test_grading_runs_header_code_footer(self):
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                response = self.post('/api/run-tests/', 'def dist(p):\n    return (p.x ** 2 + p.y ** 2) ** 0.5\n',
+                                     version=version)
+                self.assertEqual(response.data['status'], 'success', response.data)
+                self.assertEqual(response.data['passed'], 2)
+
+    def test_student_error_shows_their_line_and_no_hidden_source(self):
+        response = self.post('/api/run-tests/', 'def dist(p):\n    return p.z\n')
+        self.assertEqual((response.data['status'], response.data['test_number']), ('error', 1))
+        stderr = response.data['stderr']
+        self.assertIn('main.py", line 2, in dist', stderr)
+        self.assertIn("AttributeError: 'Point' object has no attribute 'z'", stderr)
+        self.assertNotIn(self.SECRET, stderr)
+        self.assertNotIn('print(dist', stderr)
+
+    def test_run_button_runs_the_stored_footer(self):
+        response = self.post('/api/run-code/', 'def dist(p):\n    return p.x + p.y\n',
+                             stdin='1 2\n', header='raise SystemExit("evil")')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.data['stdout'], response.data['stderr']), ('3\n', ''))
+
+
 class SecretKeyStartupTests(SimpleTestCase):
     """Without DEBUG the server refuses to start unless SECRET_KEY is set."""
 
