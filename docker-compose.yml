@@ -11,9 +11,49 @@ services:
         required: false     # needs Docker Compose 2.24+
     environment:
       - ALLOWED_HOSTS=185.186.140.57,uchebus.ru,www.uchebus.ru
+      - RUNNER_URL=http://runner:8001/run   # api/runner.py sends student code here
     volumes:
       - db-data:/app/db          # persist SQLite database between restarts
       - media-data:/app/media    # persist author-uploaded lesson images
+    networks:
+      - default       # nginx → Django
+      - runner-net    # Django → code runner
+
+  # Runs student code (runner/server.py). Locked down: no ports, no volumes,
+  # no env_file (only the two variables below: never SECRET_KEY), internal
+  # network only, read-only filesystem, almost no capabilities.
+  runner:
+    build: ./runner
+    restart: unless-stopped
+    init: true               # PID 1 reaps the orphans of killed runs
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=0700,noexec,nosuid,nodev    # the server's own (run output files)
+      - /work:size=64m,mode=0711,noexec,nosuid,nodev   # one directory per run
+    cap_drop:
+      - ALL
+    cap_add:
+      - SETUID    # run code as the slot's user
+      - SETGID
+      - KILL      # kill a run's processes (another user's)
+      - CHOWN     # hand the run's directory to the slot's user
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.5
+    pids_limit: 200
+    environment:
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?set RUNNER_TOKEN in .env (see .env.example)}
+      RUNNER_SLOTS: "4"
+    networks:
+      - runner-net
+    healthcheck:
+      test: ["CMD", "python", "-I", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   nginx:
     image: nginx:1.27-alpine
@@ -26,6 +66,14 @@ services:
       - /root/certs/uchebus:/etc/nginx/certs:ro   # certificate + key: server only, never in Git
     depends_on:
       - web
+
+networks:
+  # Django ↔ runner only. internal: no route out of it (no internet). The
+  # fixed bridge name lets host firewall rules match it (iptables -i br-runner).
+  runner-net:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.name: br-runner
 
 volumes:
   db-data:

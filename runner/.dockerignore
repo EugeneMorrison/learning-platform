@@ -1,0 +1,5 @@
+# Only the runner's own sources go into its image.
+__pycache__/
+*.pyc
+Dockerfile
+.dockerignore

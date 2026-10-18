@@ -20,3 +20,7 @@ db.sqlite3
 # Test files
 iframe_test.html
 test_permissions.py
+
+# The code runner has its own image (runner/Dockerfile); the web image must
+# not contain it (api/runner.py falls back to it in local development only).
+runner/

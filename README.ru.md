@@ -81,8 +81,13 @@ learning-platform/
 │       └── lib/
 │           ├── pythonHighlight.js   # Общая подсветка код-блоков через highlight.js
 │           └── fillTemplate.js      # Разбор пропусков {{ответ}} для FILL-блоков
+├── runner/                   # Запуск кода студентов в отдельном изолированном контейнере
+│   ├── server.py             # HTTP-сервер (только стандартная библиотека), его вызывает api/runner.py
+│   ├── sandbox.py            # Один запуск: лимиты, пользователь слота, уборка
+│   ├── tests/
+│   └── Dockerfile            # Python 3.12 + 3.10
 ├── Dockerfile                # Многоэтапная сборка: Node → Python
-├── docker-compose.yml        # Запуск одной командой
+├── docker-compose.yml        # Запуск одной командой: web, runner, nginx
 ├── .dockerignore
 ├── requirements.txt          # Включая channels и daphne
 └── manage.py
@@ -197,11 +202,12 @@ Django отдаёт каждый урок по адресу `/lesson/<uuid>/`. R
 
 Понадобится [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-1. Клонировать и запустить:
+1. Клонировать, создать `.env` из `.env.example` (задать `SECRET_KEY` и `RUNNER_TOKEN`; без `RUNNER_TOKEN` Docker Compose не запустится) и запустить:
 
 ```bash
 git clone https://github.com/EugeneMorrison/learning-platform.git
 cd learning-platform
+cp .env.example .env
 docker-compose up --build
 ```
 
@@ -210,6 +216,7 @@ docker-compose up --build
 - Собирает React-фронтенд
 - Выполняет миграции базы
 - Запускает ASGI-сервер на порту 8000
+- Запускает сервис проверки кода (`runner/`): код студентов выполняется там, а не в контейнере Django
 
 При запуске тестовые данные не загружаются (на продакшене должны быть только его собственные данные).
 Тестовые аккаунты и курс добавляются один раз, во втором терминале:

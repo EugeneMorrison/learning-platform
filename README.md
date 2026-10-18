@@ -81,8 +81,13 @@ learning-platform/
 │       └── lib/
 │           ├── pythonHighlight.js   # Shared highlight.js code-block highlighter
 │           └── fillTemplate.js      # Parses {{answer}} blanks for FILL blocks
+├── runner/                   # Code runner: runs student code in its own locked-down container
+│   ├── server.py             # HTTP server (standard library only), called by api/runner.py
+│   ├── sandbox.py            # One run: limits, per-slot user, cleanup
+│   ├── tests/
+│   └── Dockerfile            # Python 3.12 + 3.10
 ├── Dockerfile                # Multi-stage build: Node → Python
-├── docker-compose.yml        # One-command launch
+├── docker-compose.yml        # One-command launch: web, runner, nginx
 ├── .dockerignore
 ├── requirements.txt          # Includes channels + daphne
 └── manage.py
@@ -197,11 +202,12 @@ There's an `iframe_test.html` in the repo root for trying this locally.
 
 You'll need [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-1. Clone and start:
+1. Clone, create `.env` from `.env.example` (set `SECRET_KEY` and `RUNNER_TOKEN`; Docker Compose refuses to start without `RUNNER_TOKEN`), and start:
 
 ```bash
 git clone https://github.com/EugeneMorrison/learning-platform.git
 cd learning-platform
+cp .env.example .env
 docker-compose up --build
 ```
 
@@ -210,6 +216,7 @@ Docker takes care of the rest:
 - Builds the React frontend
 - Runs database migrations
 - Starts the ASGI server on port 8000
+- Starts the code runner (`runner/`): student code runs there, never in the Django container
 
 No sample data is loaded on start (production must keep only its own data).
 Add the sample accounts and course once, in a second terminal:
