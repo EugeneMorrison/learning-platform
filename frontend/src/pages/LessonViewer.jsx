@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
 import TextBlock from '../components/TextBlock';
@@ -26,6 +26,7 @@ function getLessonIdFromUrl() {
 
 function LessonViewer() {
     const isInIframe = window.self !== window.top;
+    const { hash } = useLocation();
 
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]);
@@ -66,6 +67,14 @@ function LessonViewer() {
         if (loading) return undefined;
         return watchFigureOverflow(document.querySelector('.lesson-page'));
     }, [loading, blocks]);
+
+    // "#block-<id>" (e.g. back from the editor): the browser's own hash scroll
+    // fires before the blocks have loaded, so scroll once they are on the page.
+    useEffect(() => {
+        if (loading || !hash.startsWith('#block-')) return;
+        const el = document.getElementById(hash.slice(1));
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [loading, hash]);
 
     async function loadLesson() {
         try {
@@ -221,7 +230,18 @@ function LessonViewer() {
             default:
                 return null;
         }
-        return <div key={block.id} id={`block-${block.id}`} className="lesson-anchor">{inner}</div>;
+        return (
+            <div key={block.id} id={`block-${block.id}`} className="lesson-anchor">
+                {canEdit && (
+                    <div className="lesson-anchor__tools">
+                        <Link className="btn btn-secondary btn-sm" to={`/lesson/${lesson.id}/edit/?block=${block.id}`}>
+                            ✎ Изменить
+                        </Link>
+                    </div>
+                )}
+                {inner}
+            </div>
+        );
     }
 
     // Lessons panel: Esc, backdrop, close button or a chosen lesson close it;
@@ -231,6 +251,10 @@ function LessonViewer() {
         listButtonRef.current?.focus();
     }
 
+    // The course's author: edit buttons instead of the student chat.
+    const isCourseAuthor = Boolean(user && course && user.id === course.author);
+    // "✎ Редактировать урок" / "✎ Изменить": the author only, never in an embed.
+    const canEdit = isCourseAuthor && !isInIframe;
     // The floating chat button (student → teacher) is hidden for the course author.
     const hasChat = Boolean(user && course && user.id !== course.author);
 
@@ -321,6 +345,15 @@ function LessonViewer() {
                         Always shown (no lesson locking); hidden in an embed. */}
                     {!isInIframe && (
                         <nav className="lesson-nav" aria-label="Навигация по курсу">
+                            {canEdit && (
+                                <Link
+                                    className="btn btn-secondary btn-sm"
+                                    to={`/lesson/${lesson.id}/edit/`}
+                                    onClick={() => window.scrollTo(0, 0)}
+                                >
+                                    ✎ Редактировать урок
+                                </Link>
+                            )}
                             {lesson.next_lesson_id ? (
                                 <Link
                                     className="btn btn-secondary btn-sm"

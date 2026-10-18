@@ -78,6 +78,7 @@
 .lesson-nav {
     display: flex;
     justify-content: flex-end;
+    gap: var(--space-2);
 }
 
 .lesson-nav .btn {
@@ -153,6 +154,14 @@
     scroll-margin-top: calc(var(--space-8) + var(--space-4));
 }
 
+/* Course author only: "✎ Изменить" just above the block's top-right corner,
+   in its own row, so it never covers the block's badge, text or buttons. */
+.lesson-anchor__tools {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--space-2);
+}
+
 /* Room below the last block so it always scrolls clear of the floating
    "next task" and chat buttons (tallest stack: the 56px chat button + 24px). */
 .page.lesson-page {
@@ -188,7 +197,9 @@
             "nav nav";
     }
 
+    /* "✎ Редактировать урок" (author) above the next link, both full width. */
     .lesson-header--nav .lesson-nav {
+        flex-direction: column;
         margin-top: var(--space-5);
     }
 

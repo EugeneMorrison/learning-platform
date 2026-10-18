@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
@@ -55,6 +55,8 @@ function stripHtml(html) {
 function LessonEditor() {
     const { lessonId } = useParams();
     const navigate = useNavigate();
+    // ?block=<id>: open that block's form on load ("✎ Изменить" on the lesson page).
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]);
@@ -62,9 +64,12 @@ function LessonEditor() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // The block currently open in the form: { id: string|null, type, content }.
-    // id === null means we're creating a new block.
+    // The block currently open in the form: { id: string|null, type, content,
+    // baseline }. id === null means we're creating a new block; baseline is
+    // the content as opened (JSON), to tell unsaved changes.
     const [draft, setDraft] = useState(null);
+    const [lastSavedId, setLastSavedId] = useState(null); // "Предпросмотр" returns here
+    const scrollToFormRef = useRef(null); // block id whose form to scroll into view
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
     const [busy, setBusy] = useState(false); // reorder/delete/copy in flight
@@ -84,6 +89,15 @@ function LessonEditor() {
         return () => clearTimeout(timer);
     }, [copiedId]);
 
+    // A form opened from ?block=<id>: scroll it into view once it's rendered.
+    useEffect(() => {
+        const id = scrollToFormRef.current;
+        const el = id && draft?.id === id && document.getElementById(`edit-block-${id}`);
+        if (!el) return;
+        scrollToFormRef.current = null;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [draft, loading]);
+
     async function load() {
         try {
             const [meRes, lessonRes, blocksRes] = await Promise.all([
@@ -94,6 +108,21 @@ function LessonEditor() {
             setUser(meRes.data);
             setLesson(lessonRes.data);
             setBlocks(blocksRes.data);
+
+            // An unknown id is ignored: the editor opens as usual. The parameter
+            // goes (replace, not push), so Back and a reload behave normally.
+            const blockId = searchParams.get('block');
+            if (blockId) {
+                const block = blocksRes.data.find(b => b.id === blockId);
+                if (block) {
+                    scrollToFormRef.current = block.id;
+                    startEdit(block);
+                }
+                setSearchParams(params => {
+                    params.delete('block');
+                    return params;
+                }, { replace: true });
+            }
         } catch (err) {
             console.error('Failed to load lesson editor:', err);
             setError('Не удалось загрузить урок.');
@@ -114,7 +143,8 @@ function LessonEditor() {
 
     function startAdd(type) {
         setFormError('');
-        setDraft({ id: null, type, content: defaultContent(type) });
+        const content = defaultContent(type);
+        setDraft({ id: null, type, content, baseline: JSON.stringify(content) });
     }
 
     function startEdit(block) {
@@ -122,7 +152,21 @@ function LessonEditor() {
         // Deep-ish clone so editing doesn't mutate state until save.
         let content = JSON.parse(JSON.stringify(block.content));
         if (block.type === 'CODE') content = withVisibleFlags(content);
-        setDraft({ id: block.id, type: block.type, content });
+        setDraft({ id: block.id, type: block.type, content, baseline: JSON.stringify(content) });
+    }
+
+    const hasUnsavedChanges = Boolean(draft) && JSON.stringify(draft.content) !== draft.baseline;
+
+    // "Предпросмотр" / "← Назад к курсу": confirm first when the open form has changes.
+    function leaveTo(path) {
+        if (hasUnsavedChanges && !window.confirm('Есть несохранённые изменения. Уйти без сохранения?')) return;
+        navigate(path);
+    }
+
+    // Back to the lesson at the block being edited, else the last one saved.
+    function previewPath() {
+        const blockId = draft?.id || lastSavedId;
+        return blockId ? `/lesson/${lessonId}/#block-${blockId}` : `/lesson/${lessonId}/`;
     }
 
     function cancelDraft() {
@@ -178,12 +222,13 @@ function LessonEditor() {
         setFormError('');
         try {
             if (id === null) {
-                await api.post('/blocks/', {
+                const res = await api.post('/blocks/', {
                     lesson: lessonId,
                     type,
                     order_index: nextOrderIndex(),
                     content,
                 });
+                setLastSavedId(res.data.id);
             } else {
                 const existing = blocks.find(b => b.id === id);
                 await api.put(`/blocks/${id}/`, {
@@ -192,6 +237,7 @@ function LessonEditor() {
                     order_index: existing.order_index,
                     content,
                 });
+                setLastSavedId(id);
             }
             await reloadBlocks();
             setDraft(null);
@@ -276,7 +322,7 @@ function LessonEditor() {
 
     return (
         <div className="page">
-            <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${lesson.course}/`)}>
+            <button className="btn btn-ghost btn-sm page__back" onClick={() => leaveTo(`/courses/${lesson.course}/`)}>
                 ← Назад к курсу
             </button>
 
@@ -294,7 +340,7 @@ function LessonEditor() {
                         }}
                     />
                 </div>
-                <button onClick={() => navigate(`/lesson/${lessonId}/`)} style={ghostBtn}>
+                <button onClick={() => leaveTo(previewPath())} style={ghostBtn}>
                     👁 Предпросмотр
                 </button>
             </div>
@@ -307,7 +353,8 @@ function LessonEditor() {
             )}
 
             {blocks.map((block, index) => (
-                <div key={block.id}>
+                // scroll-margin: the form scrolls clear of the sticky app header.
+                <div key={block.id} id={`edit-block-${block.id}`} style={{ scrollMarginTop: 'calc(var(--space-8) + var(--space-4))' }}>
                     {draft?.id === block.id ? (
                         <BlockForm
                             draft={draft}
