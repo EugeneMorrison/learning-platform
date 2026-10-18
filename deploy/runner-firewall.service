@@ -1,0 +1,32 @@
+# Host firewall for the code runner's network (docker-compose.yml: runner-net,
+# bridge br-runner), so the runner container (student code) can't reach the
+# host itself or anything outside runner-net:
+# - INPUT: packets from br-runner to the host's own services (sshd, ports
+#   Docker publishes) are dropped. DOCKER-USER can't do this: it only sees
+#   forwarded traffic.
+# - DOCKER-USER: forwarded packets from br-runner to any other interface are
+#   dropped. web <-> runner stays on br-runner and is not affected.
+# Idempotent: each rule is checked (iptables -C) before it's inserted, so a
+# restart never duplicates it; stopping removes every copy. Started with
+# Docker (WantedBy) and stopped / restarted with it (PartOf).
+#
+# Not installed by anything in this repo. On the server, as root:
+#   cp deploy/runner-firewall.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now runner-firewall.service
+
+[Unit]
+Description=Firewall rules for the code runner network (br-runner)
+After=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iptables -C INPUT -i br-runner -j DROP 2>/dev/null || iptables -I INPUT -i br-runner -j DROP'
+ExecStart=/bin/sh -c 'iptables -C DOCKER-USER -i br-runner ! -o br-runner -j DROP 2>/dev/null || iptables -I DOCKER-USER -i br-runner ! -o br-runner -j DROP'
+ExecStop=/bin/sh -c 'while iptables -C INPUT -i br-runner -j DROP 2>/dev/null; do iptables -D INPUT -i br-runner -j DROP; done'
+ExecStop=/bin/sh -c 'while iptables -C DOCKER-USER -i br-runner ! -o br-runner -j DROP 2>/dev/null; do iptables -D DOCKER-USER -i br-runner ! -o br-runner -j DROP; done'
+
+[Install]
+WantedBy=multi-user.target docker.service
