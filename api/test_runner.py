@@ -16,6 +16,7 @@ In the container (see the report for the full command):
 
 import json
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -53,8 +54,9 @@ needs_runner_user = unittest.skipUnless(
 VERSIONS = list(PYTHON_BINARIES)
 
 
-def run(code, stdin='', version='Python 3.12'):
-    return run_python(textwrap.dedent(code), stdin=stdin, version=version)
+def run(code, stdin='', version='Python 3.12', header='', footer=''):
+    return run_python(textwrap.dedent(code), stdin=stdin, version=version,
+                      header=textwrap.dedent(header), footer=textwrap.dedent(footer))
 
 
 def runner_processes():
@@ -146,6 +148,142 @@ class RunnerBasicsTests(SimpleTestCase):
     def test_sleeping_code_is_stopped_by_the_wall_clock(self):
         with self.assertRaises(subprocess.TimeoutExpired):
             run('import time\ntime.sleep(60)')
+
+
+def same_run_dir(text):
+    """Tracebacks of two runs differ only in the temporary directory's name."""
+    return re.sub(r'run-[^\\/"]+', 'run-X', text)
+
+
+class RunnerHiddenCodeTests(SimpleTestCase):
+    """A CODE block's header / footer (runner.LAUNCHER): one program, one
+    namespace, and errors never show the hidden source. Each test runs on
+    every interpreter offered (both exist only in the Docker image)."""
+
+    SECRET = 'MARK-HIDDEN-SOURCE'
+    HEADER = f"""
+        import math
+        class Point:
+            def __init__(self, x, y):
+                self.x, self.y = x, y  # {SECRET}
+    """  # 5 lines: the leading blank line counts
+
+    def test_header_code_footer_share_one_namespace(self):
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                result = run("""
+                    def dist(p):
+                        return math.hypot(p.x, p.y)
+                """, header=self.HEADER, footer='print(dist(Point(3, 4)))', version=version)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, '5.0\n')
+
+    def test_student_error_reports_their_own_line(self):
+        code = 'x = 1\nprint(1 / 0)\n'
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                result = run(code, header=self.HEADER, version=version)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('main.py", line 2, in <module>', result.stderr)
+                self.assertIn('print(1 / 0)', result.stderr)
+                # The very traceback a run without hidden code prints.
+                plain = run(code, version=version)
+                self.assertEqual(same_run_dir(result.stderr), same_run_dir(plain.stderr))
+
+    def test_student_syntax_error_reports_their_own_line(self):
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                result = run('x = 1\ndef f(:\n', header=self.HEADER,
+                             footer='print("footer ran")', version=version)
+                self.assertIn('main.py", line 2', result.stderr)
+                self.assertIn('SyntaxError', result.stderr)
+                self.assertEqual(result.stdout, '')  # nothing runs
+
+    def test_footer_error_hides_its_source_and_the_launcher(self):
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                result = run("""
+                    def area(p):
+                        return p.x / p.y
+                """, header=self.HEADER, footer=f"""
+                    print(area(Point(1, 2)))
+                    print(area(Point(1, 0)))  # {self.SECRET}
+                """, version=version)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, '0.5\n')
+                stderr = result.stderr
+                self.assertIn('ZeroDivisionError', stderr)
+                # The checker's frame (no source), then the student's (with source).
+                self.assertIn('File "<hidden>", line 3, in <module>', stderr)
+                self.assertIn('main.py", line 3, in area', stderr)
+                self.assertIn('return p.x / p.y', stderr)
+                self.assertNotIn(self.SECRET, stderr)
+                self.assertNotIn('print(area', stderr)
+                for launcher in ('_launch', 'exec(', '<string>', 'hidden.json'):
+                    self.assertNotIn(launcher, stderr)
+
+    def test_hidden_exception_chain_hides_every_source_line(self):
+        result = run('pass', footer=f"""
+            try:
+                {{}}['key']  # {self.SECRET}
+            except KeyError as exc:
+                raise ValueError('checker failed') from exc  # {self.SECRET}
+        """)
+        self.assertIn('KeyError', result.stderr)
+        self.assertIn('ValueError: checker failed', result.stderr)
+        self.assertNotIn(self.SECRET, result.stderr)
+
+    def test_hidden_syntax_error_hides_the_line(self):
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                result = run('print("student")', header=f'def broken(:  # {self.SECRET}\n',
+                             version=version)
+                self.assertIn('SyntaxError', result.stderr)
+                self.assertIn('File "<hidden>", line 1', result.stderr)
+                self.assertNotIn(self.SECRET, result.stderr)
+                self.assertNotIn('broken', result.stderr)
+                self.assertEqual(result.stdout, '')
+
+    def test_program_sees_what_a_plain_run_sees(self):
+        probe = """
+            import json, os, sys, __main__
+            print(json.dumps([sorted(globals()), __name__, os.path.basename(__file__),
+                              sys.argv, type(__loader__).__name__, __spec__, __cached__,
+                              __main__.__dict__ is globals(), sorted(os.listdir('.'))]))
+        """
+        for version in VERSIONS:
+            with self.subTest(version=version):
+                hidden = run(probe, header='x_from_header = 1', version=version)
+                plain = run('x_from_header = 1\n' + textwrap.dedent(probe), version=version)
+                self.assertEqual(hidden.returncode, 0, hidden.stderr)
+                # Same globals, __main__, argv, loader; hidden.json already gone.
+                self.assertEqual(json.loads(hidden.stdout), json.loads(plain.stdout))
+
+    def test_exit_ends_the_program_before_the_footer(self):
+        result = run('import sys\nprint("student")\nsys.exit(3)', footer='print("footer")')
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(result.stdout, 'student\n')
+        self.assertEqual(result.stderr, '')
+
+    def test_stdin_reaches_the_program(self):
+        result = run('n = int(input())', header='data = [1, 2, 3]',
+                     footer='print(data[n])', stdin='2\n')
+        self.assertEqual(result.stdout, '3\n')
+
+    def test_timeout_covers_the_whole_run(self):
+        with self.assertRaises(subprocess.TimeoutExpired):
+            run('print("student")', footer='import time\ntime.sleep(60)')
+
+    def test_without_hidden_code_nothing_changes(self):
+        code = 'import os\nprint(sorted(os.listdir(".")))\nprint(1 / 0)\n'
+        before = run(code)
+        after = run(code, header='', footer='')
+        # The very same command: python main.py, no launcher.
+        self.assertEqual(before.args, after.args)
+        self.assertNotIn(runner.LAUNCHER, ' '.join(after.args))
+        self.assertIn('main.py', after.args[-1])
+        self.assertEqual(same_run_dir(after.stderr), same_run_dir(before.stderr))
+        self.assertEqual(after.stdout, "['main.py']\n")
 
 
 @needs_posix

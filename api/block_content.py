@@ -8,7 +8,8 @@ Grading (QUIZ, FILL here; CODE in RunTestsView) happens only on the server, and
 
 Answer-bearing fields per type:
 - CODE: `solution`; `tests` (each {input, expected, visible?}, or a legacy string
-  meaning expected output with empty stdin).
+  meaning expected output with empty stdin); `header` / `footer`, hidden code
+  run before / after the student's (api/runner.py), missing = "".
 - QUIZ: `correct_answer` (option index), `explanation`.
 - FILL: the answers inside `{{a|b}}` in `template`, `explanation`.
 """
@@ -57,7 +58,8 @@ def student_content(block_type, content):
     if block_type == 'CODE':
         tests = content.get('tests') or []
         flags = test_visibility(tests)
-        content.pop('solution', None)
+        for field in ('solution', 'header', 'footer'):
+            content.pop(field, None)
         content['tests'] = [t for t, visible in zip(tests, flags) if visible]
         content['hidden_test_count'] = flags.count(False)
     elif block_type == 'QUIZ':

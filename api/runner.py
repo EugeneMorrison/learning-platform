@@ -21,10 +21,17 @@ INTERIM lockdown until a real sandbox (separate container / nsjail). Each run:
 - writes stdout/stderr to unnamed files the server opened, capped by the file
   size limit, so a flood of output can't fill the server's memory.
 
+Hidden code (a CODE block's `header` / `footer`): when either is set, LAUNCHER
+runs header → student code → footer as one program in one namespace, under
+the same limits and timeout. The student's line numbers stay their own, and
+errors never print a source line of the hidden code. Without hidden code the
+run is exactly `python main.py`, as before.
+
 Not covered yet: network access; a process that starts its own session
 survives the kill (bounded by the process limit).
 """
 
+import json
 import os
 import shutil
 import signal
@@ -54,10 +61,12 @@ PROCESSES = 32               # per user: shared by all runs at the same time
 PYTHON_FLAGS = ['-I', '-B', '-X', 'utf8']
 CHILD_ENV = {'PATH': '/usr/local/bin:/usr/bin:/bin', 'LANG': 'C.UTF-8'}
 CODE_FILE = 'main.py'
+HIDDEN_FILE = 'hidden.json'    # header / footer for LAUNCHER; it deletes the file
+HIDDEN_NAME = '<hidden>'       # filename of header / footer in tracebacks
 
 # Runs first, inside the child: lower the limits (an unprivileged process
 # can't raise them again; a lower inherited hard limit is kept), then replace
-# itself with the student's program.
+# itself with the student's program (`target`: main.py, or LAUNCHER).
 BOOTSTRAP = """\
 import os, resource, sys
 for name, soft, hard in {limits!r}:
@@ -66,8 +75,65 @@ for name, soft, hard in {limits!r}:
     if current_hard != resource.RLIM_INFINITY:
         hard = min(hard, current_hard)
     resource.setrlimit(which, (min(soft, hard), hard))
-os.execv(sys.executable, [sys.executable] + {flags!r} + [{code_file!r}])
+os.execv(sys.executable, [sys.executable] + {flags!r} + {target!r})
 """
+
+# `python -c LAUNCHER`, for a block with hidden code. Reads and deletes
+# HIDDEN_FILE, compiles each part on its own (header / footer as HIDDEN_NAME,
+# the student's code as main.py: their line 1 is line 1), then runs them in
+# the real __main__ namespace, set up as for `python main.py`. On an uncaught
+# exception it prints the traceback itself: no launcher frames, and hidden
+# frames keep file / line / function but lose their source line. Everything
+# lives inside _launch(), the only global it adds, which it removes before
+# the parts run. Python 3.10 APIs only (the oldest interpreter offered).
+LAUNCHER = """\
+def _launch():
+    import importlib.machinery, json, os, sys, traceback
+    launcher_file = sys._getframe().f_code.co_filename
+    with open({hidden_file!r}, encoding='utf-8') as f:
+        hidden = json.load(f)
+    os.remove({hidden_file!r})
+    path = os.path.abspath({code_file!r})
+    with open(path, 'rb') as f:
+        sources = [(hidden['header'], {hidden_name!r}), (f.read(), path),
+                   (hidden['footer'], {hidden_name!r})]
+    del hidden
+    main = sys.modules['__main__'].__dict__
+    try:
+        # All parts first: a syntax error anywhere means nothing runs.
+        parts = [compile(source, name, 'exec', dont_inherit=True) for source, name in sources]
+        del sources
+        del main['_launch']
+        main.update(__file__=path, __cached__=None,
+                    __loader__=importlib.machinery.SourceFileLoader('__main__', path))
+        sys.argv[:] = [{code_file!r}]
+        for part in parts:
+            exec(part, main)
+    except SystemExit:
+        raise
+    except BaseException as exc:
+        tb = exc.__traceback__
+        while tb is not None and tb.tb_frame.f_code.co_filename == launcher_file:
+            tb = tb.tb_next
+        report = traceback.TracebackException(type(exc), exc, tb)
+        todo, seen = [report], set()
+        while todo:
+            te = todo.pop()
+            if te is None or id(te) in seen:
+                continue
+            seen.add(id(te))
+            te.stack = traceback.StackSummary.from_list([
+                traceback.FrameSummary(frame.filename, frame.lineno, frame.name,
+                                       lookup_line=False, line='')
+                if frame.filename == {hidden_name!r} else frame
+                for frame in te.stack])
+            if getattr(te, 'filename', None) == {hidden_name!r}:
+                te.text = None
+            todo += [te.__cause__, te.__context__] + list(getattr(te, 'exceptions', None) or [])
+        sys.stderr.write(''.join(report.format()))
+        raise SystemExit(1)
+_launch()
+""".format(hidden_file=HIDDEN_FILE, hidden_name=HIDDEN_NAME, code_file=CODE_FILE)
 
 
 class RunnerUnavailable(Exception):
@@ -116,24 +182,32 @@ def _read(f):
     return f.read().decode('utf-8', errors='replace').replace('\r\n', '\n')
 
 
-def run_python(code, stdin='', version=''):
+def run_python(code, stdin='', version='', header='', footer=''):
     """
-    Run `code` with `stdin`; returns subprocess.CompletedProcess(args,
-    returncode, stdout, stderr). Raises subprocess.TimeoutExpired after
-    TIMEOUT_SECONDS (wall clock), RunnerUnavailable when it can't run safely.
+    Run `code` with `stdin`, after `header` and before `footer` (hidden code,
+    see LAUNCHER); returns subprocess.CompletedProcess(args, returncode,
+    stdout, stderr). Raises subprocess.TimeoutExpired after TIMEOUT_SECONDS
+    (wall clock, the whole run), RunnerUnavailable when it can't run safely.
     """
     account = _runner_account()
     python = resolve_python(version)
     base = RUNNER_TMP_BASE if os.path.isdir(RUNNER_TMP_BASE) else None
     workdir = tempfile.mkdtemp(prefix='run-', dir=base)
     try:
-        with open(os.path.join(workdir, CODE_FILE), 'w', encoding='utf-8') as f:
-            f.write(code)
+        files = {CODE_FILE: code}
+        if header or footer:
+            files[HIDDEN_FILE] = json.dumps({'header': header, 'footer': footer})
+            target = ['-c', LAUNCHER]
+        else:
+            target = [CODE_FILE]
+        for name, text in files.items():
+            with open(os.path.join(workdir, name), 'w', encoding='utf-8') as f:
+                f.write(text)
         if os.name == 'posix':
             args = [python] + PYTHON_FLAGS + ['-c', BOOTSTRAP.format(
-                limits=_limits(account is not None), flags=PYTHON_FLAGS, code_file=CODE_FILE)]
+                limits=_limits(account is not None), flags=PYTHON_FLAGS, target=target)]
         else:
-            args = [python] + PYTHON_FLAGS + [CODE_FILE]
+            args = [python] + PYTHON_FLAGS + target
 
         kwargs = {}
         if os.name == 'posix':
@@ -142,7 +216,8 @@ def run_python(code, stdin='', version=''):
         if account:
             uid, gid = account
             os.chown(workdir, uid, gid)
-            os.chown(os.path.join(workdir, CODE_FILE), uid, gid)
+            for name in files:
+                os.chown(os.path.join(workdir, name), uid, gid)
             kwargs.update(user=uid, group=gid, extra_groups=[])
 
         # Unnamed files the child writes through its stdout/stderr only.

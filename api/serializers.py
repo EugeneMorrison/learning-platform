@@ -321,6 +321,10 @@ def block_content_error(block_type, value):
         for field in ['prompt', 'starter_code']:
             if field not in value:
                 return f"CODE blocks must have '{field}' field in content"
+        # Optional hidden code run before / after the student's.
+        for field in ['header', 'footer']:
+            if field in value and not isinstance(value[field], str):
+                return f"CODE '{field}' must be a string"
         # Optional per-test flag: shown to students or hidden.
         for test in value.get('tests') or []:
             if isinstance(test, dict) and 'visible' in test and not isinstance(test['visible'], bool):

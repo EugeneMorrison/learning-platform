@@ -867,7 +867,10 @@ class StudentContentAndGradingTests(APITestCase):
     FILL_ANSWER = 'MARK-FILL-ANSWER'
     FILL_ALT = 'mark-fill-alt'
     FILL_EXPL = 'MARK-FILL-EXPLANATION'
-    ALL_MARKERS = [SOLUTION, HIDDEN_IN, HIDDEN_OUT, QUIZ_EXPL, FILL_ANSWER, FILL_ALT, FILL_EXPL]
+    HEADER = '# MARK-HEADER'
+    FOOTER = '# MARK-FOOTER'
+    ALL_MARKERS = [SOLUTION, HIDDEN_IN, HIDDEN_OUT, QUIZ_EXPL, FILL_ANSWER, FILL_ALT, FILL_EXPL,
+                   HEADER, FOOTER]
 
     @classmethod
     def setUpTestData(cls):
@@ -878,6 +881,7 @@ class StudentContentAndGradingTests(APITestCase):
         # No visible flags → default rule: first 2 visible, the 3rd hidden.
         cls.code = Block.objects.create(lesson=cls.lesson, type='CODE', order_index=1, content={
             'prompt': 'p', 'starter_code': '', 'solution': cls.SOLUTION,
+            'header': cls.HEADER, 'footer': cls.FOOTER,
             'tests': [{'input': 'in1', 'expected': 'out1'},
                       {'input': 'in2', 'expected': 'out2'},
                       {'input': cls.HIDDEN_IN, 'expected': cls.HIDDEN_OUT}]})
@@ -912,7 +916,8 @@ class StudentContentAndGradingTests(APITestCase):
 
         by_type = {b['type']: b['content'] for b in
                    self.client.get(f'/api/blocks/?lesson={self.lesson.id}').data}
-        self.assertNotIn('solution', by_type['CODE'])
+        for field in ['solution', 'header', 'footer']:
+            self.assertNotIn(field, by_type['CODE'])
         self.assertNotIn('correct_answer', by_type['QUIZ'])
         self.assertNotIn('explanation', by_type['QUIZ'])
         self.assertNotIn('explanation', by_type['FILL'])
@@ -926,6 +931,8 @@ class StudentContentAndGradingTests(APITestCase):
             self.assertIn(marker, body)
         quiz = self.client.get(f'/api/blocks/{self.quiz.id}/').data['content']
         self.assertEqual(quiz['correct_answer'], 2)
+        code = self.client.get(f'/api/blocks/{self.code.id}/').data['content']
+        self.assertEqual((code['header'], code['footer']), (self.HEADER, self.FOOTER))
 
     def test_default_rule_first_two_tests_visible(self):
         self.as_user(self.student)
@@ -959,6 +966,20 @@ class StudentContentAndGradingTests(APITestCase):
 
         self.assertEqual(self.client.post('/api/blocks/', ok, format='json').status_code, 201)
         self.assertEqual(self.client.post('/api/blocks/', bad, format='json').status_code, 400)
+
+    def test_hidden_code_is_validated(self):
+        self.as_user(self.author)
+        content = {'prompt': 'p', 'starter_code': ''}
+        for i, (extra, status_code) in enumerate([
+                ({}, 201),                                     # optional
+                ({'header': 'import math', 'footer': ''}, 201),
+                ({'header': None}, 400),
+                ({'footer': ['print(1)']}, 400)]):
+            with self.subTest(extra=extra):
+                response = self.client.post('/api/blocks/', {
+                    'lesson': str(self.lesson.id), 'type': 'CODE', 'order_index': 20 + i,
+                    'content': dict(content, **extra)}, format='json')
+                self.assertEqual(response.status_code, status_code, response.data)
 
     # --- CODE: run-tests grades with the stored tests ----------------------
 
