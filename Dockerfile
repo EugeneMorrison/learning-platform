@@ -19,46 +19,15 @@ RUN npm run build
 
 
 # =============================================================
-# Stage 1b: Official Python 3.10 image (source for the code runner)
-# =============================================================
-# Debian — the base of python:3.12-slim — has no apt package for
-# python3.10, so we pull the official 3.10 image and copy just the
-# interpreter + standard library into the final image below. Pinned
-# to the same Debian release (bookworm) as the 3.12 base so the
-# shared system libraries (OpenSSL, sqlite, ...) are compatible.
-# =============================================================
-FROM python:3.10-slim-bookworm AS py310
-
-
-# =============================================================
 # Stage 2: Django backend + built React files
 # =============================================================
 # Uses Python to run Django. Copies the React build from stage 1.
-# This is the final image that actually runs.
+# This is the final image that actually runs. Student code never
+# runs here: that's the runner service (runner/Dockerfile).
 # =============================================================
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app
-
-# --- Python 3.10 for the multi-version code runner -----------------
-# Copy only what's needed to run plain Python 3.10 scripts: the
-# interpreter, its standard library, and the shared libpython. Then
-# refresh the linker cache and assert the binary actually runs (this
-# fails the build early if anything is missing).
-COPY --from=py310 /usr/local/bin/python3.10 /usr/local/bin/python3.10
-COPY --from=py310 /usr/local/lib/python3.10 /usr/local/lib/python3.10
-COPY --from=py310 /usr/local/lib/libpython3.10.so.1.0 /usr/local/lib/libpython3.10.so.1.0
-RUN ldconfig && python3.10 --version
-
-# --- Code runner user (api/runner.py) -------------------------------
-# Student code runs as this unprivileged system user, never as root.
-# It owns nothing. Each run gets its own directory under
-# /var/lib/runner: root-owned and 0711, so the runner can enter its
-# own run directory but can't list or write the parent.
-RUN groupadd --system runner \
- && useradd --system --gid runner --no-create-home \
-        --home-dir /nonexistent --shell /usr/sbin/nologin runner \
- && mkdir -p /var/lib/runner && chmod 0711 /var/lib/runner
 
 # Install Python dependencies
 COPY requirements.txt .
@@ -79,14 +48,9 @@ COPY --from=frontend-build /app/frontend/dist frontend/dist/
 ENV DB_DIR=/app/db
 RUN mkdir -p /app/db
 
-# --- Keep the runner user out ---------------------------------------
 # /app (code, database volume, media volume, static files) is
-# root-only: without x on /app the runner can't reach anything below
-# it, the volumes mounted at /app/db and /app/media included.
-# No directory in the image stays world-writable (/tmp, /var/tmp,
-# /run/lock, ...), so the runner can write only in its run directory.
-RUN chmod 0700 /app \
- && find / -xdev -type d -perm -0002 -exec chmod o-w {} +
+# root-only: the server runs as root and nothing else needs it.
+RUN chmod 0700 /app
 
 # Port Django will listen on
 EXPOSE 8000
@@ -95,10 +59,7 @@ EXPOSE 8000
 # data is loaded here: production keeps only what is in its database volume
 # (local sample accounts and a course come from "manage.py seed_data").
 # A failed migration stops the start instead of being ignored.
-# /dev/shm and /dev/mqueue are mounted by Docker at run time (world-
-# writable), so the runner's write access is removed here, not above.
 CMD ["bash", "-c", "\
-    (chmod o-w /dev/shm /dev/mqueue 2>/dev/null || true) && \
     echo 'Running migrations...' && \
     python manage.py migrate && \
     python manage.py collectstatic --noinput && \
