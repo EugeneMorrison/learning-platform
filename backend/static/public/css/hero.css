@@ -1,0 +1,135 @@
+/*
+ * Author hero (public/includes/hero.html): text + the author's picture.
+ * Loaded by the pages that include it ("Об авторе"). Uses only the
+ * variables from tokens.css.
+ */
+
+/* Hero: text + the author's picture. Phones and tablets: one column, the
+   picture under the text. From 56.25rem (900px): two columns, below. */
+.hero {
+  /* Bottom padding: the picture ends inside the section, not on its edge. */
+  padding: var(--space-6) 0 var(--space-7);
+  overflow-x: hidden;  /* fallback for overflow-x: clip */
+  overflow-x: clip;    /* the illustration may bleed past the container edge */
+}
+
+.hero__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+/* Above the illustration where it reaches into the column gap. */
+.hero__text {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+/* Small greeting above the heading. */
+.hero__eyebrow {
+  margin-bottom: var(--space-3);
+  color: var(--color-accent);
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+.hero__title {
+  margin-bottom: var(--space-5);
+}
+
+/* The author's paragraphs: regular body text. */
+.hero__about {
+  max-width: calc(var(--container-width) / 2);
+  margin-bottom: var(--space-6);
+}
+
+.hero__about p:last-child {
+  margin-bottom: 0;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* The picture: two layers measured from the mockup, in % of .hero__media.
+   Front: the author's cut-out, 70% wide, right of centre; it sets the box
+   height; both layers share its bottom edge.
+   Back: the violet illustration, 119% wide, from -9.8% to 109.2%: its
+   leftmost violet starts at about -4.4%, inside the column gap, so nothing
+   violet sits behind the text; the transparent glow may reach further.
+   Its rightmost violet ends at about 104.4%.
+   Phones: the box is narrowed so the whole illustration fits the screen. */
+.hero__media {
+  position: relative;
+  z-index: 0;  /* own stacking context: the illustration stays behind */
+  width: 84%;
+  min-width: 0;
+  margin-left: 8.2%;
+}
+
+.hero__media picture,
+.hero__media img {
+  display: block;
+}
+
+.hero__bg {
+  position: absolute;
+  bottom: 0;
+  left: -9.8%;
+  z-index: -1;
+  width: 119%;
+  pointer-events: none;
+}
+
+.hero__bg img {
+  width: 100%;
+  height: auto;
+}
+
+.hero__author {
+  width: 70%;
+  margin-left: 22%;
+}
+
+/* The cut-out ends at the waist: its last few percent fade out (only the
+   mask's alpha matters), so the bottom reads as an edge, not a crop. */
+.hero__img {
+  width: 100%;
+  height: auto;
+  -webkit-mask-image: linear-gradient(to bottom, var(--color-ink) 88%, transparent);
+  mask-image: linear-gradient(to bottom, var(--color-ink) 88%, transparent);
+}
+
+/* Desktop: text about 45%, picture about 55%; the text is centred against the
+   picture. */
+@media (min-width: 56.25rem) {
+  .hero {
+    padding-top: var(--space-5);
+  }
+
+  .hero__inner {
+    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+    align-items: center;
+  }
+
+  /* The surname stays on one line in the 45% column: full h1 size from
+     about 1280px, scaled down towards --text-2xl on narrower desktops. */
+  .hero__title {
+    font-size: clamp(var(--text-2xl), 3.4vw, var(--text-3xl));
+  }
+
+  /* 5% kept free on the right: the illustration's violet reaches about 4.4%
+     past the box, and stays inside the container instead of the viewport
+     cutting it off on narrower desktops. */
+  .hero__media {
+    align-self: end;
+    width: auto;
+    margin-left: 0;
+    margin-right: 5%;
+  }
+}

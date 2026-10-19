@@ -107,13 +107,13 @@ class LandingCatalogTests(PublicPagesTestCase):
         self.assertContains(response, 'Курсы скоро появятся')
         self.assertNotContains(response, 'catalog__list')
 
-    def test_english_hero_headline(self):
+    def test_english_catalog_heading(self):
         self.make_course('Основы', price=0)
 
         response = self.client.get('/en/')
 
         self.assertContains(response, '<html lang="en">')
-        self.assertContains(response, "I'm Lyudmila Kolesnikova")
+        self.assertContains(response, '<h1 id="catalog-title" class="catalog__title">Courses</h1>')
         self.assertContains(response, 'Lessons: 0')
         self.assertContains(response, 'Free')
         # Database content stays as entered (no model translations yet).
@@ -335,16 +335,15 @@ class CourseDetailTests(PublicPagesTestCase):
 
 
 class HeaderAuthLinkTests(PublicPagesTestCase):
-    """Login links (header "Войти", hero "Войти в аккаунт") are server-rendered; one
-    inline script in base.html swaps every link carrying data-account-* for
-    "Мой кабинет" when the React app's token is in localStorage (cosmetic only)."""
+    """The header login link ("Войти") is server-rendered; one inline script in
+    base.html swaps every link carrying data-account-* for "Мой кабинет" when
+    the React app's token is in localStorage (cosmetic only)."""
 
     # (link id, url, login label, account label)
     LINKS = [
         ('header-auth-link', '/', 'Войти', 'Мой кабинет'),
         ('header-auth-link', '/en/', 'Log in', 'My account'),
-        ('hero-auth-link', '/', 'Войти в аккаунт', 'Мой кабинет'),
-        ('hero-auth-link', '/en/', 'Log in to your account', 'My account'),
+        ('header-auth-link', '/about/', 'Войти', 'Мой кабинет'),
     ]
 
     def test_both_labels_rendered_for_the_script(self):
@@ -378,11 +377,10 @@ class HeaderAuthLinkTests(PublicPagesTestCase):
         self.assertIn("querySelectorAll('a[data-account-href]')", script)
 
     def test_script_runs_after_the_links(self):
-        # At the end of <body>, so the header and the hero both exist when it runs.
+        # At the end of <body>, so the header link exists when it runs.
         html = self.client.get('/').content.decode()
         script_at = html.index(self.login_script(html))
         self.assertLess(html.index('id="header-auth-link"'), script_at)
-        self.assertLess(html.index('id="hero-auth-link"'), script_at)
 
     def test_course_page_has_the_same_header_link(self):
         course = self.make_course('Header')
@@ -407,10 +405,11 @@ class HeaderAuthLinkTests(PublicPagesTestCase):
 
 
 class HeroTests(PublicPagesTestCase):
-    """Hero: text + a two-layer picture (the violet illustration behind the
-    author's cut-out), WebP with PNG fallbacks, loaded eagerly, alt translated."""
+    """Author hero (public/includes/hero.html, on "Об авторе"): text + a two-layer
+    picture (the violet illustration behind the author's cut-out), WebP with PNG
+    fallbacks, loaded eagerly, alt translated."""
 
-    CASES = [('/', 'ru', 'Людмила Колесникова'), ('/en/', 'en', 'Lyudmila Kolesnikova')]
+    CASES = [('/about/', 'ru', 'Людмила Колесникова'), ('/en/about/', 'en', 'Lyudmila Kolesnikova')]
 
     def hero_html(self, url):
         html = self.client.get(url).content.decode()
@@ -469,7 +468,7 @@ class HeroTests(PublicPagesTestCase):
                     self.assertAlmostEqual(im.width / im.height, width / height, places=2, msg=name)
 
     def test_code_card_and_cat_are_gone(self):
-        hero = self.hero_html('/')
+        hero = self.hero_html('/about/')
         for old in ['code-card', 'lesson_01.py', 'hero__cat', 'cat-desk']:
             self.assertNotIn(old, hero)
         # The cat artwork stays in static files for later use.
@@ -477,7 +476,7 @@ class HeroTests(PublicPagesTestCase):
         self.assertIsNotNone(finders.find('public/img/cat-desk-800.webp'))
 
     TEXTS = {
-        '/': ['<p class="hero__eyebrow">Привет!</p>',
+        '/about/': ['<p class="hero__eyebrow">Привет!</p>',
               '<h1 id="hero-title" class="hero__title">Я Людмила Колесникова</h1>',
               '<p>Автор образовательного проекта учиЛКа.</p>',
               '<p>Уже более 10 лет я преподаю, создаю образовательные курсы и руковожу проектами.</p>',
@@ -485,8 +484,8 @@ class HeroTests(PublicPagesTestCase):
               'до управления людьми и командами.</p>',
               '<p>Люблю объяснять сложное простыми словами и уверена, что ошибки — лучшие учителя, '
               'а не повод сдаваться!</p>',
-              '>Смотреть курсы<', 'data-account-label="Мой кабинет"'],
-        '/en/': ['<p class="hero__eyebrow">Hi!</p>',
+              '<a class="btn btn-primary" href="/">Смотреть курсы</a>'],
+        '/en/about/': ['<p class="hero__eyebrow">Hi!</p>',
                  '<h1 id="hero-title" class="hero__title">I\'m Lyudmila Kolesnikova</h1>',
                  '<p>Author of the educational project uchiLKa.</p>',
                  '<p>For more than 10 years I have been teaching, creating educational courses '
@@ -495,7 +494,7 @@ class HeroTests(PublicPagesTestCase):
                  'to managing people and teams.</p>',
                  '<p>I love explaining complex things in simple words, and I believe that mistakes '
                  'are the best teachers, not a reason to give up!</p>',
-                 '>Browse courses<', 'data-account-label="My account"'],
+                 '<a class="btn btn-primary" href="/en/">Browse courses</a>'],
     }
 
     def test_author_texts_in_ru_and_en(self):
@@ -505,8 +504,16 @@ class HeroTests(PublicPagesTestCase):
                 for text in texts:
                     self.assertIn(text, hero)
 
+    def test_one_button_and_no_link_to_the_page_itself(self):
+        for url in ['/about/', '/en/about/']:
+            hero = self.hero_html(url)
+            with self.subTest(url=url):
+                self.assertEqual(hero.count('<a '), 1)  # "Смотреть курсы" only
+                for gone in ['hero__more', 'hero-auth-link', 'data-account-href', '/login/']:
+                    self.assertNotIn(gone, hero)
+
     def test_old_hero_texts_are_gone(self):
-        hero = self.hero_html('/') + self.hero_html('/en/')
+        hero = self.hero_html('/about/') + self.hero_html('/en/about/')
         for old in ['Python: от ужаса до понимания', 'Учитесь Python шаг за шагом',
                     'Короткие уроки и практика', 'Python: from horror to understanding',
                     'Learn Python step by step', 'hero__lead']:
@@ -515,7 +522,7 @@ class HeroTests(PublicPagesTestCase):
     def test_no_remote_font_hosts(self):
         from django.contrib.staticfiles import finders
 
-        for url in ['/', '/en/']:
+        for url in ['/', '/en/', '/about/']:
             html = self.client.get(url).content.decode()
             for host in ['fonts.googleapis.com', 'fonts.gstatic.com']:
                 self.assertNotIn(host, html, url)
@@ -578,7 +585,7 @@ class ProductionStaticFilesTests(TestCase):
     def test_hero_images_are_collected_and_hashed(self):
         import os
 
-        html = self.client.get('/').content.decode()
+        html = self.client.get('/about/').content.decode()
         for name in ['hero-bg', 'hero-bg-1536', 'hero-bg-768',
                      'hero-author', 'hero-author-864', 'hero-author-432']:
             ext = 'png' if name in ('hero-bg', 'hero-author') else 'webp'
@@ -736,8 +743,8 @@ class AuthorProfileAdminTests(PublicPagesTestCase):
 
 
 class AboutPageTests(PublicPagesTestCase):
-    """"Об авторе" (/about/, /en/about/): the author's bio from the template, the
-    uploaded photo or the static cut-out, and the links to it from every page."""
+    """"Об авторе" (/about/, /en/about/): the author hero on top, then the author's
+    bio from the template (no second photo), and the links to it from every page."""
 
     KEY_PHRASES = [
         '<h2 class="about__name">Колесникова Людмила Сергеевна</h2>',
@@ -772,8 +779,12 @@ class AboutPageTests(PublicPagesTestCase):
         ru, en = self.get('/about/'), self.get('/en/about/')
         self.assertIn('<title>Об авторе — Game Python</title>', ru)
         self.assertIn('<title>About the author — Game Python</title>', en)
-        self.assertIn('class="about__title">Об авторе</h1>', ru)
-        self.assertIn('class="about__title">About the author</h1>', en)
+        # An h2: the hero above holds the page's only h1.
+        self.assertIn('class="about__title">Об авторе</h2>', ru)
+        self.assertIn('class="about__title">About the author</h2>', en)
+        for html in [ru, en]:
+            self.assertEqual(html.count('<h1'), 1)
+            self.assertIn('<h1 id="hero-title"', html)
         self.assertIn('<meta name="description" content="Людмила Колесникова — преподаватель', ru)
         self.assertIn('<meta name="description" content="Lyudmila Kolesnikova — teacher', en)
 
@@ -787,24 +798,19 @@ class AboutPageTests(PublicPagesTestCase):
                     'https://t.me/ohota_na_python', 'https://stepik.org/users/32005180/profile']:
             self.assertIn(f'href="{url}"', html)
 
-    def photo_html(self):
-        html = self.get('/about/')
-        return re.search(r'<div class="about__photo">.*?</div>', html, re.S).group(0)
-
-    def test_static_cut_out_without_an_uploaded_photo(self):
-        make_author_profile(photo='')  # a profile without a photo counts as none
-        photo = self.photo_html()
-        self.assertIn('public/img/hero-author-864.webp 864w', photo)
-        self.assertIn('public/img/hero-author.png" width="864" height="1120"', photo)
-        self.assertIn('alt="Колесникова Людмила Сергеевна"', photo)
-        self.assertNotIn('loading=', photo)  # top of the page: never lazy
-
-    def test_uploaded_photo_used_when_there_is_one(self):
-        make_author_profile()
-        photo = self.photo_html()
-        self.assertIn('<img src="/media/author/me.jpg" width="360" height="480"', photo)
-        self.assertNotIn('hero-author', photo)
-        self.assertNotIn('loading=', photo)
+    def test_hero_first_then_the_bio_without_a_second_photo(self):
+        make_author_profile()  # an uploaded photo is no longer shown anywhere
+        for url in ['/about/', '/en/about/']:
+            html = self.get(url)
+            main = html[html.index('<main>'):html.index('</main>')]
+            with self.subTest(url=url):
+                self.assertLess(main.index('<section class="hero"'), main.index('<article class="about"'))
+                # The cut-out appears once: in the hero.
+                self.assertEqual(main.count('<img class="hero__img"'), 1)
+                self.assertEqual(main.count('hero-author.png'), 1)
+                self.assertNotIn('about__photo', html)
+                self.assertNotIn('/media/author/me.jpg', html)
+                self.assertIn('public/css/hero.css', html)
 
     def test_nav_link_on_every_public_page(self):
         course = self.make_course('Course')
@@ -816,10 +822,6 @@ class AboutPageTests(PublicPagesTestCase):
                 self.assertIn(f'<a class="site-nav__link" href="{href}">{label}</a>', html)
                 self.assertIn('#catalog"', html)  # the other items stay
         self.assertIn('href="/about/" aria-current="page">Об авторе</a>', self.get('/about/'))
-
-    def test_hero_links_to_the_page(self):
-        self.assertIn('<p class="hero__more"><a href="/about/">Подробнее обо мне →</a></p>', self.get('/'))
-        self.assertIn('<p class="hero__more"><a href="/en/about/">More about me →</a></p>', self.get('/en/'))
 
     def test_landing_no_longer_has_the_author_section(self):
         make_author_profile(stepik_url='https://stepik.org/users/1')
@@ -927,3 +929,122 @@ class LandingCatTests(PublicPagesTestCase):
             with self.subTest(url=url):
                 self.assertNotIn('landing-cat', html)
                 self.assertNotIn('cat-desk', html)
+
+
+class LandingHomeTests(PublicPagesTestCase):
+    """The home page opens with the course catalog: no author hero, a short
+    heading (the page's h1) and one subtitle line, in RU and EN."""
+
+    HEADINGS = {
+        '/': ('Курсы', 'Короткие уроки с практикой прямо в браузере. Выберите курс и начните.'),
+        '/en/': ('Courses', 'Short lessons with hands-on practice right in your browser. '
+                            'Pick a course and start.'),
+    }
+
+    def test_catalog_heading_and_subtitle(self):
+        for url, (title, subtitle) in self.HEADINGS.items():
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertIn(f'<h1 id="catalog-title" class="catalog__title">{title}</h1>', html)
+                self.assertIn(f'<p class="catalog__subtitle">{subtitle}</p>', html)
+                self.assertEqual(html.count('<h1'), 1)
+
+    def test_catalog_is_the_first_section_and_the_hero_is_gone(self):
+        for url in self.HEADINGS:
+            html = self.client.get(url).content.decode()
+            main = html[html.index('<main>'):html.index('</main>')]
+            with self.subTest(url=url):
+                self.assertRegex(main, r'^<main>\s*<section id="catalog"')
+                for gone in ['class="hero', 'hero-author', 'hero-bg', 'hero.css',
+                             'hero-auth-link', 'Привет!', 'Hi!', 'Подробнее обо мне', 'More about me']:
+                    self.assertNotIn(gone, html)
+
+    def test_header_is_unchanged(self):
+        html = self.client.get('/').content.decode()
+        header = html[html.index('<header class="site-header">'):html.index('</header>')]
+        for part in ['class="site-logo"', 'class="site-nav"', 'class="lang-switch"',
+                     'id="header-auth-link"', 'data-account-label="Мой кабинет"']:
+            self.assertIn(part, header)
+
+
+class CourseLoginGateTests(PublicPagesTestCase):
+    """Course pages send visitors without the React app's token to the login page,
+    with ?next= back to the course. The login state is only in localStorage, so
+    the check is an inline script in <head>, before anything is painted."""
+
+    def gate_script(self, html):
+        head = html[:html.index('</head>')]
+        scripts = [s for s in re.findall(r'<script>(.*?)</script>', head, re.S) if 'access_token' in s]
+        self.assertEqual(len(scripts), 1, 'exactly one login gate in <head>')
+        return scripts[0]
+
+    def test_gate_in_head_of_course_pages(self):
+        course = self.make_course('Gated')
+        for url in [f'/course/{course.slug}/', f'/en/course/{course.slug}/']:
+            script = self.gate_script(self.client.get(url).content.decode())
+            with self.subTest(url=url):
+                # Same key as frontend/src/api.js; storage access guarded.
+                self.assertIn("window.localStorage.getItem('access_token')", script)
+                self.assertIn('catch (e)', script)
+                # replace(): the course page doesn't stay in history (Back won't loop).
+                self.assertIn("window.location.replace('/login/?next=' + encodeURIComponent(next))", script)
+                self.assertIn('window.location.pathname + window.location.search', script)
+
+    def test_no_gate_on_other_public_pages(self):
+        for url in ['/', '/en/', '/about/']:
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertNotIn('access_token', html[:html.index('</head>')])
+                self.assertNotIn('/login/?next=', html)
+
+    def test_cards_still_link_to_the_course_page(self):
+        # Logged-in visitors keep the course page; the gate there handles the rest.
+        course = self.make_course('Card')
+        self.assertContains(self.client.get('/'), f'<a class="course-card" href="/course/{course.slug}/">')
+
+
+class AuthPageNextTests(TestCase):
+    """/login/ and /register/ (React pages) check ?next= on the server with
+    url_has_allowed_host_and_scheme: a value leading off the site is dropped by
+    a redirect to the bare page."""
+
+    def get(self, url, **extra):
+        from unittest import mock
+        from django.http import HttpResponse
+
+        # index.html is the React build (frontend/dist, not in Git): stand in for it.
+        with mock.patch('backend.urls.render', return_value=HttpResponse('spa')):
+            return self.client.get(url, **extra)
+
+    def test_routes(self):
+        from django.urls import resolve
+        from backend.urls import auth_page_view
+
+        for path in ['/login/', '/register/']:
+            self.assertIs(resolve(path).func, auth_page_view)
+
+    def test_same_site_next_is_kept(self):
+        for page in ['/login/', '/register/']:
+            for next_url in ['/course/python-basics/', '/en/course/python-basics/',
+                             '/enroll/3fa85f64-5717-4562-b3fc-2c963f66afa6/',
+                             'http://testserver/course/python-basics/']:
+                with self.subTest(page=page, next=next_url):
+                    response = self.get(page, data={'next': next_url})
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response.content, b'spa')
+
+    def test_no_next_serves_the_page(self):
+        self.assertEqual(self.get('/login/').status_code, 200)
+
+    def test_off_site_next_is_dropped(self):
+        for page in ['/login/', '/register/']:
+            for next_url in ['https://evil.example/', '//evil.example/', '/\\evil.example/',
+                             'http://evil.example/course/x/', 'javascript:alert(1)', '']:
+                with self.subTest(page=page, next=next_url):
+                    response = self.get(page, data={'next': next_url})
+                    self.assertRedirects(response, page, fetch_redirect_response=False)
+
+    def test_https_page_refuses_an_http_next(self):
+        response = self.get('/login/', data={'next': 'http://testserver/course/x/'}, secure=True)
+        self.assertRedirects(response, '/login/', fetch_redirect_response=False)
+

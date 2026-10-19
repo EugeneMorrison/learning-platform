@@ -6,8 +6,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-16 01:59+0300\n"
-"PO-Revision-Date: 2026-10-07 00:30+0300\n"
+"POT-Creation-Date: 2026-10-19 04:58+0300\n"
+"PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
 "Language: en\n"
@@ -49,53 +49,53 @@ msgstr ""
 msgid "Код можно запускать только в блоке с задачей."
 msgstr "Code can only be run in an exercise block."
 
-#: .\api\views.py:588
+#: .\api\views.py:605
 msgid "Урок недоступен."
 msgstr "This lesson is not available."
 
-#: .\api\views.py:608
+#: .\api\views.py:625
 msgid "Укажите курс: ?course=<id>."
 msgstr ""
 
-#: .\api\views.py:824
+#: .\api\views.py:919
 msgid "Записаться на курс может только учащийся."
 msgstr "Only students can enroll in a course."
 
-#: .\api\views.py:830
+#: .\api\views.py:925
 msgid "Курс не найден."
 msgstr "Course not found."
 
-#: .\api\views.py:835
+#: .\api\views.py:930
 msgid ""
 "Это платный курс: самостоятельно записаться можно только на бесплатные курсы."
 msgstr "This is a paid course: you can only enroll yourself in free courses."
 
-#: .\api\views.py:916
+#: .\api\views.py:1011
 msgid "Не указан блок."
 msgstr "block is required."
 
-#: .\api\views.py:917
+#: .\api\views.py:1012
 msgid "Отвечать могут только записанные на курс учащиеся и автор курса."
 msgstr ""
 "Only students enrolled in the course and the course author can submit "
 "answers."
 
-#: .\api\views.py:920
+#: .\api\views.py:1015
 msgid "Задачи с кодом проверяются запуском тестов."
 msgstr "Code tasks are checked by running the tests."
 
-#: .\api\views.py:1168
+#: .\api\views.py:1263
 msgid ""
 "Писать в чат курса могут только его автор и записанные на курс учащиеся."
 msgstr ""
 
-#: .\api\views.py:1172
+#: .\api\views.py:1267
 #, python-format
 msgid "Сообщение слишком длинное: не больше %(max)d символов."
 msgstr ""
 
 #: .\backend\templates\public\about.html:4
-#: .\backend\templates\public\about.html:36
+#: .\backend\templates\public\about.html:23
 #: .\backend\templates\public\base.html:34
 msgid "Об авторе"
 msgstr "About the author"
@@ -108,28 +108,26 @@ msgstr ""
 "Lyudmila Kolesnikova — teacher, methodologist and course author: experience, "
 "students, results and awards."
 
-#: .\backend\templates\public\about.html:23
-#: .\backend\templates\public\about.html:30
-#: .\backend\templates\public\about.html:37
+#: .\backend\templates\public\about.html:24
 msgid "Колесникова Людмила Сергеевна"
 msgstr ""
 
-#: .\backend\templates\public\about.html:38
+#: .\backend\templates\public\about.html:25
 msgid ""
 "Преподаватель, методист и автор курсов. Руководитель с 10-летним стажем."
 msgstr ""
 
-#: .\backend\templates\public\about.html:39
+#: .\backend\templates\public\about.html:26
 msgid ""
 "Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников "
 "Сколково."
 msgstr ""
 
-#: .\backend\templates\public\about.html:45
+#: .\backend\templates\public\about.html:31
 msgid "Немного обо мне"
 msgstr ""
 
-#: .\backend\templates\public\about.html:46
+#: .\backend\templates\public\about.html:32
 msgid ""
 "За моими плечами <strong>11 лет преподавания, 10 лет руководства "
 "подразделениями в онлайн-школе программирования, 11 000+ проведённых "
@@ -137,169 +135,169 @@ msgid ""
 "strong>"
 msgstr ""
 
-#: .\backend\templates\public\about.html:47
+#: .\backend\templates\public\about.html:33
 msgid "Но когда-то мне самой учёба давалась нелегко."
 msgstr ""
 
-#: .\backend\templates\public\about.html:48
+#: .\backend\templates\public\about.html:34
 msgid "Я пошла в школу в 5 лет, когда моим одноклассникам было уже по 7-8."
 msgstr ""
 
-#: .\backend\templates\public\about.html:49
+#: .\backend\templates\public\about.html:35
 msgid ""
 "Казалось бы, разница небольшая, но учиться наравне с ними мне было непросто. "
 "Я медленнее читала, писала и считала. То, что другим давалось легко, мне "
 "приходилось разбирать снова и снова."
 msgstr ""
 
-#: .\backend\templates\public\about.html:50
+#: .\backend\templates\public\about.html:36
 msgid ""
 "Постепенно я нашла свой способ учиться: искать понятные объяснения и "
 "примеры, не зубрить, а пробовать, ошибаться и пробовать снова."
 msgstr ""
 
-#: .\backend\templates\public\about.html:51
+#: .\backend\templates\public\about.html:37
 msgid "Сегодня именно так я учу своих учеников."
 msgstr ""
 
-#: .\backend\templates\public\about.html:52
+#: .\backend\templates\public\about.html:38
 msgid ""
 "Я знаю, каково это — не понимать то, что другим кажется очевидным. И знаю, "
 "что это вовсе не означает отсутствие способностей."
 msgstr ""
 
-#: .\backend\templates\public\about.html:53
+#: .\backend\templates\public\about.html:39
 msgid ""
 "Неважно, семь пядей у тебя во лбу или нет. И не так уж важно, какие у тебя "
 "оценки и любят ли тебя учителя."
 msgstr ""
 
-#: .\backend\templates\public\about.html:54
+#: .\backend\templates\public\about.html:40
 msgid ""
 "Гораздо важнее другое: хватит ли у тебя терпения и желания разобраться в "
 "том, что пока не получается."
 msgstr ""
 
-#: .\backend\templates\public\about.html:58
+#: .\backend\templates\public\about.html:44
 msgid "Мои ученики и результаты"
 msgstr ""
 
-#: .\backend\templates\public\about.html:60
+#: .\backend\templates\public\about.html:46
 msgid ""
 "Подготовила более <strong>100 победителей и призёров олимпиад:</strong> "
 "ВсОШ, НТО GameDev, НТО АБП, НТО.Junior и других."
 msgstr ""
 
-#: .\backend\templates\public\about.html:61
+#: .\backend\templates\public\about.html:47
 #, python-format
 msgid "100%% новых учеников приходят по рекомендациям."
 msgstr ""
 
-#: .\backend\templates\public\about.html:62
+#: .\backend\templates\public\about.html:48
 #, python-format
 msgid ""
 "Более <strong>90%% учеников</strong> проходят со мной полный образовательный "
 "цикл — вплоть до поступления в вуз."
 msgstr ""
 
-#: .\backend\templates\public\about.html:63
+#: .\backend\templates\public\about.html:49
 msgid ""
 "Мои выпускники учатся в <strong>Московском Политехе, ВШЭ, ИТМО</strong> и "
 "других ведущих вузах России."
 msgstr ""
 
-#: .\backend\templates\public\about.html:68
+#: .\backend\templates\public\about.html:54
 msgid "Профессиональный опыт"
 msgstr ""
 
-#: .\backend\templates\public\about.html:70
+#: .\backend\templates\public\about.html:56
 msgid ""
 "Разрабатывала образовательные программы, учебные материалы и методики "
 "преподавания."
 msgstr ""
 
-#: .\backend\templates\public\about.html:71
+#: .\backend\templates\public\about.html:57
 msgid ""
 "Занималась организацией обучения и руководством подразделениями онлайн-школы "
 "программирования."
 msgstr ""
 
-#: .\backend\templates\public\about.html:72
+#: .\backend\templates\public\about.html:58
 msgid ""
 "Прошла более <strong>30 профильных курсов</strong> по наставничеству и "
 "управлению проектами."
 msgstr ""
 
-#: .\backend\templates\public\about.html:77
+#: .\backend\templates\public\about.html:63
 msgid "Награды и достижения"
 msgstr ""
 
-#: .\backend\templates\public\about.html:79
+#: .\backend\templates\public\about.html:65
 msgid ""
 "<strong>Заслуженный наставник кружкового движения НТИ</strong> (2023, 2024)."
 msgstr ""
 
-#: .\backend\templates\public\about.html:80
+#: .\backend\templates\public\about.html:66
 msgid "<strong>Эксперт Школы наставников Сколково</strong> (2020, 2021)."
 msgstr ""
 
-#: .\backend\templates\public\about.html:81
+#: .\backend\templates\public\about.html:67
 msgid ""
 "<strong>Эксперт Международной Scratch-Олимпиады по креативному "
 "программированию</strong> (2018–2023)."
 msgstr ""
 
-#: .\backend\templates\public\about.html:82
+#: .\backend\templates\public\about.html:68
 msgid ""
 "<strong>Победитель Stepik Birthday Hack</strong> в номинации «Самый "
 "социально значимый проект» (2023)."
 msgstr ""
 
-#: .\backend\templates\public\about.html:83
+#: .\backend\templates\public\about.html:69
 msgid ""
 "Благодарности от организаторов олимпиад, конкурсов и хакатонов за подготовку "
 "учеников."
 msgstr ""
 
-#: .\backend\templates\public\about.html:85
+#: .\backend\templates\public\about.html:71
 msgid "Также прошла повышение квалификации по направлениям:"
 msgstr ""
 
-#: .\backend\templates\public\about.html:87
+#: .\backend\templates\public\about.html:73
 msgid "<strong>Искусственный интеллект</strong> — МГПУ (2020)."
 msgstr ""
 
-#: .\backend\templates\public\about.html:88
+#: .\backend\templates\public\about.html:74
 msgid ""
 "<strong>Технологии дополненной реальности в образовании</strong> (2022)."
 msgstr ""
 
-#: .\backend\templates\public\about.html:93
+#: .\backend\templates\public\about.html:79
 msgid "Немного личного"
 msgstr ""
 
-#: .\backend\templates\public\about.html:94
+#: .\backend\templates\public\about.html:80
 msgid ""
 "Люблю придумывать небольшие забавные стишки и создавать необычные задания."
 msgstr ""
 
-#: .\backend\templates\public\about.html:95
+#: .\backend\templates\public\about.html:81
 msgid ""
 "Верю, что <strong>ошибки — это часть обучения, а не повод останавливаться.</"
 "strong>"
 msgstr ""
 
-#: .\backend\templates\public\about.html:101
+#: .\backend\templates\public\about.html:87
 msgid "Связаться со мной"
 msgstr ""
 
-#: .\backend\templates\public\about.html:102
+#: .\backend\templates\public\about.html:88
 msgid ""
 "По вопросам сотрудничества — <a href=\"https://t.me/kolesnikova1995\" "
 "target=\"_blank\" rel=\"noopener noreferrer\">Telegram</a>."
 msgstr ""
 
-#: .\backend\templates\public\about.html:103
+#: .\backend\templates\public\about.html:89
 msgid ""
 "<strong>Мои сообщества:</strong> <a href=\"https://m.vk.com/"
 "ohota_na_python\" target=\"_blank\" rel=\"noopener noreferrer\">ВКонтакте</"
@@ -307,7 +305,7 @@ msgid ""
 "rel=\"noopener noreferrer\">Telegram</a>"
 msgstr ""
 
-#: .\backend\templates\public\about.html:104
+#: .\backend\templates\public\about.html:90
 msgid ""
 "<strong>Мои курсы:</strong> <a href=\"https://stepik.org/users/32005180/"
 "profile\" target=\"_blank\" rel=\"noopener noreferrer\">Профиль на Stepik</a>"
@@ -322,13 +320,13 @@ msgid "Основная навигация"
 msgstr "Main navigation"
 
 #: .\backend\templates\public\base.html:25
-#: .\backend\templates\public\landing.html:53
+#: .\backend\templates\public\landing.html:13
 msgid "Курсы"
 msgstr "Courses"
 
 #: .\backend\templates\public\base.html:30
 #: .\backend\templates\public\base.html:32
-#: .\backend\templates\public\landing.html:89
+#: .\backend\templates\public\landing.html:51
 msgid "Отзывы"
 msgstr "Reviews"
 
@@ -341,7 +339,6 @@ msgid "Язык сайта"
 msgstr "Site language"
 
 #: .\backend\templates\public\base.html:51
-#: .\backend\templates\public\landing.html:24
 msgid "Мой кабинет"
 msgstr "My account"
 
@@ -365,40 +362,40 @@ msgstr "Personal data processing policy"
 msgid "Контакты"
 msgstr "Contacts"
 
-#: .\backend\templates\public\course_detail.html:13
+#: .\backend\templates\public\course_detail.html:31
 msgid "Все курсы"
 msgstr "All courses"
 
-#: .\backend\templates\public\course_detail.html:34
+#: .\backend\templates\public\course_detail.html:52
 msgid "Начать бесплатно"
 msgstr "Start for free"
 
-#: .\backend\templates\public\course_detail.html:36
+#: .\backend\templates\public\course_detail.html:54
 msgid "Доступен на Stepik"
 msgstr "Available on Stepik"
 
-#: .\backend\templates\public\course_detail.html:38
+#: .\backend\templates\public\course_detail.html:56
 msgid "Скоро на этой платформе"
 msgstr "Coming soon to this platform"
 
-#: .\backend\templates\public\course_detail.html:48
+#: .\backend\templates\public\course_detail.html:66
 msgid "О курсе"
 msgstr "About the course"
 
-#: .\backend\templates\public\course_detail.html:58
+#: .\backend\templates\public\course_detail.html:76
 msgid "Программа курса"
 msgstr "Course syllabus"
 
-#: .\backend\templates\public\course_detail.html:62
-#: .\backend\templates\public\landing.html:71
+#: .\backend\templates\public\course_detail.html:80
+#: .\backend\templates\public\landing.html:33
 msgid "Уроков:"
 msgstr "Lessons:"
 
-#: .\backend\templates\public\course_detail.html:68
+#: .\backend\templates\public\course_detail.html:86
 msgid "Уроки откроются после записи на курс."
 msgstr "Lessons unlock after you enroll in the course."
 
-#: .\backend\templates\public\course_detail.html:88
+#: .\backend\templates\public\course_detail.html:106
 msgid "Программа скоро появится"
 msgstr "The syllabus is coming soon"
 
@@ -431,19 +428,19 @@ msgstr "Free"
 msgid "Старая цена:"
 msgstr "Old price:"
 
-#: .\backend\templates\public\landing.html:12
+#: .\backend\templates\public\includes\hero.html:9
 msgid "Привет!"
 msgstr "Hi!"
 
-#: .\backend\templates\public\landing.html:13
+#: .\backend\templates\public\includes\hero.html:10
 msgid "Я Людмила Колесникова"
 msgstr "I'm Lyudmila Kolesnikova"
 
-#: .\backend\templates\public\landing.html:15
+#: .\backend\templates\public\includes\hero.html:12
 msgid "Автор образовательного проекта учиЛКа."
 msgstr "Author of the educational project uchiLKa."
 
-#: .\backend\templates\public\landing.html:16
+#: .\backend\templates\public\includes\hero.html:13
 msgid ""
 "Уже более 10 лет я преподаю, создаю образовательные курсы и руковожу "
 "проектами."
@@ -451,7 +448,7 @@ msgstr ""
 "For more than 10 years I have been teaching, creating educational courses "
 "and leading projects."
 
-#: .\backend\templates\public\landing.html:17
+#: .\backend\templates\public\includes\hero.html:14
 msgid ""
 "Здесь я делюсь своим опытом и знаниями: от программирования и создания игр "
 "до управления людьми и командами."
@@ -459,7 +456,7 @@ msgstr ""
 "Here I share my experience and knowledge: from programming and game "
 "development to managing people and teams."
 
-#: .\backend\templates\public\landing.html:18
+#: .\backend\templates\public\includes\hero.html:15
 msgid ""
 "Люблю объяснять сложное простыми словами и уверена, что ошибки — лучшие "
 "учителя, а не повод сдаваться!"
@@ -467,22 +464,20 @@ msgstr ""
 "I love explaining complex things in simple words, and I believe that "
 "mistakes are the best teachers, not a reason to give up!"
 
-#: .\backend\templates\public\landing.html:21
+#: .\backend\templates\public\includes\hero.html:18
 msgid "Смотреть курсы"
 msgstr "Browse courses"
 
-#: .\backend\templates\public\landing.html:24
-msgid "Войти в аккаунт"
-msgstr "Log in to your account"
-
-#: .\backend\templates\public\landing.html:26
-msgid "Подробнее обо мне →"
-msgstr "More about me →"
-
-#: .\backend\templates\public\landing.html:45
+#: .\backend\templates\public\includes\hero.html:35
 msgid "Людмила Колесникова"
 msgstr "Lyudmila Kolesnikova"
 
-#: .\backend\templates\public\landing.html:80
+#: .\backend\templates\public\landing.html:14
+msgid "Короткие уроки с практикой прямо в браузере. Выберите курс и начните."
+msgstr ""
+"Short lessons with hands-on practice right in your browser. Pick a course "
+"and start."
+
+#: .\backend\templates\public\landing.html:42
 msgid "Курсы скоро появятся. Загляните позже."
 msgstr "Courses are coming soon. Check back later."

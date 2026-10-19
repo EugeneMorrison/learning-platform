@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { login } from '../api';
-import { safeNext, withNext } from '../lib/safeNext';
+import { goToNext, safeNext, withNext } from '../lib/safeNext';
 import './auth.css';
 
 function LoginPage() {
@@ -17,7 +17,11 @@ function LoginPage() {
         setError('');
         try {
             await login(username, password);
-            navigate(next || '/dashboard/');
+            if (next) {
+                goToNext(next);
+            } else {
+                navigate('/dashboard/');
+            }
         } catch {
             setError('Неверный логин или пароль');
         }

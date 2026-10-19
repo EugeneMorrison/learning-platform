@@ -1,11 +1,12 @@
 /*
- * "Об авторе" page: photo beside the name at the top, then the bio in one
- * reading column (--measure, about 68 characters per line). Uses only the
- * variables from tokens.css.
+ * "Об авторе" page, below the author hero (hero.css): the name and titles,
+ * then the bio in one reading column (--measure, about 68 characters per
+ * line). Uses only the variables from tokens.css.
  */
 
+/* No top padding: the hero's bottom padding already separates the two. */
 .about {
-  padding: var(--space-7) 0 var(--space-8);
+  padding: 0 0 var(--space-8);
 }
 
 /* The page text is a step larger than body text; --measure (in ch) is taken
@@ -15,43 +16,14 @@
   font-size: var(--text-lg);
 }
 
-/* Photo and intro side by side; stacked on phones (see below). */
 .about__header {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-6);
   margin-bottom: var(--space-7);
 }
 
-/* A 3:4 frame on the tinted panel colour: an uploaded photo of any shape is
-   cropped to it from the top; the transparent cut-out sits on the tint. */
-.about__photo {
-  flex: 0 0 15rem;
-  overflow: hidden;
-  aspect-ratio: 3 / 4;
-  border-radius: var(--radius-card);
-  background: var(--color-soft);
-}
-
-.about__photo picture,
-.about__photo img {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.about__photo img {
-  object-fit: cover;
-  object-position: top;
-}
-
-.about__intro {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
+/* An h2 (the hero holds the page's h1), at the h1 size it had before. */
 .about__title {
   margin-bottom: var(--space-5);
+  font-size: var(--text-3xl);
 }
 
 .about__name {
@@ -97,22 +69,4 @@
 
 .about__body section > :last-child {
   margin-bottom: 0;
-}
-
-/* Phones: photo above the intro, smaller. */
-@media (max-width: 40rem) {
-  .about {
-    padding-top: var(--space-6);
-  }
-
-  .about__header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-5);
-  }
-
-  .about__photo {
-    flex-basis: auto;
-    width: 12rem;
-  }
 }

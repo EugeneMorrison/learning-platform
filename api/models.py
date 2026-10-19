@@ -556,9 +556,9 @@ def _localized(ru, en, lang):
 
 class AuthorProfile(models.Model):
     """
-    The course author shown in the landing page's "Об авторе" section.
-    Intended as a single row (the admin allows only one); the section is hidden
-    while there is none.
+    The course author. Intended as a single row (the admin allows only one).
+    Not shown on the public pages at the moment: "Об авторе" (/about/) keeps its
+    text in the template.
     """
     name = models.CharField(max_length=200)
     name_en = models.CharField(max_length=200, blank=True, help_text="Name in English; leave empty to show the Russian name on /en/")

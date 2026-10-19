@@ -6,6 +6,24 @@
 
 {% block extra_head %}
   <link rel="stylesheet" href="{% static 'public/css/course.css' %}">
+  {# Course pages are for logged-in visitors. The login state is the React app's #}
+  {# token in localStorage, which only the browser sees, so this check runs here, #}
+  {# in <head>, before anything is painted.                                       #}
+  <script>
+    // No 'access_token' (frontend/src/api.js) → the login page, which comes back
+    // here after logging in (?next=, checked by auth_page_view in backend/urls.py).
+    // The token is not trusted for anything: the page holds no private data.
+    // Storage blocked → stay (logging in couldn't store a token either).
+    (function () {
+      try {
+        if (window.localStorage.getItem('access_token')) return;
+      } catch (e) {
+        return;
+      }
+      var next = window.location.pathname + window.location.search;
+      window.location.replace('/login/?next=' + encodeURIComponent(next));
+    })();
+  </script>
 {% endblock %}
 
 {% block content %}

@@ -1,0 +1,39 @@
+{% load i18n static %}
+{# Author hero: greeting, name, short bio and the two-layer picture (the violet   #}
+{# illustration behind the author's cut-out). Styles: public/css/hero.css, which   #}
+{# the including page loads. At the top of the page, so neither image is lazy;     #}
+{# width/height reserve their space. The sizes values follow the % in hero.css.    #}
+<section class="hero" aria-labelledby="hero-title">
+  <div class="container hero__inner">
+    <div class="hero__text">
+      <p class="hero__eyebrow">{% translate "Привет!" %}</p>
+      <h1 id="hero-title" class="hero__title">{% translate "Я Людмила Колесникова" %}</h1>
+      <div class="hero__about">
+        <p>{% translate "Автор образовательного проекта учиЛКа." %}</p>
+        <p>{% translate "Уже более 10 лет я преподаю, создаю образовательные курсы и руковожу проектами." %}</p>
+        <p>{% translate "Здесь я делюсь своим опытом и знаниями: от программирования и создания игр до управления людьми и командами." %}</p>
+        <p>{% translate "Люблю объяснять сложное простыми словами и уверена, что ошибки — лучшие учителя, а не повод сдаваться!" %}</p>
+      </div>
+      <div class="hero__actions">
+        <a class="btn btn-primary" href="{% url 'landing' %}">{% translate "Смотреть курсы" %}</a>
+      </div>
+    </div>
+
+    <div class="hero__media">
+      <picture class="hero__bg">
+        <source type="image/webp"
+                srcset="{% static 'public/img/hero-bg-768.webp' %} 768w, {% static 'public/img/hero-bg-1536.webp' %} 1536w"
+                sizes="(min-width: 72rem) 44rem, (min-width: 56.25rem) calc((100vw - 5rem) * 0.655), calc(100vw - 2rem)">
+        <img src="{% static 'public/img/hero-bg.png' %}" width="1536" height="1024" alt="" aria-hidden="true">
+      </picture>
+      <picture class="hero__author">
+        <source type="image/webp"
+                srcset="{% static 'public/img/hero-author-432.webp' %} 432w, {% static 'public/img/hero-author-864.webp' %} 864w"
+                sizes="(min-width: 72rem) 26rem, (min-width: 56.25rem) calc((100vw - 5rem) * 0.385), calc((100vw - 2rem) * 0.59)">
+        <img class="hero__img" src="{% static 'public/img/hero-author.png' %}"
+             width="864" height="1120" fetchpriority="high"
+             alt="{% translate "Людмила Колесникова" %}">
+      </picture>
+    </div>
+  </div>
+</section>

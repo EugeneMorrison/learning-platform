@@ -1,5 +1,5 @@
 """
-Server-rendered public pages (landing and course pages; legal pages later).
+Server-rendered public pages (landing, course and about pages; legal pages later).
 
 Templates live in backend/templates/public/, styles in backend/static/public/.
 The React app is served separately by spa_view / lesson_view in backend/urls.py.
@@ -11,7 +11,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import translation
 
-from api.models import AuthorProfile, Course, Review
+from api.models import Course, Review
 
 from .pricing import add_price_labels
 
@@ -50,13 +50,9 @@ def landing_view(request):
 
 
 def about_view(request):
-    """"Об авторе": the author's bio lives in the template (public/about.html).
-    The photo is the one uploaded in the admin (AuthorProfile.photo) when there
-    is one; otherwise the template shows the static cut-out from the hero."""
-    author = AuthorProfile.objects.exclude(photo='').first()
-    return render(request, 'public/about.html', {
-        'author_photo_url': author.photo.url if author else None,
-    })
+    """"Об авторе": the author hero (public/includes/hero.html) and the bio,
+    both in the template (public/about.html)."""
+    return render(request, 'public/about.html')
 
 
 def favicon_view(request):

@@ -5,39 +5,25 @@
 {% block meta_description %}{% translate "Людмила Колесникова — преподаватель, методист и автор курсов: опыт, ученики, результаты и награды." %}{% endblock %}
 
 {% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/hero.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/about.css' %}">
 {% endblock %}
 
-{# The author's own text (source: design-src/about-author.md), word for word. Each #}
+{# The author hero (the page's h1, portrait over the illustration), then the     #}
+{# author's own text (source: design-src/about-author.md), word for word. Each    #}
 {# paragraph is translatable as a whole, markup included; no English yet, so /en/ #}
 {# shows the Russian text.                                                          #}
 {% block content %}
+  {% include "public/includes/hero.html" %}
+
   <article class="about" aria-labelledby="about-title">
     <div class="container about__inner">
 
       <header class="about__header">
-        {# At the top of the page: not lazy-loaded. The uploaded photo (admin) when there #}
-        {# is one, otherwise the hero's cut-out. width/height give the box ratio (3:4).  #}
-        <div class="about__photo">
-          {% if author_photo_url %}
-            <img src="{{ author_photo_url }}" width="360" height="480" alt="{% translate "Колесникова Людмила Сергеевна" %}">
-          {% else %}
-            <picture>
-              <source type="image/webp"
-                      srcset="{% static 'public/img/hero-author-432.webp' %} 432w, {% static 'public/img/hero-author-864.webp' %} 864w"
-                      sizes="(min-width: 40rem) 15rem, 12rem">
-              <img src="{% static 'public/img/hero-author.png' %}" width="864" height="1120"
-                   alt="{% translate "Колесникова Людмила Сергеевна" %}">
-            </picture>
-          {% endif %}
-        </div>
-
-        <div class="about__intro">
-          <h1 id="about-title" class="about__title">{% translate "Об авторе" %}</h1>
-          <h2 class="about__name">{% translate "Колесникова Людмила Сергеевна" %}</h2>
-          <p class="about__role"><em>{% translate "Преподаватель, методист и автор курсов. Руководитель с 10-летним стажем." %}</em></p>
-          <p class="about__honors"><strong>{% translate "Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников Сколково." %}</strong></p>
-        </div>
+        <h2 id="about-title" class="about__title">{% translate "Об авторе" %}</h2>
+        <h2 class="about__name">{% translate "Колесникова Людмила Сергеевна" %}</h2>
+        <p class="about__role"><em>{% translate "Преподаватель, методист и автор курсов. Руководитель с 10-летним стажем." %}</em></p>
+        <p class="about__honors"><strong>{% translate "Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников Сколково." %}</strong></p>
       </header>
 
       <div class="about__body">

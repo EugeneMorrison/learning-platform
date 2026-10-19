@@ -14,6 +14,14 @@ export function safeNext(value) {
     return value;
 }
 
+// After login / sign-up: open `next` with a full page load, not navigate().
+// It may be a Django-rendered page (/course/<slug>/ sends anonymous visitors to
+// /login/?next=...), which the React router can't show; React routes such as
+// /enroll/<id>/ load fine this way too.
+export function goToNext(next) {
+    window.location.assign(next);
+}
+
 // Build "/path/?next=<encoded>" when next is set, else just "/path/".
 export function withNext(path, next) {
     return next ? `${path}?next=${encodeURIComponent(next)}` : path;

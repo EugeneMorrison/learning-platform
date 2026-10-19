@@ -1,143 +1,27 @@
 /*
- * Landing page: hero (text + the author's picture), and the course catalog
- * (numbered-path motif on the cards). Uses only the variables from tokens.css.
+ * Landing page: the course catalog (numbered-path motif on the cards), reviews
+ * and the cat above the footer. Uses only the variables from tokens.css.
  */
 
-/* Hero: text + the author's picture. Phones and tablets: one column, the
-   picture under the text. From 56.25rem (900px): two columns, below. */
-.hero {
-  padding: var(--space-6) 0 0;  /* the picture sits on the bottom edge */
-  overflow-x: hidden;  /* fallback for overflow-x: clip */
-  overflow-x: clip;    /* the illustration may bleed past the container edge */
-}
-
-.hero__inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-6);
-}
-
-/* Above the illustration where it reaches into the column gap. */
-.hero__text {
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-}
-
-/* Small greeting above the heading. */
-.hero__eyebrow {
-  margin-bottom: var(--space-3);
-  color: var(--color-accent);
-  font-family: var(--font-heading);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-tight);
-}
-
-.hero__title {
-  margin-bottom: var(--space-5);
-}
-
-/* The author's paragraphs: regular body text. */
-.hero__about {
-  max-width: calc(var(--container-width) / 2);
-  margin-bottom: var(--space-6);
-}
-
-.hero__about p:last-child {
-  margin-bottom: 0;
-}
-
-.hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-/* "Подробнее обо мне →": a plain text link under the buttons, not a third button. */
-.hero__more {
-  margin: var(--space-4) 0 0;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-}
-
-/* The picture: two layers measured from the mockup, in % of .hero__media.
-   Front: the author's cut-out, 70% wide, right of centre; it sets the box
-   height and its bottom is the hero's bottom edge (no bottom padding).
-   Back: the violet illustration, 119% wide, from -9.8% to 109.2%: its
-   leftmost violet starts at about -4.4%, inside the column gap, so nothing
-   violet sits behind the text; the transparent glow may reach further.
-   Phones: the box is narrowed so the whole illustration fits the screen. */
-.hero__media {
-  position: relative;
-  z-index: 0;  /* own stacking context: the illustration stays behind */
-  width: 84%;
-  min-width: 0;
-  margin-left: 8.2%;
-}
-
-.hero__media picture,
-.hero__media img {
-  display: block;
-}
-
-.hero__bg {
-  position: absolute;
-  bottom: 0;
-  left: -9.8%;
-  z-index: -1;
-  width: 119%;
-  pointer-events: none;
-}
-
-.hero__bg img {
-  width: 100%;
-  height: auto;
-}
-
-.hero__author {
-  width: 70%;
-  margin-left: 22%;
-}
-
-.hero__img {
-  width: 100%;
-  height: auto;
-}
-
-/* Desktop: text about 45%, picture about 55%; the text is centred against the
-   picture, which sits on the hero's bottom edge. */
-@media (min-width: 56.25rem) {
-  .hero {
-    padding-top: var(--space-5);
-  }
-
-  .hero__inner {
-    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
-    align-items: center;
-  }
-
-  /* The surname stays on one line in the 45% column: full h1 size from
-     about 1280px, scaled down towards --text-2xl on narrower desktops. */
-  .hero__title {
-    font-size: clamp(var(--text-2xl), 3.4vw, var(--text-3xl));
-  }
-
-  .hero__media {
-    align-self: end;
-    width: auto;
-    margin-left: 0;
-  }
-}
-
-/* Catalog */
+/* Catalog: the first section of the page, its title is the page's h1. */
 .catalog {
   padding: var(--space-7) 0;
   scroll-margin-top: var(--space-4);
 }
 
-.catalog__title {
+.catalog__header {
   margin-bottom: var(--space-6);
+}
+
+.catalog__title {
+  margin-bottom: var(--space-3);
+}
+
+.catalog__subtitle {
+  max-width: calc(var(--container-width) / 2);
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-lg);
 }
 
 .catalog__list {
@@ -297,6 +181,10 @@
 }
 
 @media (max-width: 40rem) {
+  .catalog {
+    padding-top: var(--space-6);
+  }
+
   .landing-cat img {
     width: 15rem;
   }

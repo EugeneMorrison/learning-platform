@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { register } from '../api';
-import { safeNext, withNext } from '../lib/safeNext';
+import { goToNext, safeNext, withNext } from '../lib/safeNext';
 import './auth.css';
 
 // "не меньше N символа/символов": genitive singular after 1, 21, 31… (not 11).
@@ -69,7 +69,7 @@ function RegisterPage() {
             // Same destination rule as the login page: `next` (e.g. /enroll/<id>/) or the
             // dashboard, which shows a one-time "registered" notice.
             if (next) {
-                navigate(next);
+                goToNext(next);
             } else {
                 navigate('/dashboard/', { state: { justRegistered: true } });
             }
