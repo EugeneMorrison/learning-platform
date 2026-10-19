@@ -43,6 +43,76 @@
     color: var(--color-accent);
 }
 
+/* Lesson page: course › lesson over "Решено X из Y задач" and the bar. Takes
+   the free width between the logo and the badge; long titles end in "…". */
+.app-header__lesson {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.app-header__crumbs {
+    display: flex;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    line-height: var(--leading-tight);
+    white-space: nowrap;
+}
+
+/* Both titles shorten when space runs out; the course title never takes more
+   than about half, so neither disappears. */
+.app-header__crumb {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.app-header__crumb--course {
+    max-width: 45%;
+}
+
+.app-header__crumb--lesson {
+    color: var(--color-ink);
+    font-weight: var(--weight-bold);
+}
+
+.app-header__crumb-link {
+    color: var(--color-muted);
+    font-weight: var(--weight-medium);
+    text-decoration: underline;
+    text-underline-offset: var(--space-1);
+}
+
+.app-header__crumb-link:hover {
+    color: var(--color-accent);
+}
+
+.app-header__crumb-link:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.app-header__crumb-sep {
+    margin: 0 var(--space-2);
+    color: var(--color-muted);
+    font-weight: var(--weight-regular);
+}
+
+/* Compact progress for the bar: tight lines, slim track. */
+.app-header__lesson .lesson-progress__labels {
+    margin-bottom: var(--space-1);
+    line-height: var(--leading-tight);
+}
+
+.app-header__lesson .lesson-progress__track {
+    height: var(--space-1);
+}
+
 @media (max-width: 40rem) {
     .app-header__inner {
         gap: var(--space-4);
@@ -51,5 +121,26 @@
 
     .app-header__brand {
         font-size: var(--text-base);
+    }
+
+    /* Phones: only the lesson title. */
+    .app-header__crumb--course,
+    .app-header__crumb-sep {
+        display: none;
+    }
+}
+
+/* Narrowest screens (the badge drops the name here too): "10 из 15 задач",
+   and once every task is solved "✓ Урок пройден" alone. The hidden words
+   stay for screen readers (same technique as .visually-hidden). */
+@media (max-width: 30rem) {
+    .app-header__lesson .lesson-progress__verb,
+    .app-header__lesson .lesson-progress--complete .lesson-progress__count {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
     }
 }

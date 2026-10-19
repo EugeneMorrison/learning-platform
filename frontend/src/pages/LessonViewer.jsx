@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
@@ -8,7 +8,9 @@ import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
 import LessonsPanel, { ListIcon } from '../components/LessonsPanel';
 import ChatPanel, { ChatIcon, CloseIcon } from '../components/ChatPanel';
+import LessonProgress from '../components/LessonProgress';
 import { watchFigureOverflow } from '../lib/contentImages';
+import { useSetLessonBar } from '../lib/lessonBar';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
 import './LessonViewer.css';
 
@@ -45,8 +47,15 @@ function LessonViewer() {
     const chatButtonRef = useRef(null);
     const listButtonRef = useRef(null);
 
-    const solvedBlockIds = new Set(
-        progress.filter(p => p.is_correct === true).map(p => p.block)
+    // The one source of truth for "solved" on this page (is_correct, as in the
+    // lessons panel and course_completed). The app header counts X from it.
+    const solvedBlockIds = useMemo(
+        () => new Set(progress.filter(p => p.is_correct === true).map(p => p.block)),
+        [progress]
+    );
+    const taskIds = useMemo(
+        () => blocks.filter(b => TASK_TYPES.has(b.type)).map(b => b.id),
+        [blocks]
     );
     const firstUnresolved = blocks.find(
         b => TASK_TYPES.has(b.type) && !solvedBlockIds.has(b.id)
@@ -61,6 +70,22 @@ function LessonViewer() {
     useEffect(() => {
         loadLesson();
     }, []);
+
+    // The app header shows the breadcrumb and progress once everything has
+    // loaded (not "Решено 0 из N" before the progress arrives); cleared when
+    // leaving the page.
+    const setLessonBar = useSetLessonBar();
+    useEffect(() => {
+        if (loading || error || !lesson) return undefined;
+        setLessonBar({
+            courseId: lesson.course,
+            courseTitle: lesson.course_title,
+            lessonTitle: lesson.title,
+            taskIds,
+            solvedIds: solvedBlockIds,
+        });
+        return () => setLessonBar(null);
+    }, [loading, error, lesson, taskIds, solvedBlockIds, setLessonBar]);
 
     // Fade at the right edge of formula boxes that scroll sideways (phones).
     useEffect(() => {
@@ -281,15 +306,15 @@ function LessonViewer() {
         <>
             <div className="page page--narrow lesson-page">
 
-                {/* Lesson header. Top row: list button, course + "Урок N из M", next
-                    link (on phones the link moves under the progress bar). The list
-                    button, course link and next link are site chrome: not in an embed. */}
-                <div className={isInIframe ? 'lesson-header' : 'lesson-header lesson-header--nav'}>
-                    {!isInIframe && (
+                {/* The lesson title and progress are in the app header. Here: the
+                    lessons list and, for the author, "✎ Редактировать урок" (site
+                    chrome: not in an embed). */}
+                {!isInIframe && (
+                    <div className="lesson-toolbar">
                         <button
                             ref={listButtonRef}
                             type="button"
-                            className="btn btn-secondary btn-sm lesson-header__list"
+                            className="btn btn-secondary btn-sm lesson-toolbar__list"
                             onClick={() => setShowLessons(true)}
                             aria-label="Список уроков"
                             aria-haspopup="dialog"
@@ -298,78 +323,25 @@ function LessonViewer() {
                         >
                             <ListIcon />
                         </button>
-                    )}
-                    <div className="lesson-header__context">
-                        {!isInIframe && (
-                            <Link className="lesson-header__course" to={`/courses/${lesson.course}/`}>
-                                {lesson.course_title}
+                        {canEdit && (
+                            <Link
+                                className="btn btn-secondary btn-sm lesson-toolbar__edit"
+                                to={`/lesson/${lesson.id}/edit/`}
+                                onClick={() => window.scrollTo(0, 0)}
+                            >
+                                ✎ Редактировать урок
                             </Link>
                         )}
-                        {/* Position in the course's ordered lessons, not order_index. */}
-                        <p className="lesson-header__eyebrow">
-                            Урок {lesson.lesson_position} из {lesson.lesson_count}
-                        </p>
                     </div>
-                    <h1 className="lesson-header__title">{lesson.title}</h1>
-                    <p className="lesson-header__meta">{blocks.length} блоков</p>
-                    {(() => {
-                        const taskBlocks = blocks.filter(b => TASK_TYPES.has(b.type));
-                        const total = taskBlocks.length;
-                        if (total === 0) return null;
-                        const solved = taskBlocks.filter(b => solvedBlockIds.has(b.id)).length;
-                        const percent = Math.round((solved / total) * 100);
-                        const complete = solved === total;
-                        return (
-                            <div className={complete ? 'lesson-progress lesson-progress--complete' : 'lesson-progress'}>
-                                <div className="lesson-progress__labels">
-                                    <span>Решено {solved} из {total} задач</span>
-                                    <span>{complete ? '✓ Урок пройден' : `${percent}%`}</span>
-                                </div>
-                                <div
-                                    className="lesson-progress__track"
-                                    role="progressbar"
-                                    aria-label="Решено задач"
-                                    aria-valuemin={0}
-                                    aria-valuemax={total}
-                                    aria-valuenow={solved}
-                                >
-                                    {/* Width is data, so it stays inline. */}
-                                    <div className="lesson-progress__fill" style={{ width: `${percent}%` }} />
-                                </div>
-                            </div>
-                        );
-                    })()}
+                )}
 
-                    {/* Next lesson in the course; on the last lesson, back to the course
-                        ("Курс пройден" only once every task in the course is solved).
-                        Always shown (no lesson locking); hidden in an embed. */}
-                    {!isInIframe && (
-                        <nav className="lesson-nav" aria-label="Навигация по курсу">
-                            {canEdit && (
-                                <Link
-                                    className="btn btn-secondary btn-sm"
-                                    to={`/lesson/${lesson.id}/edit/`}
-                                    onClick={() => window.scrollTo(0, 0)}
-                                >
-                                    ✎ Редактировать урок
-                                </Link>
-                            )}
-                            {lesson.next_lesson_id ? (
-                                <Link
-                                    className="btn btn-secondary btn-sm"
-                                    to={`/lesson/${lesson.next_lesson_id}/`}
-                                    onClick={() => window.scrollTo(0, 0)}
-                                >
-                                    Следующий урок →
-                                </Link>
-                            ) : (
-                                <Link className="btn btn-secondary btn-sm" to={`/courses/${lesson.course}/`}>
-                                    {lesson.course_completed ? 'Курс пройден → к курсу' : 'Последний урок → к курсу'}
-                                </Link>
-                            )}
-                        </nav>
-                    )}
-                </div>
+                {/* An embed has no app header: title and progress stay on the page. */}
+                {isInIframe && (
+                    <div className="lesson-header">
+                        <h1 className="lesson-header__title">{lesson.title}</h1>
+                        <LessonProgress taskIds={taskIds} solvedIds={solvedBlockIds} />
+                    </div>
+                )}
 
                 {showLessons && (
                     <LessonsPanel
@@ -382,6 +354,28 @@ function LessonViewer() {
 
                 {/* Render all blocks */}
                 {blocks.map(renderBlock)}
+
+                {/* After the last block: the next lesson in the course; on the last
+                    lesson, back to the course ("Курс пройден" only once every task in
+                    the course is solved). Always shown (no lesson locking); hidden
+                    in an embed. */}
+                {!isInIframe && (
+                    <nav className="lesson-nav" aria-label="Навигация по курсу">
+                        {lesson.next_lesson_id ? (
+                            <Link
+                                className="btn btn-secondary btn-sm"
+                                to={`/lesson/${lesson.next_lesson_id}/`}
+                                onClick={() => window.scrollTo(0, 0)}
+                            >
+                                Следующий урок →
+                            </Link>
+                        ) : (
+                            <Link className="btn btn-secondary btn-sm" to={`/courses/${lesson.course}/`}>
+                                {lesson.course_completed ? 'Курс пройден → к курсу' : 'Последний урок → к курсу'}
+                            </Link>
+                        )}
+                    </nav>
+                )}
 
             </div>
 

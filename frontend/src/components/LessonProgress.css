@@ -1,0 +1,55 @@
+/* "Решено X из Y задач" + percentage over a progress bar (LessonProgress.jsx).
+   Moved from LessonViewer.css when the lesson header moved into the app bar. */
+
+/* One line, never wrapping or overflowing (narrow app header): the count
+   shortens with an ellipsis first, the percentage only when nothing else is
+   left to shorten. */
+.lesson-progress__labels {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+
+.lesson-progress__count {
+    flex: 0 1000 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* margin-left: stays at the right end even when the count is hidden. */
+.lesson-progress__percent {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lesson-progress__track {
+    height: var(--space-2);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--color-line);
+}
+
+.lesson-progress__fill {
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    transition: width 0.3s ease;
+}
+
+/* All tasks solved: the one place the progress turns green. */
+.lesson-progress--complete .lesson-progress__fill {
+    background: var(--color-success-on-light);
+}
+
+.lesson-progress--complete .lesson-progress__percent {
+    color: var(--color-success-on-light);
+    font-weight: var(--weight-bold);
+}

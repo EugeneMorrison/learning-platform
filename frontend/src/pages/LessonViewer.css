@@ -1,97 +1,33 @@
-/* Lesson viewer: header card with progress, block anchors, "next task" button.
-   The blocks themselves are styled in components/blocks.css. */
+/* Lesson viewer: toolbar, embed header, block anchors, next-lesson link,
+   "next task" button. The lesson title and progress are in the app header
+   (AppHeader.css, LessonProgress.css); the blocks are in components/blocks.css. */
 
+/* Above the blocks: "Список уроков" on the left, the author's
+   "✎ Редактировать урок" on the right. */
+.lesson-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+}
+
+/* Square icon button, a comfortable tap target. */
+.lesson-toolbar__list {
+    padding: var(--space-3);
+}
+
+.lesson-toolbar__edit {
+    white-space: nowrap;
+}
+
+/* Embedded lesson only (no app header): title and progress card. */
 .lesson-header {
     margin-bottom: var(--space-5);
     padding: var(--space-6);
     border: var(--border-width) solid var(--color-line);
     border-radius: var(--radius-card);
     background: var(--color-ground);
-}
-
-/* With site chrome (not embedded): list button | course + "Урок N из M" |
-   next link on the top row; title, meta and progress below. */
-.lesson-header--nav {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-        "list context nav"
-        "title title title"
-        "meta meta meta"
-        "progress progress progress";
-    column-gap: var(--space-3);
-    align-items: center;
-}
-
-.lesson-header--nav .lesson-header__list { grid-area: list; }
-.lesson-header--nav .lesson-header__context { grid-area: context; }
-.lesson-header--nav .lesson-nav { grid-area: nav; }
-.lesson-header--nav .lesson-header__title { grid-area: title; }
-.lesson-header--nav .lesson-header__meta { grid-area: meta; }
-.lesson-header--nav .lesson-progress { grid-area: progress; }
-
-.lesson-header--nav .lesson-header__title {
-    margin-top: var(--space-5);
-}
-
-/* Square icon button, a comfortable tap target. */
-.lesson-header__list {
-    align-self: center;
-    padding: var(--space-3);
-}
-
-/* Course title over "Урок N из M": always two lines. */
-.lesson-header__context {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-1);
-    min-width: 0;
-}
-
-.lesson-header__context .lesson-header__eyebrow {
-    margin: 0;
-}
-
-/* Course title: a link back to the course page. */
-.lesson-header__course {
-    display: inline-block;
-    color: var(--color-muted);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
-    text-decoration: underline;
-    text-underline-offset: var(--space-1);
-    overflow-wrap: anywhere;
-}
-
-.lesson-header__course:hover {
-    color: var(--color-accent);
-}
-
-.lesson-header__course:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: var(--focus-ring-offset);
-}
-
-/* "Следующий урок →" / "Последний урок → к курсу" / "Курс пройден → к курсу":
-   full text, never shortened. */
-.lesson-nav {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-}
-
-.lesson-nav .btn {
-    white-space: nowrap;
-}
-
-/* "Урок 3": same small cobalt line as the landing hero's eyebrow. */
-.lesson-header__eyebrow {
-    margin: 0 0 var(--space-2);
-    color: var(--color-accent);
-    font-family: var(--font-heading);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-medium);
 }
 
 /* Lesson headings are Golos bold (decided), including the lesson title. */
@@ -104,54 +40,27 @@
     overflow-wrap: break-word;
 }
 
-.lesson-header__meta {
-    margin: var(--space-2) 0 0;
-    color: var(--color-muted);
-    font-size: var(--text-sm);
-}
-
-.lesson-progress {
+.lesson-header .lesson-progress {
     margin-top: var(--space-5);
 }
 
-.lesson-progress__labels {
+/* After the last block: "Следующий урок →" / "Последний урок → к курсу" /
+   "Курс пройден → к курсу": full text, never shortened. */
+.lesson-nav {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: var(--space-2);
-    margin-bottom: var(--space-2);
-    color: var(--color-muted);
-    font-size: var(--text-sm);
 }
 
-.lesson-progress__track {
-    height: var(--space-2);
-    overflow: hidden;
-    border-radius: var(--radius-pill);
-    background: var(--color-line);
-}
-
-.lesson-progress__fill {
-    height: 100%;
-    border-radius: var(--radius-pill);
-    background: var(--color-accent);
-    transition: width 0.3s ease;
-}
-
-/* All tasks solved: the one place the header turns green. */
-.lesson-progress--complete .lesson-progress__fill {
-    background: var(--color-success-on-light);
-}
-
-.lesson-progress--complete .lesson-progress__labels > :last-child {
-    color: var(--color-success-on-light);
-    font-weight: var(--weight-bold);
+.lesson-nav .btn {
+    white-space: nowrap;
 }
 
 /* "К следующей задаче" scrolls a block to the top: keep it clear of the
-   sticky app header (not shown in an iframe, where the margin is harmless). */
+   sticky app header, which on the lesson page also holds the breadcrumb and
+   progress (not shown in an iframe, where the margin is harmless). */
 .lesson-anchor {
-    scroll-margin-top: calc(var(--space-8) + var(--space-4));
+    scroll-margin-top: calc(var(--space-9) + var(--space-2));
 }
 
 /* Course author only: "✎ Изменить" just above the block's top-right corner,
@@ -185,24 +94,7 @@
         padding: var(--space-5) var(--space-4);
     }
 
-    /* The next link doesn't fit beside the titles: its own full-width row at
-       the bottom of the card, under the progress bar. */
-    .lesson-header--nav {
-        grid-template-columns: auto minmax(0, 1fr);
-        grid-template-areas:
-            "list context"
-            "title title"
-            "meta meta"
-            "progress progress"
-            "nav nav";
-    }
-
-    /* "✎ Редактировать урок" (author) above the next link, both full width. */
-    .lesson-header--nav .lesson-nav {
-        flex-direction: column;
-        margin-top: var(--space-5);
-    }
-
+    /* The next link: full width under the last block. */
     .lesson-nav .btn {
         width: 100%;
         white-space: normal;
