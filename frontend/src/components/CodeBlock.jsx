@@ -8,7 +8,7 @@ import './blocks.css';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
-function CodeBlock({ blockId, content, savedProgress, number }) {
+function CodeBlock({ blockId, content, savedProgress, number, onSubmitted }) {
     const wasSolved = savedProgress?.is_correct === true;
     const savedCode = savedProgress?.answer?.code;
 
@@ -109,6 +109,7 @@ function CodeBlock({ blockId, content, savedProgress, number }) {
                 version: pythonVersion,
             });
             setSubmitResults(res.data);
+            onSubmitted?.(res.data); // the lesson's progress (app header, "next task")
         } catch (err) {
             setSubmitResults({
                 status: 'error',

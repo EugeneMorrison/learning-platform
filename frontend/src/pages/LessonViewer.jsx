@@ -46,6 +46,7 @@ function LessonViewer() {
     const [showLessons, setShowLessons] = useState(false);
     const chatButtonRef = useRef(null);
     const listButtonRef = useRef(null);
+    const codeRefetchSeq = useRef({}); // block id → number of its latest read-back
 
     // The one source of truth for "solved" on this page (is_correct, as in the
     // lessons panel and course_completed). The app header counts X from it.
@@ -235,6 +236,40 @@ function LessonViewer() {
         return map;
     })();
 
+    // After a submission, the block's stored progress record replaces the old
+    // one; everything that reads solvedBlockIds (app header, "next task", the
+    // embed card) follows. Only a recorded submission changes what is stored:
+    // the server grades a re-submission of an already solved block (that block
+    // stays solved) but doesn't save it, and then its response is this
+    // attempt's result, not the stored record.
+    function storeProgressRecord(record) {
+        setProgress(prev => [...prev.filter(p => p.block !== record.block), record]);
+    }
+
+    // QUIZ / FILL: /progress/submit/ returns the saved record (+ "recorded").
+    function handleAnswerSubmitted(data) {
+        if (!data.recorded) return;
+        const record = { ...data };
+        delete record.recorded;
+        storeProgressRecord(record);
+    }
+
+    // CODE: /run-tests/ returns the test results and is_correct, not the saved
+    // record, so read the record back. Only this block's record is taken (the
+    // others may have changed since), and only from the latest read-back.
+    async function handleCodeSubmitted(blockId, data) {
+        if (!data.recorded) return;
+        const seq = (codeRefetchSeq.current[blockId] || 0) + 1;
+        codeRefetchSeq.current[blockId] = seq;
+        try {
+            const res = await api.get(`/progress/course/${lesson.course}/`);
+            const record = res.data.find(p => p.block === blockId);
+            if (record && codeRefetchSeq.current[blockId] === seq) storeProgressRecord(record);
+        } catch (err) {
+            console.error('Failed to reload progress:', err);
+        }
+    }
+
     function renderBlock(block) {
         const blockProgress = progress.find(p => p.block === block.id) || null;
         const number = blockNumbers[block.id];
@@ -244,13 +279,16 @@ function LessonViewer() {
                 inner = <TextBlock blockId={block.id} content={block.content} />;
                 break;
             case 'QUIZ':
-                inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
+                inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
+                    onSubmitted={handleAnswerSubmitted} />;
                 break;
             case 'CODE':
-                inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
+                inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
+                    onSubmitted={data => handleCodeSubmitted(block.id, data)} />;
                 break;
             case 'FILL':
-                inner = <FillBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number} />;
+                inner = <FillBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
+                    onSubmitted={handleAnswerSubmitted} />;
                 break;
             default:
                 return null;

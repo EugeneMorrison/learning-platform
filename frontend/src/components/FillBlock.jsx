@@ -22,7 +22,7 @@ function toResult(isCorrect, feedback) {
     };
 }
 
-function FillBlock({ content, blockId, savedProgress, number }) {
+function FillBlock({ content, blockId, savedProgress, number, onSubmitted }) {
     const segments = parseTemplate(content.template);
     const blanks = segments.filter(s => s.type === 'blank');
 
@@ -52,6 +52,7 @@ function FillBlock({ content, blockId, savedProgress, number }) {
                 answer: { blanks: values },
             });
             setResult(toResult(res.data.is_correct, res.data.feedback));
+            onSubmitted?.(res.data); // the lesson's progress (app header, "next task")
         } catch (err) {
             console.error('Failed to check answer:', err);
             setCheckError(err.response?.data?.detail || 'Не удалось проверить ответ. Попробуйте ещё раз.');

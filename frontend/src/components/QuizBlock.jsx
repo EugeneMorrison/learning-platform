@@ -14,7 +14,7 @@ function isHtmlQuestion(q) {
     return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|strong|em|code|div|br)\b/i.test(q || '');
 }
 
-function QuizBlock({ content, blockId, savedProgress, number }) {
+function QuizBlock({ content, blockId, savedProgress, number, onSubmitted }) {
     const savedSelected = savedProgress?.answer?.selected;
     const hasAttempt = typeof savedSelected === 'number';
     const [selected, setSelected] = useState(hasAttempt ? savedSelected : null);
@@ -54,6 +54,7 @@ function QuizBlock({ content, blockId, savedProgress, number }) {
                 isCorrect: res.data.is_correct === true,
                 explanation: res.data.feedback?.explanation || '',
             });
+            onSubmitted?.(res.data); // the lesson's progress (app header, "next task")
         } catch (err) {
             console.error('Failed to check answer:', err);
             setCheckError(err.response?.data?.detail || 'Не удалось проверить ответ. Попробуйте ещё раз.');
