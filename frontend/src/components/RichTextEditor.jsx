@@ -15,8 +15,15 @@ import './RichTextEditor.css';
  * Images (incl. formulas pasted as pictures) are uploaded to Django via
  * POST /api/upload-image/ and inserted as <img src="<absolute url>">. Authors
  * can add them three ways: the toolbar button, Ctrl+V paste, and drag-and-drop.
+ *
+ * headingLevels: which heading buttons the toolbar shows (H1 only in the TEXT
+ * block form). The schema keeps all six levels in every editor, so existing
+ * headings in saved content are never rewritten.
  */
-function RichTextEditor({ value, onChange, placeholder }) {
+const DEFAULT_HEADING_LEVELS = [2, 3];
+const HEADING_TITLES = { 1: 'Главный заголовок', 2: 'Заголовок', 3: 'Подзаголовок' };
+
+function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_HEADING_LEVELS }) {
     const fileInputRef = useRef(null);
 
     const editor = useEditor({
@@ -124,10 +131,11 @@ function RichTextEditor({ value, onChange, placeholder }) {
                 <button type="button" title="Курсив" style={btn(editor.isActive('italic'))}
                     onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></button>
                 <span className="rte-sep" />
-                <button type="button" title="Заголовок" style={btn(editor.isActive('heading', { level: 2 }))}
-                    onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>H2</button>
-                <button type="button" title="Подзаголовок" style={btn(editor.isActive('heading', { level: 3 }))}
-                    onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>H3</button>
+                {headingLevels.map(level => (
+                    <button key={level} type="button" title={HEADING_TITLES[level] || `Заголовок ${level}`}
+                        style={btn(editor.isActive('heading', { level }))}
+                        onClick={() => editor.chain().focus().toggleHeading({ level }).run()}>H{level}</button>
+                ))}
                 <span className="rte-sep" />
                 <button type="button" title="Маркированный список" style={btn(editor.isActive('bulletList'))}
                     onClick={() => editor.chain().focus().toggleBulletList().run()}>• Список</button>

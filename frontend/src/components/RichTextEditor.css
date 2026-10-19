@@ -35,6 +35,17 @@
     margin: 0 0 10px 0;
 }
 
+/* Main heading (TEXT blocks only): Golos bold, a step above h2. */
+.rte-content .ProseMirror h1 {
+    margin: var(--space-3) 0 var(--space-3);
+    font-family: var(--font-body);
+    font-weight: var(--weight-bold);
+    font-size: var(--text-2xl);
+    line-height: var(--leading-tight);
+    color: var(--color-ink);
+    overflow-wrap: break-word;
+}
+
 .rte-content .ProseMirror h2 {
     font-size: 22px;
     margin: 8px 0 10px;

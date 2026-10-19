@@ -697,7 +697,8 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
 
             {type === 'TEXT' && (
                 <Field label="Текст теории">
-                    <RichField field="html" value={content.html} setContent={setContent} placeholder="Напишите теорию урока..." />
+                    <RichField field="html" value={content.html} setContent={setContent} placeholder="Напишите теорию урока..."
+                        headingLevels={TEXT_HEADING_LEVELS} />
                 </Field>
             )}
 
@@ -1044,10 +1045,13 @@ function FillFields({ content, setContent }) {
 // per field, so typing elsewhere in the card doesn't re-render them, and
 // @uiw/react-codemirror (which reconfigures the whole editor whenever its
 // onChange prop changes) never reconfigures while the author types.
-const RichField = memo(function RichField({ field, value, setContent, placeholder }) {
+const RichField = memo(function RichField({ field, value, setContent, placeholder, headingLevels }) {
     const onChange = useCallback(html => setContent(c => ({ ...c, [field]: html })), [field, setContent]);
-    return <RichTextEditor value={value} onChange={onChange} placeholder={placeholder} />;
+    return <RichTextEditor value={value} onChange={onChange} placeholder={placeholder} headingLevels={headingLevels} />;
 });
+
+// Theory text gets its own main heading (H1); other rich fields keep H2/H3.
+const TEXT_HEADING_LEVELS = [1, 2, 3];
 
 const CodeField = memo(function CodeField({ field, value, setContent }) {
     const onChange = useCallback(val => setContent(c => ({ ...c, [field]: val })), [field, setContent]);
