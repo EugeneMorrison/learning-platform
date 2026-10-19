@@ -2,8 +2,7 @@ services:
   web:
     build: .
     restart: unless-stopped
-    ports:
-      - "8000:8000"        # host:container — fallback while HTTPS is new; close later
+    expose: ["8000"]
     # Settings come from .env (optional; see .env.example). Without it Django
     # defaults to DEBUG=False and the built-in ALLOWED_HOSTS.
     env_file:
