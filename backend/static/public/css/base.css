@@ -159,10 +159,15 @@ a {
   padding-bottom: var(--space-4);
 }
 
+/* Wordmark: the name is all caps already; uppercase keeps it so whatever the
+   setting holds. */
 .site-logo {
   font-family: var(--font-heading);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-logo);
+  text-transform: uppercase;
+  white-space: nowrap;
   color: var(--color-ink);
   text-decoration: none;
 }
@@ -282,12 +287,34 @@ a {
 @media (max-width: 40rem) {
   h1 { font-size: var(--text-2xl); }
 
+  /* Sides only: the shorthand would also zero the header's own top/bottom padding. */
   .container {
-    padding: 0 var(--space-4);
+    padding-right: var(--space-4);
+    padding-left: var(--space-4);
   }
 
   .site-nav {
     order: 3;
     flex-basis: 100%;
+  }
+
+  /* Logo, RU/EN switch and "Мой кабинет" share the first line down to 360px:
+     the logo keeps its size, the gaps and the controls get tighter. */
+  .site-header__inner {
+    justify-content: space-between;
+    column-gap: var(--space-3);
+  }
+
+  .site-header__actions {
+    gap: var(--space-2);
+  }
+
+  .lang-switch__btn {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .site-header__actions .btn {
+    padding: var(--space-3);
+    font-size: var(--text-sm);
   }
 }

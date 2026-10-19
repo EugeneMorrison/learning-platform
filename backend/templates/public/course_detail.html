@@ -1,7 +1,7 @@
 {% extends "public/base.html" %}
 {% load i18n static public_site %}
 
-{# Course name plus the short brand; the default title's tagline would make it too long. #}
+{# Course name plus the site name. #}
 {% block title %}{{ course.title }} — {% brand_name %}{% endblock %}
 
 {% block extra_head %}

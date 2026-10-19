@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { BRAND_NAME, BRAND_TAGLINE } from './src/brand.js'
+import { BRAND_NAME } from './src/brand.js'
 
 // Design tokens, web fonts and icons are shared with the Django pages: one copy, in
 // backend/static/public/ (served by Django at /static/public/). They are linked
@@ -24,7 +24,7 @@ function sharedDesignTokens() {
       order: 'post',
       handler(html) {
         return {
-          html: html.replace('%BRAND_NAME%', BRAND_NAME).replace('%BRAND_TAGLINE%', BRAND_TAGLINE),
+          html: html.replace('%BRAND_NAME%', BRAND_NAME),
           tags: [
             ...ICONS.map(attrs => ({ tag: 'link', attrs, injectTo: 'head' })),
             {

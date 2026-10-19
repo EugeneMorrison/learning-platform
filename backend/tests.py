@@ -777,8 +777,8 @@ class AboutPageTests(PublicPagesTestCase):
 
     def test_title_meta_and_heading_translated(self):
         ru, en = self.get('/about/'), self.get('/en/about/')
-        self.assertIn('<title>Об авторе — Game Python</title>', ru)
-        self.assertIn('<title>About the author — Game Python</title>', en)
+        self.assertIn('<title>Об авторе — УЧЁБУС</title>', ru)
+        self.assertIn('<title>About the author — UCHEBUS</title>', en)
         # An h2: the hero above holds the page's only h1.
         self.assertIn('class="about__title">Об авторе</h2>', ru)
         self.assertIn('class="about__title">About the author</h2>', en)
@@ -1048,3 +1048,69 @@ class AuthPageNextTests(TestCase):
         response = self.get('/login/', data={'next': 'http://testserver/course/x/'}, secure=True)
         self.assertRedirects(response, '/login/', fetch_redirect_response=False)
 
+
+class BrandTests(PublicPagesTestCase):
+    """The site name comes from settings.BRAND_NAMES only: УЧЁБУС on Russian
+    pages, UCHEBUS on English ones, in the logo, footer, <title> and admin."""
+
+    OLD_NAMES = ['Game Python', 'от ужаса до понимания', 'from horror to understanding']
+
+    def pages(self):
+        course = self.make_course('Python basics')
+        # (url, name, logo link)
+        return [('/', 'УЧЁБУС', '/'), ('/about/', 'УЧЁБУС', '/'), (f'/course/{course.slug}/', 'УЧЁБУС', '/'),
+                ('/en/', 'UCHEBUS', '/en/'), ('/en/about/', 'UCHEBUS', '/en/'),
+                (f'/en/course/{course.slug}/', 'UCHEBUS', '/en/')]
+
+    def test_logo_footer_and_title(self):
+        titles = {'/': '<title>УЧЁБУС</title>', '/en/': '<title>UCHEBUS</title>'}
+        for url, name, home in self.pages():
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertIn(f'<a class="site-logo" href="{home}">{name}</a>', html)
+                self.assertIn(f'<p class="site-footer__name">{name}</p>', html)
+                self.assertRegex(html, rf'<title>(.+ — )?{name}</title>')
+                if url in titles:
+                    self.assertIn(titles[url], html)
+                for old in self.OLD_NAMES:
+                    self.assertNotIn(old, html)
+
+    def test_course_title_has_the_name(self):
+        course = self.make_course('Python basics')
+        self.assertContains(self.client.get(f'/course/{course.slug}/'), '<title>Python basics — УЧЁБУС</title>')
+        self.assertContains(self.client.get(f'/en/course/{course.slug}/'), '<title>Python basics — UCHEBUS</title>')
+
+    def test_admin_header_and_title(self):
+        User.objects.create_superuser('boss', 'b@example.com', 'x')
+        self.client.login(username='boss', password='x')
+        html = self.client.get('/admin/').content.decode()
+        self.assertIn('УЧЁБУС', html)
+        self.assertNotIn('Django administration', html)
+        self.assertNotIn('Администрирование Django', html)
+
+    def test_one_setting_renames_everything(self):
+        from django.test import override_settings
+
+        with override_settings(BRAND_NAMES={'ru': 'НОВОЕ', 'en': 'NEW'}):
+            ru = self.client.get('/').content.decode()
+            en = self.client.get('/en/').content.decode()
+        self.assertIn('<a class="site-logo" href="/">НОВОЕ</a>', ru)
+        self.assertIn('<title>НОВОЕ</title>', ru)
+        self.assertIn('<a class="site-logo" href="/en/">NEW</a>', en)
+        self.assertNotIn('УЧЁБУС', ru + en)
+
+    def test_react_constant_matches_the_russian_name(self):
+        from django.conf import settings
+
+        brand_js = open(settings.BASE_DIR / 'frontend' / 'src' / 'brand.js', encoding='utf-8').read()
+        self.assertIn(f"export const BRAND_NAME = '{settings.BRAND_NAMES['ru']}';", brand_js)
+        for old in self.OLD_NAMES:
+            self.assertNotIn(old, brand_js)
+
+    def test_logo_is_an_all_caps_wordmark(self):
+        from django.contrib.staticfiles import finders
+
+        css = open(finders.find('public/css/base.css'), encoding='utf-8').read()
+        logo = re.search(r'\.site-logo \{(.*?)\}', css, re.S).group(1)
+        self.assertIn('letter-spacing: var(--tracking-logo);', logo)
+        self.assertIn('white-space: nowrap;', logo)

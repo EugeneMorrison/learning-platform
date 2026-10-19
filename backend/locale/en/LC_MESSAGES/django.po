@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-19 04:58+0300\n"
+"POT-Creation-Date: 2026-10-19 04:40+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -23,14 +23,6 @@ msgstr ""
 #: .\api\serializers.py:144
 msgid "Название должно быть не короче 2 символов."
 msgstr ""
-
-#: .\api\templatetags\public_site.py:14
-msgid "Game Python"
-msgstr "Game Python"
-
-#: .\api\templatetags\public_site.py:15
-msgid "от ужаса до понимания"
-msgstr "from horror to understanding"
 
 #: .\api\views.py:92
 msgid "Блок не найден."

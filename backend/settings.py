@@ -196,6 +196,11 @@ LOCALE_PATHS = [
     BASE_DIR / 'backend' / 'locale',
 ]
 
+# The site name, per language: the only place Django takes it from (logo,
+# footer, <title>, admin header; see api/templatetags/public_site.py). The React
+# app has its own constant in frontend/src/brand.js.
+BRAND_NAMES = {'ru': 'УЧЁБУС', 'en': 'UCHEBUS'}
+
 TIME_ZONE = 'UTC'
 
 USE_I18N = True

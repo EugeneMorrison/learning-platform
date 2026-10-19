@@ -20,6 +20,8 @@
     font-family: var(--font-heading);
     font-size: var(--text-lg);
     font-weight: var(--weight-bold);
+    letter-spacing: var(--tracking-logo);
+    text-transform: uppercase;
     line-height: var(--leading-tight);
     color: var(--color-ink);
     text-decoration: none;

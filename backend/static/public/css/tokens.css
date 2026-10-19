@@ -54,6 +54,9 @@
   --leading-tight: 1.15;
   --leading-normal: 1.6;
 
+  /* The all-caps wordmark (site logo, React app header): opened-up letters. */
+  --tracking-logo: 0.08em;
+
   /* Spacing scale */
   --space-1: 0.25rem;
   --space-2: 0.5rem;

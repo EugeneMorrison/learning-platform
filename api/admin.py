@@ -1,5 +1,13 @@
 from django.contrib import admin
+from django.utils.functional import lazy
+
 from .models import AuthorProfile, Block, Course, Enrollment, Lesson, Progress, Review, User
+from .templatetags.public_site import get_brand_name
+
+# Admin header and browser-tab title: the site name (settings.BRAND_NAMES), in
+# the language of each request.
+admin.site.site_header = lazy(get_brand_name, str)()
+admin.site.site_title = lazy(get_brand_name, str)()
 
 
 # =============================================================================
