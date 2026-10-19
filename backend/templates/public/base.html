@@ -31,7 +31,7 @@
           {% else %}
             <li><span class="site-nav__link site-nav__link--soon">{% translate "Отзывы" %}<span class="visually-hidden"> {% translate "(скоро)" %}</span></span></li>
           {% endif %}
-          <li><a class="site-nav__link" href="{% url 'about' %}"{% if request.resolver_match.url_name == 'about' %} aria-current="page"{% endif %}>{% translate "Об авторе" %}</a></li>
+          <li><a class="site-nav__link" href="{% url 'about' %}"{% if request.resolver_match.url_name == 'about' %} aria-current="page"{% endif %}>{% translate "Обо мне" %}</a></li>
         </ul>
       </nav>
 

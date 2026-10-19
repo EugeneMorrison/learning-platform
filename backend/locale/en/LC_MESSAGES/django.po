@@ -89,8 +89,8 @@ msgstr ""
 #: .\backend\templates\public\about.html:4
 #: .\backend\templates\public\about.html:23
 #: .\backend\templates\public\base.html:34
-msgid "Об авторе"
-msgstr "About the author"
+msgid "Обо мне"
+msgstr "About me"
 
 #: .\backend\templates\public\about.html:5
 msgid ""

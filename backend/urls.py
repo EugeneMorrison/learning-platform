@@ -4,7 +4,7 @@ Main URL Configuration for Learning Platform
 Includes:
 - Landing page: / (Russian) and /en/ (English), rendered by Django
 - Course page: /course/<slug>/ and /en/course/<slug>/ (Django)
-- About the author: /about/ and /en/about/ (Django)
+- About me ("Обо мне"): /about/ and /en/about/ (Django)
 - Language switch: /i18n/setlang/ (Django's set_language view)
 - Admin panel: /admin/
 - API endpoints: /api/

@@ -50,7 +50,7 @@ def landing_view(request):
 
 
 def about_view(request):
-    """"Об авторе": the author hero (public/includes/hero.html) and the bio,
+    """"Обо мне" (/about/): the author hero (public/includes/hero.html) and the bio,
     both in the template (public/about.html)."""
     return render(request, 'public/about.html')
 

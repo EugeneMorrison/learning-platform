@@ -557,7 +557,7 @@ def _localized(ru, en, lang):
 class AuthorProfile(models.Model):
     """
     The course author. Intended as a single row (the admin allows only one).
-    Not shown on the public pages at the moment: "Об авторе" (/about/) keeps its
+    Not shown on the public pages at the moment: "Обо мне" (/about/) keeps its
     text in the template.
     """
     name = models.CharField(max_length=200)

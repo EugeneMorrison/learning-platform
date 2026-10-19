@@ -405,7 +405,7 @@ class HeaderAuthLinkTests(PublicPagesTestCase):
 
 
 class HeroTests(PublicPagesTestCase):
-    """Author hero (public/includes/hero.html, on "Об авторе"): text + a two-layer
+    """Author hero (public/includes/hero.html, on "Обо мне"): text + a two-layer
     picture (the violet illustration behind the author's cut-out), WebP with PNG
     fallbacks, loaded eagerly, alt translated."""
 
@@ -743,7 +743,7 @@ class AuthorProfileAdminTests(PublicPagesTestCase):
 
 
 class AboutPageTests(PublicPagesTestCase):
-    """"Об авторе" (/about/, /en/about/): the author hero on top, then the author's
+    """"Обо мне" (/about/, /en/about/): the author hero on top, then the author's
     bio from the template (no second photo), and the links to it from every page."""
 
     KEY_PHRASES = [
@@ -777,11 +777,11 @@ class AboutPageTests(PublicPagesTestCase):
 
     def test_title_meta_and_heading_translated(self):
         ru, en = self.get('/about/'), self.get('/en/about/')
-        self.assertIn('<title>Об авторе — УЧЁБУС</title>', ru)
-        self.assertIn('<title>About the author — UCHEBUS</title>', en)
+        self.assertIn('<title>Обо мне — УЧЁБУС</title>', ru)
+        self.assertIn('<title>About me — UCHEBUS</title>', en)
         # An h2: the hero above holds the page's only h1.
-        self.assertIn('class="about__title">Об авторе</h2>', ru)
-        self.assertIn('class="about__title">About the author</h2>', en)
+        self.assertIn('class="about__title">Обо мне</h2>', ru)
+        self.assertIn('class="about__title">About me</h2>', en)
         for html in [ru, en]:
             self.assertEqual(html.count('<h1'), 1)
             self.assertIn('<h1 id="hero-title"', html)
@@ -814,14 +814,14 @@ class AboutPageTests(PublicPagesTestCase):
 
     def test_nav_link_on_every_public_page(self):
         course = self.make_course('Course')
-        for url, href, label in [('/', '/about/', 'Об авторе'),
-                                 (f'/course/{course.slug}/', '/about/', 'Об авторе'),
-                                 ('/en/', '/en/about/', 'About the author')]:
+        for url, href, label in [('/', '/about/', 'Обо мне'),
+                                 (f'/course/{course.slug}/', '/about/', 'Обо мне'),
+                                 ('/en/', '/en/about/', 'About me')]:
             html = self.get(url)
             with self.subTest(url=url):
                 self.assertIn(f'<a class="site-nav__link" href="{href}">{label}</a>', html)
                 self.assertIn('#catalog"', html)  # the other items stay
-        self.assertIn('href="/about/" aria-current="page">Об авторе</a>', self.get('/about/'))
+        self.assertIn('href="/about/" aria-current="page">Обо мне</a>', self.get('/about/'))
 
     def test_landing_no_longer_has_the_author_section(self):
         make_author_profile(stepik_url='https://stepik.org/users/1')
@@ -836,15 +836,15 @@ class AboutPageTests(PublicPagesTestCase):
 
 
 class HeaderNavTests(PublicPagesTestCase):
-    """The header nav (base.html): exactly Курсы · Отзывы · Об авторе, on every
+    """The header nav (base.html): exactly Курсы · Отзывы · Обо мне, on every
     public page, in RU and EN. "Отзывы" is a link only while published reviews
     exist; before that it is plain text, never a link that leads nowhere."""
 
     CASES = [
-        ('/', ['Курсы', 'Отзывы', 'Об авторе'], '/'),
-        ('/about/', ['Курсы', 'Отзывы', 'Об авторе'], '/'),
-        ('/en/', ['Courses', 'Reviews', 'About the author'], '/en/'),
-        ('/en/about/', ['Courses', 'Reviews', 'About the author'], '/en/'),
+        ('/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
+        ('/about/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
+        ('/en/', ['Courses', 'Reviews', 'About me'], '/en/'),
+        ('/en/about/', ['Courses', 'Reviews', 'About me'], '/en/'),
     ]
 
     def nav(self, url):
