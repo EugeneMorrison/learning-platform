@@ -5,8 +5,11 @@ import './LessonProgress.css';
  * X is counted from solvedIds (a Set of block ids), Y is taskIds.length; a
  * lesson without tasks shows nothing. Used in the app header and, in an
  * embedded lesson (no app header), on the page itself.
+ *
+ * All solved: "Решено N из N задач ✅", a green bar, and at the right end
+ * completeAction (the app header's next-lesson link) or "✓ Урок пройден".
  */
-function LessonProgress({ taskIds, solvedIds }) {
+function LessonProgress({ taskIds, solvedIds, completeAction }) {
     const total = taskIds.length;
     if (total === 0) return null;
     const solved = taskIds.filter(id => solvedIds.has(id)).length;
@@ -19,7 +22,10 @@ function LessonProgress({ taskIds, solvedIds }) {
                 <span className="lesson-progress__count">
                     <span className="lesson-progress__verb">Решено </span>{solved} из {total} задач
                 </span>
-                <span className="lesson-progress__percent">{complete ? '✓ Урок пройден' : `${percent}%`}</span>
+                {complete && <span className="lesson-progress__emoji" aria-hidden="true">✅</span>}
+                <span className="lesson-progress__percent">
+                    {complete ? (completeAction || '✓ Урок пройден') : `${percent}%`}
+                </span>
             </div>
             <div
                 className="lesson-progress__track"

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
@@ -6,7 +6,7 @@ import TextBlock from '../components/TextBlock';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
-import LessonsPanel, { ListIcon } from '../components/LessonsPanel';
+import LessonsPanel from '../components/LessonsPanel';
 import ChatPanel, { ChatIcon, CloseIcon } from '../components/ChatPanel';
 import LessonProgress from '../components/LessonProgress';
 import { watchFigureOverflow } from '../lib/contentImages';
@@ -24,6 +24,15 @@ function getLessonIdFromUrl() {
     const idx = parts.indexOf('lesson');
     if (idx !== -1 && parts[idx + 1]) return parts[idx + 1];
     return import.meta.env.DEV ? DEV_LESSON_ID : null;
+}
+
+// Where the lesson leads: the next lesson in the course or, on the last lesson,
+// back to the course (courseCompleted: every task in the course is solved).
+// One rule for the link after the last block and the app header's link.
+function nextStep(lesson) {
+    return lesson.next_lesson_id
+        ? { to: `/lesson/${lesson.next_lesson_id}/`, isNextLesson: true }
+        : { to: `/courses/${lesson.course}/`, isNextLesson: false, courseCompleted: lesson.course_completed };
 }
 
 function LessonViewer() {
@@ -45,7 +54,6 @@ function LessonViewer() {
     const [sendError, setSendError] = useState('');
     const [showLessons, setShowLessons] = useState(false);
     const chatButtonRef = useRef(null);
-    const listButtonRef = useRef(null);
     const codeRefetchSeq = useRef({}); // block id → number of its latest read-back
 
     // The one source of truth for "solved" on this page (is_correct, as in the
@@ -72,6 +80,34 @@ function LessonViewer() {
         loadLesson();
     }, []);
 
+    // Last lesson: course_completed was loaded with the page. When the student
+    // completes this lesson here, re-read the lesson so both "… к курсу" links
+    // (nextStep) show whether the whole course is now done.
+    const lessonComplete = taskIds.length > 0 && taskIds.every(id => solvedBlockIds.has(id));
+    const lessonWasComplete = useRef(null); // null until the page has loaded
+    useEffect(() => {
+        if (loading || !lesson) return;
+        const was = lessonWasComplete.current;
+        lessonWasComplete.current = lessonComplete;
+        if (was === false && lessonComplete && !lesson.next_lesson_id && !lesson.course_completed) {
+            getLesson(lesson.id)
+                .then(res => setLesson(res.data))
+                .catch(err => console.error('Failed to reload the lesson:', err));
+        }
+    }, [loading, lesson, lessonComplete]);
+
+    // The app header's lessons button opens this page's lessons panel.
+    const openLessons = useCallback(() => setShowLessons(true), []);
+
+    // The lesson title in the app header: back to the top of the lesson content,
+    // with the blocks' own scroll offset (.lesson-anchor), so nothing ends up
+    // under the app header.
+    const scrollToContent = useCallback(() => {
+        const first = blocks[0] && document.getElementById(`block-${blocks[0].id}`);
+        if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [blocks]);
+
     // The app header shows the breadcrumb and progress once everything has
     // loaded (not "Решено 0 из N" before the progress arrives); cleared when
     // leaving the page.
@@ -84,9 +120,13 @@ function LessonViewer() {
             lessonTitle: lesson.title,
             taskIds,
             solvedIds: solvedBlockIds,
+            nextStep: nextStep(lesson),
+            lessonsOpen: showLessons,
+            onOpenLessons: openLessons,
+            onTitleClick: scrollToContent,
         });
         return () => setLessonBar(null);
-    }, [loading, error, lesson, taskIds, solvedBlockIds, setLessonBar]);
+    }, [loading, error, lesson, taskIds, solvedBlockIds, showLessons, openLessons, scrollToContent, setLessonBar]);
 
     // Fade at the right edge of formula boxes that scroll sideways (phones).
     useEffect(() => {
@@ -308,10 +348,9 @@ function LessonViewer() {
     }
 
     // Lessons panel: Esc, backdrop, close button or a chosen lesson close it;
-    // focus goes back to the list button.
+    // the app header then puts focus back on its "Список уроков" button.
     function handleCloseLessons() {
         setShowLessons(false);
-        listButtonRef.current?.focus();
     }
 
     // The course's author: edit buttons instead of the student chat.
@@ -344,32 +383,18 @@ function LessonViewer() {
         <>
             <div className="page page--narrow lesson-page">
 
-                {/* The lesson title and progress are in the app header. Here: the
-                    lessons list and, for the author, "✎ Редактировать урок" (site
-                    chrome: not in an embed). */}
-                {!isInIframe && (
+                {/* The lessons button, lesson title and progress are in the app
+                    header. Here, for the author only: "✎ Редактировать урок" (no
+                    row at all for students; never in an embed, see canEdit). */}
+                {canEdit && (
                     <div className="lesson-toolbar">
-                        <button
-                            ref={listButtonRef}
-                            type="button"
-                            className="btn btn-secondary btn-sm lesson-toolbar__list"
-                            onClick={() => setShowLessons(true)}
-                            aria-label="Список уроков"
-                            aria-haspopup="dialog"
-                            aria-expanded={showLessons}
-                            title="Список уроков"
+                        <Link
+                            className="btn btn-secondary btn-sm lesson-toolbar__edit"
+                            to={`/lesson/${lesson.id}/edit/`}
+                            onClick={() => window.scrollTo(0, 0)}
                         >
-                            <ListIcon />
-                        </button>
-                        {canEdit && (
-                            <Link
-                                className="btn btn-secondary btn-sm lesson-toolbar__edit"
-                                to={`/lesson/${lesson.id}/edit/`}
-                                onClick={() => window.scrollTo(0, 0)}
-                            >
-                                ✎ Редактировать урок
-                            </Link>
-                        )}
+                            ✎ Редактировать урок
+                        </Link>
                     </div>
                 )}
 
@@ -397,23 +422,26 @@ function LessonViewer() {
                     lesson, back to the course ("Курс пройден" only once every task in
                     the course is solved). Always shown (no lesson locking); hidden
                     in an embed. */}
-                {!isInIframe && (
-                    <nav className="lesson-nav" aria-label="Навигация по курсу">
-                        {lesson.next_lesson_id ? (
-                            <Link
-                                className="btn btn-secondary btn-sm"
-                                to={`/lesson/${lesson.next_lesson_id}/`}
-                                onClick={() => window.scrollTo(0, 0)}
-                            >
-                                Следующий урок →
-                            </Link>
-                        ) : (
-                            <Link className="btn btn-secondary btn-sm" to={`/courses/${lesson.course}/`}>
-                                {lesson.course_completed ? 'Курс пройден → к курсу' : 'Последний урок → к курсу'}
-                            </Link>
-                        )}
-                    </nav>
-                )}
+                {!isInIframe && (() => {
+                    const step = nextStep(lesson);
+                    return (
+                        <nav className="lesson-nav" aria-label="Навигация по курсу">
+                            {step.isNextLesson ? (
+                                <Link
+                                    className="btn btn-secondary btn-sm"
+                                    to={step.to}
+                                    onClick={() => window.scrollTo(0, 0)}
+                                >
+                                    Следующий урок →
+                                </Link>
+                            ) : (
+                                <Link className="btn btn-secondary btn-sm" to={step.to}>
+                                    {step.courseCompleted ? 'Курс пройден → к курсу' : 'Последний урок → к курсу'}
+                                </Link>
+                            )}
+                        </nav>
+                    );
+                })()}
 
             </div>
 

@@ -95,6 +95,18 @@ function LessonsPanel({ courseId, courseTitle, currentLessonId, onClose }) {
             >
                 <div className="lessons-panel__head">
                     <div className="lessons-panel__heading">
+                        {/* The way back to the course on phones, where the app header
+                            hides the logo and the course crumb. */}
+                        <Link
+                            className="lessons-panel__back"
+                            to={`/courses/${courseId}/`}
+                            onClick={() => {
+                                onClose();
+                                window.scrollTo(0, 0);
+                            }}
+                        >
+                            <span aria-hidden="true">← </span>К курсу
+                        </Link>
                         <h2 id="lessons-panel-title" className="lessons-panel__title">Уроки курса</h2>
                         {courseTitle && <p className="lessons-panel__course">{courseTitle}</p>}
                     </div>

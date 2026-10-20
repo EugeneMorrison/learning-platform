@@ -21,6 +21,12 @@
     text-overflow: ellipsis;
 }
 
+/* ✅ after "Решено N из N задач": never shortened (it stays when the count
+   is hidden on the narrowest app header). */
+.lesson-progress__emoji {
+    flex-shrink: 0;
+}
+
 /* margin-left: stays at the right end even when the count is hidden. */
 .lesson-progress__percent {
     flex: 0 1 auto;

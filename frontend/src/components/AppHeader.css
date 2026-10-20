@@ -43,9 +43,42 @@
     color: var(--color-accent);
 }
 
-/* Lesson page: course › lesson over "Решено X из Y задач" and the bar. Takes
-   the free width between the logo and the badge; long titles end in "…". */
+/* Lesson page: three columns. The middle one is the lesson column below
+   (.page--narrow: --reading-width, centred on the same axis), so the lessons
+   button, breadcrumb and progress line up with the blocks; the logo and the
+   badge sit in the side columns. The bar spans the whole window here (no
+   --container-width cap), so a long username still fits beside the column.
+   When a window is too narrow for the logo and the badge to fit beside a
+   full-width column, the middle shrinks instead. */
+.app-header__inner--lesson {
+    display: grid;
+    grid-template-columns:
+        minmax(max-content, 1fr)
+        minmax(0, var(--reading-width))
+        minmax(max-content, 1fr);
+    max-width: none;
+}
+
+.app-header__inner--lesson .user-badge {
+    justify-self: end;
+}
+
+/* Lessons button, then course › lesson over "Решено X из Y задач" and the
+   bar; long titles end in "…". */
 .app-header__lesson {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+}
+
+/* The round "Список уроков" button: a comfortable tap target. */
+.app-header__lessons-btn {
+    flex-shrink: 0;
+    padding: var(--space-3);
+}
+
+.app-header__lesson-text {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
@@ -76,9 +109,36 @@
     max-width: 45%;
 }
 
+/* The lesson title is a button (back to the top of the lesson) that shortens
+   itself, so this crumb doesn't clip: its focus ring stays whole. */
 .app-header__crumb--lesson {
+    display: flex;
+    overflow: visible;
     color: var(--color-ink);
-    font-weight: var(--weight-bold);
+    font-weight: var(--weight-medium);
+}
+
+.app-header__title-btn {
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.app-header__title-btn:hover {
+    color: var(--color-accent);
+}
+
+.app-header__title-btn:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
 }
 
 .app-header__crumb-link {
@@ -98,9 +158,28 @@
 }
 
 .app-header__crumb-sep {
+    flex-shrink: 0;
     margin: 0 var(--space-2);
     color: var(--color-muted);
     font-weight: var(--weight-regular);
+}
+
+/* All tasks solved: "Следующий урок →" / "… к курсу" at the right end of the
+   progress line, in the completed state's green (5.7:1 on the white bar).
+   Its slot clips overflow, so the focus ring is drawn inside. */
+.app-header__next {
+    color: var(--color-success-on-light);
+    text-decoration: none;
+}
+
+.app-header__next:hover,
+.app-header__next:focus-visible {
+    text-decoration: underline;
+}
+
+.app-header__next:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(var(--focus-ring-width) * -1);
 }
 
 /* Compact progress for the bar: tight lines, slim track. */
@@ -128,11 +207,31 @@
     .app-header__crumb-sep {
         display: none;
     }
+
+    /* Lesson page: no logo, tighter spacing and a smaller lessons button, so
+       the title and progress keep as much of the narrow width as possible
+       (decided: the wordmark left them only a few letters). */
+    .app-header__inner--lesson {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--space-3);
+    }
+
+    .app-header__inner--lesson .app-header__brand {
+        display: none;
+    }
+
+    .app-header__lesson {
+        gap: var(--space-2);
+    }
+
+    .app-header__lessons-btn {
+        padding: var(--space-2);
+    }
 }
 
 /* Narrowest screens (the badge drops the name here too): "10 из 15 задач",
-   and once every task is solved "✓ Урок пройден" alone. The hidden words
-   stay for screen readers (same technique as .visually-hidden). */
+   and once every task is solved only "✅" and the next-lesson link. The hidden
+   words stay for screen readers (same technique as .visually-hidden). */
 @media (max-width: 30rem) {
     .app-header__lesson .lesson-progress__verb,
     .app-header__lesson .lesson-progress--complete .lesson-progress__count {

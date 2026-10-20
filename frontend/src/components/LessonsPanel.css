@@ -77,6 +77,26 @@
     min-width: 0;
 }
 
+/* "← К курсу": above the title, back to the course content page. */
+.lessons-panel__back {
+    display: inline-block;
+    margin-bottom: var(--space-2);
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    text-decoration: none;
+}
+
+.lessons-panel__back:hover {
+    text-decoration: underline;
+    text-underline-offset: var(--space-1);
+}
+
+.lessons-panel__back:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
 .lessons-panel__title {
     margin: 0;
     font-family: var(--font-body);
