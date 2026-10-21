@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
+import { badgeText, conversationLink, formatMessageTime, useNotifications } from '../lib/notifications';
+import '../components/Notifications.css';
 import './DashboardPage.css';
 
 function DashboardPage() {
@@ -49,6 +51,7 @@ function DashboardPage() {
                     <p className="page__lead">Роль: {user.role === 'AUTHOR' ? 'Автор' : 'Студент'}</p>
                 </div>
             </div>
+            {user.role === 'AUTHOR' && <StudentQuestions />}
             {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard user={user} />}
         </div>
     );
@@ -111,6 +114,50 @@ function StudentDashboard({ user }) {
                         </div>
                     ))}
                 </div>
+            )}
+        </section>
+    );
+}
+
+// «Вопросы студентов»: conversations where students wrote to me (the author)
+// and I haven't read it yet. Unread questions («Задать вопрос») first, then
+// plain messages; newest first within each. Live (lib/notifications.js).
+function StudentQuestions() {
+    const notifications = useNotifications();
+    const conversations = (notifications?.conversations || [])
+        .filter(c => !c.other_is_author)
+        .sort((a, b) => (Number(b.has_question) - Number(a.has_question))
+            || String(b.last_message.created_at).localeCompare(String(a.last_message.created_at)));
+
+    return (
+        <section className="section">
+            <div className="section__header">
+                <h2 className="section__title">Вопросы студентов</h2>
+            </div>
+            {conversations.length === 0 ? (
+                <p className="muted">Новых сообщений от студентов нет.</p>
+            ) : (
+                <ul className="inbox-list">
+                    {conversations.map(c => (
+                        <li key={`${c.course_id}:${c.other_user_id}`}>
+                            <Link className="inbox-item" to={conversationLink(c)}>
+                                <span className="inbox-item__main">
+                                    <span className="inbox-item__who">{c.other_user_name} · {c.course_title}</span>
+                                    <span className="inbox-item__preview">
+                                        {c.has_question && <span className="question-chip">Вопрос</span>}
+                                        {c.last_message.preview}
+                                    </span>
+                                    <time className="inbox-item__time" dateTime={c.last_message.created_at}>
+                                        {formatMessageTime(c.last_message.created_at)}
+                                    </time>
+                                </span>
+                                <span className="unread-badge" aria-label={`непрочитанных: ${c.unread_count}`}>
+                                    {badgeText(c.unread_count)}
+                                </span>
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
             )}
         </section>
     );

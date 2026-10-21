@@ -534,10 +534,25 @@ class Message(models.Model):
     text = models.TextField()
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    # «Задать вопрос» (POST /api/questions/): the task the question is about and
+    # a snapshot of it and of the student's work at that moment (api/questions.py).
+    # Plain chat messages have neither.
+    block = models.ForeignKey(
+        Block,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='questions'
+    )
+    context = models.JSONField(null=True, blank=True)
 
     class Meta:
         db_table = 'messages'
         ordering = ['created_at']
+        indexes = [
+            # Unread counts: GET /api/messages/unread/ and POST /api/messages/read/.
+            models.Index(fields=['receiver', 'is_read'], name='messages_receiver_unread_idx'),
+        ]
 
     def __str__(self):
         return f"{self.sender.username} → {self.receiver.username}: {self.text[:50]}"

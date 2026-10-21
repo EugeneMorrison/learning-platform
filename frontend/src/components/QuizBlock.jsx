@@ -26,7 +26,7 @@ function orderOptions(options, shuffle) {
     return order;
 }
 
-function QuizBlock({ content, blockId, savedProgress, number, onSubmitted }) {
+function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk }) {
     // Missing shuffle_options = shuffle. The order is fixed on mount and changes
     // only on «Решить снова», never on a re-render.
     const shuffle = content.shuffle_options !== false;
@@ -101,6 +101,11 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted }) {
             <div className="lesson-block__head">
                 <span className="lesson-block__badge">Тест{number ? ` ${number}` : ''}</span>
                 {isCorrect && <span className="lesson-block__solved">✓ Решено</span>}
+                {onAsk && (
+                    <button type="button" className="lesson-block__ask" onClick={() => onAsk()}>
+                        Задать вопрос
+                    </button>
+                )}
             </div>
 
             {htmlQuestion ? (

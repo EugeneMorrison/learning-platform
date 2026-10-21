@@ -33,7 +33,8 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 
 from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
-from .chat import MAX_MESSAGE_LENGTH, chat_allowed
+from .chat import MAX_MESSAGE_LENGTH, chat_allowed, message_preview, notify_user, push_message
+from .questions import MAX_DRAFT_LENGTH, build_context
 from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
@@ -1274,5 +1275,161 @@ class MessageView(APIView):
             text=text,
         )
 
-        serializer = MessageSerializer(message)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        # Also to the open chat sockets of both users, as if sent over the socket.
+        return Response(push_message(message), status=status.HTTP_201_CREATED)
+
+
+def _question_block(request):
+    """The task block of a «Задать вопрос» request and the CODE editor draft.
+
+    400: block_id missing or not a UUID, not a task block, draft not a string or
+    longer than MAX_DRAFT_LENGTH. 404: no such block. 403: the user is not
+    enrolled in the block's course (the course author included: questions go
+    to the author).
+    """
+    try:
+        block_id = uuid.UUID(str(request.data.get('block_id')))
+    except ValueError:
+        raise ParseError(gettext('Укажите задание: block_id.'))
+    block = Block.objects.select_related('lesson__course').filter(pk=block_id).first()
+    if block is None:
+        raise NotFound(gettext('Задание не найдено.'))
+    if block.type not in TASK_TYPES:
+        raise ParseError(gettext('Вопрос можно задать только по заданию.'))
+    if not Enrollment.objects.filter(course=block.lesson.course, student=request.user).exists():
+        raise PermissionDenied(gettext('Задать вопрос могут только записанные на курс учащиеся.'))
+
+    draft = request.data.get('draft')
+    if draft is not None:
+        if not isinstance(draft, str):
+            raise ParseError(gettext('draft должен быть строкой.'))
+        if len(draft) > MAX_DRAFT_LENGTH:
+            raise ParseError(
+                gettext('Код в редакторе слишком длинный: не больше %(max)d символов.') % {'max': MAX_DRAFT_LENGTH}
+            )
+    return block, draft
+
+
+class QuestionPreviewView(APIView):
+    """
+    POST /api/questions/preview/  Body: {"block_id": "<uuid>", "draft": "<code>"?}
+
+    What «Задать вопрос» would attach (api/questions.py build_context), for
+    the student's preview. Nothing is saved. Errors as POST /api/questions/.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        block, draft = _question_block(request)
+        return Response(build_context(block, request.user, draft))
+
+
+class QuestionView(APIView):
+    """
+    POST /api/questions/  Body: {"block_id": "<uuid>", "text": "...", "draft": "<code>"?}
+
+    «Задать вопрос»: an enrolled student asks the course author about one task.
+    The message goes into their private chat (author ↔ this student only) with
+    `block` and a server-built `context` snapshot (api/questions.py: the task as
+    the student sees it, their latest submission, for CODE the editor draft),
+    and is pushed live to both sides' open chat sockets.
+
+    201: the message (MessageSerializer). 400: empty / too long text, bad
+    block_id or draft. 403: not enrolled. 404: no such block.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        block, draft = _question_block(request)
+        text = request.data.get('text')
+        text = text.strip() if isinstance(text, str) else ''
+        if not text:
+            raise ParseError(gettext('Напишите вопрос.'))
+        if len(text) > MAX_MESSAGE_LENGTH:
+            raise ParseError(
+                gettext('Сообщение слишком длинное: не больше %(max)d символов.') % {'max': MAX_MESSAGE_LENGTH}
+            )
+
+        course = block.lesson.course
+        message = Message.objects.create(
+            sender=request.user,
+            receiver_id=course.author_id,
+            course=course,
+            text=text,
+            block=block,
+            context=build_context(block, request.user, draft),
+        )
+        return Response(push_message(message), status=status.HTTP_201_CREATED)
+
+class UnreadMessagesView(APIView):
+    """
+    GET /api/messages/unread/  ← my unread messages (receiver = me)
+
+    {"total": N, "conversations": [{course_id, course_title, other_user_id,
+    other_user_name (full name, else username), other_is_author (the other
+    user is the course's author: I'm the student), unread_count, has_question
+    (an unread «Задать вопрос» among them), last_message: {id, preview,
+    created_at, is_question}}]}, newest conversation first.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        unread = (Message.objects.filter(receiver=request.user, is_read=False)
+                  .select_related('sender', 'course').order_by('created_at'))
+        groups = {}
+        for message in unread:
+            key = (message.course_id, message.sender_id)
+            group = groups.get(key)
+            if group is None:
+                sender = message.sender
+                group = groups[key] = {
+                    'course_id': str(message.course_id),
+                    'course_title': message.course.title,
+                    'other_user_id': sender.id,
+                    'other_user_name': sender.get_full_name() or sender.username,
+                    'other_is_author': message.course.author_id == sender.id,
+                    'unread_count': 0,
+                    'has_question': False,
+                }
+            is_question = message.context is not None
+            group['unread_count'] += 1
+            group['has_question'] = group['has_question'] or is_question
+            group['last_message'] = {
+                'id': message.id,
+                'preview': message_preview(message.text),
+                'created_at': message.created_at,
+                'is_question': is_question,
+            }
+        # Newest first; the id breaks ties between messages saved in the same instant.
+        conversations = sorted(groups.values(), reverse=True,
+                               key=lambda g: (g['last_message']['created_at'], g['last_message']['id']))
+        return Response({
+            'total': sum(g['unread_count'] for g in conversations),
+            'conversations': conversations,
+        })
+
+
+class MarkReadView(APIView):
+    """
+    POST /api/messages/read/  Body: {"course_id": "<uuid>", "other_user_id": <id>}
+
+    Marks read every message that user sent ME in that course: only my own
+    received messages, nothing else. {"marked": N}; my other tabs get a
+    {"type": "read"} notification. 400: missing / malformed ids.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            course_id = uuid.UUID(str(request.data.get('course_id')))
+            other_user_id = int(request.data.get('other_user_id'))
+        except (TypeError, ValueError):
+            raise ParseError(gettext('Укажите course_id и other_user_id.'))
+        marked = Message.objects.filter(
+            receiver=request.user, sender_id=other_user_id, course_id=course_id, is_read=False,
+        ).update(is_read=True)
+        if marked:
+            notify_user(request.user.id, {
+                'type': 'read', 'course_id': str(course_id), 'other_user_id': other_user_id,
+            })
+        return Response({'marked': marked})

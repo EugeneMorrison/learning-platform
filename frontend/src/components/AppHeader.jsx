@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useMatch } from 'react-router-dom';
 import UserBadge from './UserBadge';
+import NotificationsBell from './NotificationsBell';
 import LessonProgress from './LessonProgress';
 import { ListIcon } from './LessonsPanel';
 import BrandLogo from './BrandLogo';
@@ -132,8 +133,14 @@ function AppHeader() {
                         <a className="app-header__link" href="/#catalog">Курсы</a>
                     </nav>
                 )}
-                {/* Keyed by the token: a new login mounts a fresh badge, which loads the new user. */}
-                {token && <UserBadge key={token} />}
+                {/* Bell (unread messages) and the user. Keyed by the token: a new
+                    login mounts a fresh badge, which loads the new user. */}
+                {token && (
+                    <div className="app-header__end">
+                        <NotificationsBell />
+                        <UserBadge key={token} />
+                    </div>
+                )}
             </div>
         </header>
     );

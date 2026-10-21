@@ -1,0 +1,281 @@
+/* «Задать вопрос»: the student's dialog (QuestionModal), the attachment it
+   previews (QuestionContext) and the card in the chat (QuestionCard).
+   Tokens: backend/static/public/css/tokens.css */
+
+/* ---- The dialog ------------------------------------------------------------ */
+
+/* The page behind doesn't scroll while the dialog is open. */
+.question-modal-open,
+.question-modal-open body {
+    overflow: hidden;
+}
+
+/* Above the sticky header, the floating buttons and the chat. */
+.question-modal-layer {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-badge) + 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+}
+
+.question-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-ink) 50%, transparent);
+}
+
+.question-modal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, var(--reading-width));
+    max-height: calc(100dvh - 2 * var(--space-4));
+    border-radius: var(--radius-card);
+    background: var(--color-ground);
+    box-shadow: var(--shadow-lg);
+}
+
+.question-modal__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-5) var(--space-3);
+    border-bottom: var(--border-width) solid var(--color-line);
+}
+
+.question-modal__title {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+}
+
+.question-modal__where {
+    margin: var(--space-1) 0 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}
+
+.question-modal__close {
+    flex-shrink: 0;
+    padding: var(--space-2);
+}
+
+/* The attachment scrolls; the question and the buttons stay in view. */
+.question-modal__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-5);
+}
+
+.question-modal__hint {
+    margin: 0 0 var(--space-3);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.question-modal__form {
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    border-top: var(--border-width) solid var(--color-line);
+}
+
+.question-modal__label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-weight: var(--weight-bold);
+}
+
+.question-modal__text {
+    width: 100%;
+    resize: vertical;
+    font-family: var(--font-body);
+}
+
+.question-modal__error {
+    margin: var(--space-2) 0 0;
+    color: var(--color-danger);
+    font-size: var(--text-sm);
+}
+
+.question-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+}
+
+@media (max-width: 30rem) {
+    .question-modal-layer {
+        padding: var(--space-2);
+    }
+
+    .question-modal__actions {
+        flex-direction: column-reverse;
+    }
+}
+
+/* ---- The attachment ---------------------------------------------------------- */
+
+.question-context {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.question-context__part {
+    min-width: 0;
+}
+
+.question-context__title,
+.question-context__part > summary {
+    margin: 0 0 var(--space-2);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--color-ink);
+}
+
+.question-context__part > summary {
+    cursor: pointer;
+}
+
+.question-context__part > summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.question-context__body {
+    min-width: 0;
+    font-size: var(--text-sm);
+}
+
+.question-context__body > :last-child {
+    margin-bottom: 0;
+}
+
+.question-context__plain {
+    margin: 0 0 var(--space-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.question-context__label {
+    margin: var(--space-2) 0 var(--space-1);
+    color: var(--color-muted);
+}
+
+.question-context__options,
+.question-context__blanks {
+    margin: var(--space-2) 0;
+    padding-left: var(--space-5);
+}
+
+.question-context__template {
+    margin: var(--space-2) 0;
+    padding: var(--space-2) var(--space-3);
+    overflow-x: auto;
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-soft);
+    font-family: var(--font-code);
+    white-space: pre;
+}
+
+.question-context__choice {
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    overflow-wrap: anywhere;
+}
+
+.question-context__blanks code {
+    font-family: var(--font-code);
+    overflow-wrap: anywhere;
+}
+
+.question-context__muted {
+    margin: 0;
+    color: var(--color-muted);
+}
+
+.question-context__verdict {
+    margin: 0 0 var(--space-2);
+    color: var(--color-danger);
+    font-weight: var(--weight-bold);
+}
+
+.question-context__verdict--ok {
+    color: var(--color-success-on-light);
+}
+
+/* Read-only code in the editor's Darcula colours (pycharmDarcula.js). */
+.question-code {
+    max-height: calc(16 * var(--text-sm) * var(--leading-normal));
+    overflow: auto;
+    border-radius: var(--radius-small);
+    font-size: var(--text-sm);
+}
+
+.question-code + .question-code {
+    margin-top: var(--space-2);
+}
+
+/* ---- The card in the chat ---------------------------------------------------- */
+
+.question-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-left: calc(var(--border-width) * 3) solid var(--color-accent);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    text-align: left;
+}
+
+.question-card p {
+    margin: 0;
+}
+
+.question-card__kicker {
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+.question-card__who {
+    font-weight: var(--weight-bold);
+}
+
+.question-card__where {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}
+
+.question-card__text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.question-card__open {
+    align-self: flex-start;
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+.question-card__open:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}

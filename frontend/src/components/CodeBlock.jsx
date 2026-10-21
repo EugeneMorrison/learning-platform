@@ -8,7 +8,7 @@ import './blocks.css';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
-function CodeBlock({ blockId, content, savedProgress, number, onSubmitted }) {
+function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk }) {
     const wasSolved = savedProgress?.is_correct === true;
     const savedCode = savedProgress?.answer?.code;
 
@@ -138,6 +138,12 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted }) {
             <div className="lesson-block__head">
                 <span className="lesson-block__badge">Задача{number ? ` ${number}` : ''}</span>
                 {isSolved && <span className="lesson-block__solved">✓ Решено</span>}
+                {/* «Задать вопрос»: the editor's code goes along as the draft. */}
+                {onAsk && (
+                    <button type="button" className="lesson-block__ask" onClick={() => onAsk(userCode)}>
+                        Задать вопрос
+                    </button>
+                )}
             </div>
 
             {/* Task prompt */}

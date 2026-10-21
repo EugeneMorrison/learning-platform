@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
 import AppHeader from './components/AppHeader';
+import NotificationsProvider from './components/NotificationsProvider';
 import { LessonBarContext, SetLessonBarContext } from './lib/lessonBar';
 import LessonViewer from './pages/LessonViewer';
 import LoginPage from './pages/LoginPage';
@@ -24,12 +25,15 @@ function LessonBarProvider({ children }) {
     );
 }
 
-// The header on every page, the page below it.
+// The header on every page, the page below it. Unread messages (the bell,
+// chat badges) are loaded once here for the whole app.
 function Layout() {
     return (
         <LessonBarProvider>
-            <AppHeader />
-            <Outlet />
+            <NotificationsProvider>
+                <AppHeader />
+                <Outlet />
+            </NotificationsProvider>
         </LessonBarProvider>
     );
 }

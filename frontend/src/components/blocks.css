@@ -109,6 +109,30 @@
     }
 }
 
+/* «Задать вопрос»: a quiet link in the block's top-right corner (students only). */
+.lesson-block__ask {
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    text-decoration: underline;
+    text-underline-offset: var(--space-1);
+    cursor: pointer;
+}
+
+.lesson-block__ask:hover {
+    text-decoration-thickness: calc(var(--border-width) * 2);
+}
+
+.lesson-block__ask:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
 /* Quiet text button: "↑ Вернуться к теории". */
 .lesson-block__text-btn {
     display: block;

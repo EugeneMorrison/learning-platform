@@ -7,6 +7,7 @@ the code runner (/api/run-code/, /api/run-tests/), and the course chat
 Run with: python manage.py test api
 """
 
+import json
 import subprocess
 from decimal import Decimal
 from unittest import mock
@@ -1926,6 +1927,336 @@ class ChatMessageEndpointTests(APITestCase):
         response = self.client.post('/api/messages/', {
             'course': str(self.course.id), 'receiver': self.author.id, 'text': 'x'}, format='json')
         self.assertEqual(response.status_code, 401)
+
+
+class QuestionTests(APITestCase):
+    """«Задать вопрос» (POST /api/questions/ and /api/questions/preview/):
+    enrolled students only, a server-built context with nothing hidden in it,
+    private to the student and the course author, delivered live."""
+
+    # Planted in every field a student must never see.
+    HIDDEN = ['MARK-SOLUTION', 'MARK-HEADER', 'MARK-FOOTER', 'MARK-HIDDEN-IN', 'MARK-HIDDEN-OUT',
+              'MARK-QUIZ-EXPLANATION', 'MARK-FILL-ANSWER', 'MARK-FILL-EXPLANATION']
+    STARTER = '# Ваш код здесь\n'
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.classmate = User.objects.create_user(username='classmate', password='x', role='STUDENT')
+        cls.outsider = User.objects.create_user(username='outsider', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Python basics', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=cls.course, title='Lists', order_index=1)
+        cls.code = Block.objects.create(lesson=cls.lesson, type='CODE', order_index=1, content={
+            'prompt': '<p>Print 1</p>', 'starter_code': cls.STARTER, 'solution': 'MARK-SOLUTION',
+            'header': 'MARK-HEADER', 'footer': 'MARK-FOOTER',
+            'tests': [{'input': '', 'expected': '1'}, {'input': '', 'expected': '1'},
+                      {'input': 'MARK-HIDDEN-IN', 'expected': 'MARK-HIDDEN-OUT'}]})
+        cls.quiz = Block.objects.create(lesson=cls.lesson, type='QUIZ', order_index=2, content={
+            'question': 'Which?', 'options': ['a', 'b', 'c'], 'correct_answer': 2,
+            'explanation': 'MARK-QUIZ-EXPLANATION'})
+        cls.fill = Block.objects.create(lesson=cls.lesson, type='FILL', order_index=3, content={
+            'prompt': 'Fill', 'template': 'x = {{MARK-FILL-ANSWER}}', 'explanation': 'MARK-FILL-EXPLANATION'})
+        cls.text = Block.objects.create(lesson=cls.lesson, type='TEXT', order_index=4, content={'html': '<p>t</p>'})
+        for user in (cls.student, cls.classmate):
+            Enrollment.objects.create(student=user, course=cls.course)
+
+    def ask(self, user, block, text='Почему не проходит тест?', path='/api/questions/', **extra):
+        self.client.force_authenticate(user)
+        return self.client.post(path, {'block_id': str(block.id), 'text': text, **extra}, format='json')
+
+    def test_only_enrolled_students_can_ask(self):
+        self.assertEqual(self.ask(self.outsider, self.code).status_code, 403)
+        self.assertEqual(self.ask(self.author, self.code).status_code, 403)  # questions go to the author
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post('/api/questions/', {'block_id': str(self.code.id), 'text': 'q'},
+                                          format='json').status_code, 401)
+        self.assertEqual(self.ask(self.outsider, self.code, path='/api/questions/preview/').status_code, 403)
+        self.assertFalse(Message.objects.exists())
+
+    def test_empty_or_whitespace_text_is_rejected(self):
+        for text in ['', '   \n\t ', None]:
+            with self.subTest(text=text):
+                self.assertEqual(self.ask(self.student, self.code, text=text).status_code, 400)
+        self.assertEqual(self.ask(self.student, self.code, text='x' * (MAX_MESSAGE_LENGTH + 1)).status_code, 400)
+        self.assertFalse(Message.objects.exists())
+
+    def test_only_existing_task_blocks(self):
+        self.assertEqual(self.ask(self.student, self.text).status_code, 400)
+        self.client.force_authenticate(self.student)
+        for block_id, code in [('not-a-uuid', 400), ('00000000-0000-0000-0000-000000000000', 404)]:
+            response = self.client.post('/api/questions/', {'block_id': block_id, 'text': 'q'}, format='json')
+            self.assertEqual(response.status_code, code)
+
+    def test_context_is_the_students_view_and_latest_submission(self):
+        Attempt.objects.create(student=self.student, block=self.code, answer={'code': 'print(0)'}, is_correct=False)
+        Attempt.objects.create(student=self.student, block=self.code, answer={'code': 'print(2)'}, is_correct=False)
+        self.client.force_authenticate(self.student)
+        self.client.post('/api/progress/submit/', {'block': str(self.quiz.id), 'answer': {'selected': 1}}, format='json')
+        self.client.post('/api/progress/submit/', {'block': str(self.fill.id), 'answer': {'blanks': ['y']}}, format='json')
+
+        code = self.ask(self.student, self.code, draft='print(3)').data['context']
+        quiz = self.ask(self.student, self.quiz).data['context']
+        fill = self.ask(self.student, self.fill).data['context']
+        preview = self.ask(self.student, self.code, path='/api/questions/preview/', draft='print(3)').data
+
+        for context in (code, quiz, fill, preview):
+            body = json.dumps(context, ensure_ascii=False)
+            for marker in self.HIDDEN + ['correct_answer', 'explanation', 'solution']:
+                self.assertNotIn(marker, body)
+        self.assertEqual(code['course'], {'id': str(self.course.id), 'title': 'Python basics'})
+        self.assertEqual(code['lesson'], {'id': str(self.lesson.id), 'title': 'Lists'})
+        self.assertEqual(code['task'], {'prompt': '<p>Print 1</p>', 'starter_code': self.STARTER})
+        self.assertEqual((code['submission']['code'], code['submission']['language']), ('print(2)', 'Python'))
+        self.assertEqual(code['draft'], {'code': 'print(3)', 'language': 'Python'})
+        self.assertEqual(preview, code)
+        self.assertEqual(quiz['task'], {'question': 'Which?', 'options': ['a', 'b', 'c']})
+        self.assertEqual(quiz['submission']['option'], 'b')  # the text, not the index
+        self.assertNotIn('selected', quiz['submission'])
+        self.assertEqual((fill['task']['template'], fill['submission']['blanks']), ('x = {{}}', ['y']))
+        self.assertNotIn('draft', quiz)
+
+    def test_no_submission_is_null(self):
+        self.assertIsNone(self.ask(self.student, self.quiz).data['context']['submission'])
+
+    def test_draft_cap(self):
+        for path in ('/api/questions/', '/api/questions/preview/'):
+            with self.subTest(path=path):
+                self.assertEqual(self.ask(self.student, self.code, path=path, draft='x' * 20001).status_code, 400)
+                self.assertEqual(self.ask(self.student, self.code, path=path, draft=['x']).status_code, 400)
+        response = self.ask(self.student, self.code, draft='x' * 20000)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.data['context']['draft']['code']), 20000)
+        self.assertEqual(Message.objects.count(), 1)
+
+    def test_draft_left_out_when_unchanged(self):
+        self.assertNotIn('draft', self.ask(self.student, self.code, draft=self.STARTER).data['context'])
+        Attempt.objects.create(student=self.student, block=self.code, answer={'code': 'print(1)'}, is_correct=True)
+        self.assertNotIn('draft', self.ask(self.student, self.code, draft='print(1)\n').data['context'])
+
+    def test_question_is_private_to_the_student_and_the_author(self):
+        message = self.ask(self.student, self.quiz).data
+        self.assertEqual((message['receiver'], message['block']), (self.author.id, str(self.quiz.id)))
+
+        def visible_to(user):
+            self.client.force_authenticate(user)
+            return [m['id'] for m in self.client.get(f'/api/messages/?course={self.course.id}').data]
+
+        self.assertIn(message['id'], visible_to(self.student))
+        self.assertIn(message['id'], visible_to(self.author))
+        self.assertNotIn(message['id'], visible_to(self.classmate))
+        self.assertEqual(message['sender_name'], 'student')  # no full name: the username
+
+    def test_sender_name_is_the_full_name_when_set(self):
+        self.student.first_name, self.student.last_name = 'Анна', 'Петрова'
+        self.student.save()
+        self.assertEqual(self.ask(self.student, self.quiz).data['sender_name'], 'Анна Петрова')
+
+    def test_question_and_rest_messages_are_pushed_live(self):
+        from channels.layers import get_channel_layer
+        from .chat import chat_group
+
+        layer = get_channel_layer()
+        channel = async_to_sync(layer.new_channel)()
+        group = chat_group(self.course.id, self.student.id, self.author.id)
+        async_to_sync(layer.group_add)(group, channel)
+        try:
+            self.ask(self.student, self.code)
+            frame = async_to_sync(layer.receive)(channel)
+            self.assertEqual(frame['type'], 'chat.message')
+            self.assertEqual(frame['message']['context']['block']['type'], 'CODE')
+            json.dumps(frame['message'])  # the consumer sends it as JSON: must not raise
+
+            self.client.force_authenticate(self.author)
+            self.client.post('/api/messages/', {'course': str(self.course.id), 'receiver': self.student.id,
+                                                'text': 'Посмотрите на отступы'}, format='json')
+            self.assertEqual(async_to_sync(layer.receive)(channel)['message']['text'], 'Посмотрите на отступы')
+        finally:
+            async_to_sync(layer.group_discard)(group, channel)
+
+
+class UnreadMessagesTests(APITestCase):
+    """GET /api/messages/unread/, POST /api/messages/read/ and the receiver's
+    user-group notification (ws/notifications/)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.anna = User.objects.create_user(username='anna', password='x', role='STUDENT',
+                                            first_name='Анна', last_name='Петрова')
+        cls.boris = User.objects.create_user(username='boris', password='x', role='STUDENT')
+        cls.python = Course.objects.create(title='Python', author=cls.author, is_published=True)
+        cls.sql = Course.objects.create(title='SQL', author=cls.author, is_published=True)
+        cls.lesson = Lesson.objects.create(course=cls.python, title='L', order_index=1)
+        cls.quiz = Block.objects.create(lesson=cls.lesson, type='QUIZ', order_index=1,
+                                        content={'question': 'q', 'options': ['a', 'b'], 'correct_answer': 0})
+        for student, course in [(cls.anna, cls.python), (cls.boris, cls.python), (cls.anna, cls.sql)]:
+            Enrollment.objects.create(student=student, course=course)
+
+    def message(self, sender, receiver, course, text='hi', context=None, is_read=False):
+        return Message.objects.create(sender=sender, receiver=receiver, course=course, text=text,
+                                      context=context, is_read=is_read)
+
+    def get_unread(self, user):
+        self.client.force_authenticate(user)
+        return self.client.get('/api/messages/unread/').data
+
+    def mark_read(self, user, course, other):
+        self.client.force_authenticate(user)
+        return self.client.post('/api/messages/read/', {'course_id': str(course.id), 'other_user_id': other.id},
+                                format='json')
+
+    def test_counts_and_grouping(self):
+        self.message(self.anna, self.author, self.python, 'first')
+        self.message(self.anna, self.author, self.python, 'Почему NameError?', context={'block': {'type': 'QUIZ'}})
+        self.message(self.boris, self.author, self.python)
+        self.message(self.anna, self.author, self.sql)
+        self.message(self.anna, self.author, self.python, 'old', is_read=True)   # read: not counted
+        self.message(self.author, self.anna, self.python, 'reply')               # to anna, not me
+
+        data = self.get_unread(self.author)
+        self.assertEqual(data['total'], 4)
+        groups = {(g['course_title'], g['other_user_name']): g for g in data['conversations']}
+        self.assertEqual(set(groups), {('Python', 'Анна Петрова'), ('Python', 'boris'), ('SQL', 'Анна Петрова')})
+        anna = groups[('Python', 'Анна Петрова')]
+        self.assertEqual((anna['unread_count'], anna['has_question'], anna['other_is_author']), (2, True, False))
+        self.assertEqual(anna['last_message']['preview'], 'Почему NameError?')
+        self.assertTrue(anna['last_message']['is_question'])
+        self.assertFalse(groups[('Python', 'boris')]['has_question'])
+        # Newest conversation first.
+        self.assertEqual(data['conversations'][0]['course_title'], 'SQL')
+
+        anna_side = self.get_unread(self.anna)
+        self.assertEqual(anna_side['total'], 1)
+        self.assertTrue(anna_side['conversations'][0]['other_is_author'])
+
+    def test_preview_is_one_short_line(self):
+        self.message(self.anna, self.author, self.python, 'line one\n\n' + 'x' * 200)
+        preview = self.get_unread(self.author)['conversations'][0]['last_message']['preview']
+        self.assertLessEqual(len(preview), 80)
+        self.assertTrue(preview.startswith('line one x') and preview.endswith('…'))
+
+    def test_read_marks_only_that_conversation(self):
+        mine = [self.message(self.anna, self.author, self.python) for _ in range(2)]
+        other_student = self.message(self.boris, self.author, self.python)
+        other_course = self.message(self.anna, self.author, self.sql)
+        to_anna = self.message(self.author, self.anna, self.python)
+
+        self.assertEqual(self.mark_read(self.author, self.python, self.anna).data, {'marked': 2})
+        unread = set(Message.objects.filter(is_read=False).values_list('id', flat=True))
+        self.assertFalse({m.id for m in mine} & unread)
+        self.assertEqual(unread, {other_student.id, other_course.id, to_anna.id})
+        self.assertEqual(self.get_unread(self.author)['total'], 2)
+
+    def test_cannot_mark_other_peoples_messages(self):
+        to_author = self.message(self.anna, self.author, self.python)
+        # Boris names Anna's conversation with the author: none of it is his.
+        self.assertEqual(self.mark_read(self.boris, self.python, self.anna).data, {'marked': 0})
+        # The sender can't mark her own sent message read for the receiver.
+        self.assertEqual(self.mark_read(self.anna, self.python, self.author).data, {'marked': 0})
+        to_author.refresh_from_db()
+        self.assertFalse(to_author.is_read)
+
+    def test_read_input_is_validated(self):
+        self.client.force_authenticate(self.author)
+        for body in [{}, {'course_id': 'x', 'other_user_id': 1}, {'course_id': str(self.python.id), 'other_user_id': 'x'}]:
+            with self.subTest(body=body):
+                self.assertEqual(self.client.post('/api/messages/read/', body, format='json').status_code, 400)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get('/api/messages/unread/').status_code, 401)
+
+    def test_receiver_user_group_is_notified(self):
+        from channels.layers import get_channel_layer
+        from .chat import user_group
+
+        layer = get_channel_layer()
+        channel = async_to_sync(layer.new_channel)()
+        async_to_sync(layer.group_add)(user_group(self.author.id), channel)
+        try:
+            self.client.force_authenticate(self.anna)
+            self.client.post('/api/messages/', {'course': str(self.python.id), 'receiver': self.author.id,
+                                                'text': 'Здравствуйте!\nУ меня вопрос'}, format='json')
+            event = async_to_sync(layer.receive)(channel)['event']
+            self.assertEqual(
+                (event['type'], event['course_id'], event['sender_id'], event['sender_name'], event['is_question'],
+                 event['preview']),
+                ('new_message', str(self.python.id), self.anna.id, 'Анна Петрова', False, 'Здравствуйте! У меня вопрос'))
+            json.dumps(event)
+
+            self.client.post('/api/questions/', {'block_id': str(self.quiz.id), 'text': 'Почему?'}, format='json')
+            self.assertTrue(async_to_sync(layer.receive)(channel)['event']['is_question'])
+
+            # Marking read tells my other tabs.
+            self.mark_read(self.author, self.python, self.anna)
+            self.assertEqual(async_to_sync(layer.receive)(channel)['event'],
+                             {'type': 'read', 'course_id': str(self.python.id), 'other_user_id': self.anna.id})
+        finally:
+            async_to_sync(layer.group_discard)(user_group(self.author.id), channel)
+
+    def test_migration_marks_only_answered_messages_read(self):
+        import importlib
+        from datetime import timedelta
+        from django.apps import apps
+        from django.utils import timezone
+
+        migration = importlib.import_module('api.migrations.0013_message_unread')
+        now = timezone.now()
+
+        def at(minutes, *args):
+            m = self.message(*args)
+            Message.objects.filter(pk=m.pk).update(created_at=now + timedelta(minutes=minutes))
+            return m.pk
+
+        # Python: Anna (0) → author replies (5, 6) → Anna again (10).
+        anna_first = at(0, self.anna, self.author, self.python)     # author wrote after it: read
+        author_5 = at(5, self.author, self.anna, self.python)       # Anna wrote after it (10): read
+        author_6 = at(6, self.author, self.anna, self.python)       # likewise: read
+        anna_last = at(10, self.anna, self.author, self.python)     # no reply after it: unread
+        # SQL: the author's replies were in the Python course, not this one.
+        sql_question = at(1, self.anna, self.author, self.sql)      # unread
+        migration.mark_replied_read(apps, None)
+
+        read = set(Message.objects.filter(is_read=True).values_list('pk', flat=True))
+        self.assertEqual(read, {anna_first, author_5, author_6})
+        self.assertFalse({anna_last, sql_question} & read)
+
+
+class NotificationConsumerTests(TransactionTestCase):
+    """ws/notifications/: logged-in users only; gets the user-group events,
+    including for a message sent over the chat WebSocket."""
+
+    def setUp(self):
+        self.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        self.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        self.course = Course.objects.create(title='Course', author=self.author, is_published=True)
+        Enrollment.objects.create(student=self.student, course=self.course)
+
+    def socket(self, path, user):
+        from backend.asgi import application
+        from rest_framework_simplejwt.tokens import AccessToken
+        token = str(AccessToken.for_user(user)) if user else 'bad'
+        return WebsocketCommunicator(application, f'{path}?token={token}')
+
+    def test_not_logged_in_is_closed_with_4001(self):
+        async def run():
+            ws = self.socket('/ws/notifications/', None)
+            self.assertTrue((await ws.connect())[0])
+            self.assertEqual(await ws.receive_output(), {'type': 'websocket.close', 'code': 4001})
+        async_to_sync(run)()
+
+    def test_chat_socket_message_notifies_the_receiver(self):
+        async def run():
+            bell = self.socket('/ws/notifications/', self.author)
+            chat = self.socket(f'/ws/chat/{self.course.id}/{self.author.id}/', self.student)
+            self.assertTrue((await bell.connect())[0])
+            self.assertTrue((await chat.connect())[0])
+            await chat.send_json_to({'text': 'Здравствуйте!'})
+            event = await bell.receive_json_from()
+            self.assertEqual((event['type'], event['sender_id'], event['preview'], event['is_question']),
+                             ('new_message', self.student.id, 'Здравствуйте!', False))
+            await chat.disconnect()
+            await bell.disconnect()
+        async_to_sync(run)()
 
 
 class ChatConsumerTests(TransactionTestCase):

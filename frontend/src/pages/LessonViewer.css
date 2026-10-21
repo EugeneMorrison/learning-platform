@@ -58,6 +58,27 @@
     scroll-margin-top: calc(var(--space-9) + var(--space-2));
 }
 
+/* Reached by a #block-<id> link («Открыть задание» on a question card, back
+   from the editor): a cobalt ring around the block that fades out. */
+.lesson-anchor--flash > .lesson-block {
+    outline: calc(var(--focus-ring-width) * 2) solid transparent;
+    outline-offset: var(--focus-ring-offset);
+    animation: lesson-anchor-flash 2s ease-out;
+}
+
+@keyframes lesson-anchor-flash {
+    0%, 50% { outline-color: var(--color-accent); }
+    100% { outline-color: transparent; }
+}
+
+/* Reduced motion: the ring shows while it lasts, without fading. */
+@media (prefers-reduced-motion: reduce) {
+    .lesson-anchor--flash > .lesson-block {
+        outline-color: var(--color-accent);
+        animation: none;
+    }
+}
+
 /* Course author only: "✎ Изменить" just above the block's top-right corner,
    in its own row, so it never covers the block's badge, text or buttons. */
 .lesson-anchor__tools {

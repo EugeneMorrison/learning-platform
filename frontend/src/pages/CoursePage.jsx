@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import ChatPanel from '../components/ChatPanel';
 import EditableTitle from '../components/EditableTitle';
+import StudentChat from '../components/StudentChat';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
+import { badgeText, useActiveChat, useNotifications } from '../lib/notifications';
+import '../components/Notifications.css';
 import './CoursePage.css';
 
 function CoursePage() {
@@ -13,6 +16,8 @@ function CoursePage() {
     const [course, setCourse] = useState(null);
     const [lessons, setLessons] = useState([]);
     const [enrollments, setEnrollments] = useState([]);
+    // A student enrolled in this course (not the owner): the floating chat with the author.
+    const [isEnrolled, setIsEnrolled] = useState(false);
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -63,6 +68,9 @@ function CoursePage() {
                 if (courseRes.data.author === userRes.data.id) {
                     const enrollmentsRes = await api.get(`/courses/${courseId}/enrollments/`);
                     setEnrollments(enrollmentsRes.data);
+                } else {
+                    const mine = await api.get('/enrollments/');
+                    setIsEnrolled(mine.data.some(e => String(e.course) === String(courseId)));
                 }
             } catch (err) {
                 console.error('Failed to load course:', err);
@@ -240,6 +248,32 @@ function CoursePage() {
     }
 
 
+    // Unread counts per student; the open student chat counts as read.
+    const notifications = useNotifications();
+    useActiveChat(courseId, selectedStudent?.id, Boolean(selectedStudent));
+
+    // Deep link from the bell / the dashboard: ?chat=<student id> opens that
+    // student's chat (owner; ignored for a student not enrolled here), ?chat=1
+    // the student's own chat with the author. The parameter goes once used.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const studentChatRef = useRef(null);
+    const chatParam = searchParams.get('chat');
+    useEffect(() => {
+        if (loading || !course || chatParam === null) return;
+        if (user && course.author === user.id) {
+            const enrollment = enrollments.find(e => String(e.student) === chatParam);
+            if (enrollment) openChat({ id: enrollment.student, name: enrollment.student_name });
+        } else if (chatParam === '1') {
+            studentChatRef.current?.open();
+        }
+        setSearchParams(params => {
+            params.delete('chat');
+            return params;
+        }, { replace: true });
+        // openChat only sets state; it changes every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, course, user, enrollments, chatParam, setSearchParams]);
+
     if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
     if (!course) return <div className="page"><p className="page-status">Курс не найден.</p></div>;
 
@@ -415,6 +449,14 @@ function CoursePage() {
                                                 : openChat({ id: enrollment.student, name: enrollment.student_name }))}
                                         >
                                             Чат
+                                            {(() => {
+                                                const unread = notifications?.unreadFor(courseId, enrollment.student) || 0;
+                                                return unread > 0 && selectedStudent?.id !== enrollment.student && (
+                                                    <span className="unread-badge" aria-label={`непрочитанных: ${unread}`}>
+                                                        {badgeText(unread)}
+                                                    </span>
+                                                );
+                                            })()}
                                         </button>
                                     </div>
                                 </div>
@@ -446,6 +488,16 @@ function CoursePage() {
                 </section>
             )}
             </div>
+
+            {/* An enrolled student: the chat with the author (as on the lesson page). */}
+            {!isOwner && isEnrolled && (
+                <StudentChat
+                    ref={studentChatRef}
+                    course={course}
+                    id="course-chat"
+                    emptyHint="Задайте вопрос по курсу — учитель ответит здесь."
+                />
+            )}
         </div>
     );
 }

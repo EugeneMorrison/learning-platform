@@ -22,7 +22,7 @@ import json
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-from .chat import MAX_MESSAGE_LENGTH, chat_allowed
+from .chat import MAX_MESSAGE_LENGTH, chat_allowed, chat_group, new_message_event, user_group
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -44,8 +44,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self._refuse(4003)
             return
 
-        a, b = sorted([self.user_id, self.other_user_id])
-        self.group_name = f'chat_{self.course_id}_{a}_{b}'
+        self.group_name = chat_group(self.course_id, self.user_id, self.other_user_id)
 
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
@@ -88,6 +87,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.group_name,
             {'type': 'chat.message', 'message': message},
         )
+        # The receiver's bell and unread counts (NotificationConsumer).
+        await self.channel_layer.group_send(
+            user_group(self.other_user_id),
+            {'type': 'notify', 'event': new_message_event(message)},
+        )
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps(event['message']))
@@ -109,3 +113,32 @@ class ChatConsumer(AsyncWebsocketConsumer):
             text=text,
         )
         return MessageSerializer(msg).data
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    """
+    A user's own notification socket: ws/notifications/?token=<jwt>.
+
+    Joins group user_<id> (chat.user_group); the server sends {"type": ...}
+    events there: new_message (chat.new_message_event) when someone writes to
+    this user, read when this user marked a conversation read (other tabs).
+    Close code 4001 when not logged in, as for the chat. Nothing is received.
+    """
+
+    async def connect(self):
+        user = self.scope.get('user')
+        if user is None or not user.is_authenticated:
+            # Accept, then close: a browser only sees the code that way.
+            await self.accept()
+            await self.close(code=4001)
+            return
+        self.group_name = user_group(user.id)
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def notify(self, event):
+        await self.send(text_data=json.dumps(event['event']))

@@ -1,0 +1,227 @@
+/* Unread messages: the bell and its menu (NotificationsBell), the badges on
+   chat buttons, «Вопросы студентов» on the author's dashboard.
+   Tokens: backend/static/public/css/tokens.css */
+
+/* Count badge: white on --color-danger (6.6:1). */
+.unread-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: calc(var(--space-4) + var(--space-1));
+    height: calc(var(--space-4) + var(--space-1));
+    padding: 0 var(--space-1);
+    border-radius: var(--radius-pill);
+    background: var(--color-danger);
+    color: var(--color-ground);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    line-height: 1;
+}
+
+/* «Вопрос»: a message sent with «Задать вопрос». */
+.question-chip {
+    display: inline-block;
+    margin-right: var(--space-2);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--color-soft);
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+/* ---- The bell ---------------------------------------------------------------- */
+
+/* Not positioned: the menu hangs from the header's right end (.app-header__end,
+   bell + user badge), so on a phone it stays inside the screen. */
+.notify-bell {
+    flex-shrink: 0;
+}
+
+.notify-bell__button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--space-6) + var(--space-2));
+    height: calc(var(--space-6) + var(--space-2));
+    padding: 0;
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    cursor: pointer;
+}
+
+.notify-bell__button:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+.notify-bell__button:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.notify-bell__icon {
+    width: var(--space-5);
+    height: var(--space-5);
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.notify-bell__badge {
+    position: absolute;
+    top: calc(var(--space-1) * -1);
+    right: calc(var(--space-1) * -1);
+}
+
+.notify-menu {
+    position: absolute;
+    top: calc(100% + var(--space-2));
+    right: 0;
+    z-index: var(--z-badge);
+    width: min(calc(var(--panel-width) - var(--space-5)), calc(100vw - 2 * var(--space-4)));
+    max-height: min(70vh, calc(var(--space-9) * 4));
+    overflow-y: auto;
+    padding: var(--space-2);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    box-shadow: var(--shadow-md);
+}
+
+.notify-menu__title {
+    margin: var(--space-1) var(--space-2) var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+.notify-menu__empty {
+    margin: var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.notify-menu__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.notify-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-small);
+    color: var(--color-ink);
+    text-decoration: none;
+}
+
+.notify-item:hover {
+    background: var(--color-soft);
+}
+
+.notify-item:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(var(--focus-ring-width) * -1);
+}
+
+.notify-item__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.notify-item__who {
+    min-width: 0;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    overflow-wrap: anywhere;
+}
+
+.notify-item__preview {
+    color: var(--color-ink);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}
+
+.notify-item__time {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* ---- Unread count on chat buttons ----------------------------------------------- */
+
+/* The floating chat button (StudentChat): top-right corner. */
+.chat-fab .unread-badge {
+    position: absolute;
+    top: calc(var(--space-1) * -1);
+    right: calc(var(--space-1) * -1);
+    box-shadow: 0 0 0 calc(var(--border-width) * 2) var(--color-ground);
+}
+
+/* «Чат» next to a student on the course page. */
+.btn .unread-badge {
+    margin-left: var(--space-1);
+}
+
+/* ---- «Вопросы студентов» (author dashboard) --------------------------------------- */
+
+.inbox-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.inbox-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    text-decoration: none;
+}
+
+.inbox-item:hover {
+    border-color: var(--color-accent);
+}
+
+.inbox-item:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+.inbox-item__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+}
+
+.inbox-item__who {
+    font-weight: var(--weight-bold);
+    overflow-wrap: anywhere;
+}
+
+.inbox-item__preview,
+.inbox-item__time {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}

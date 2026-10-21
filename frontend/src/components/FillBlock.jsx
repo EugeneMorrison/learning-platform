@@ -22,7 +22,7 @@ function toResult(isCorrect, feedback) {
     };
 }
 
-function FillBlock({ content, blockId, savedProgress, number, onSubmitted }) {
+function FillBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk }) {
     const segments = parseTemplate(content.template);
     const blanks = segments.filter(s => s.type === 'blank');
 
@@ -80,6 +80,11 @@ function FillBlock({ content, blockId, savedProgress, number, onSubmitted }) {
             <div className="lesson-block__head">
                 <span className="lesson-block__badge">Пропуски{number ? ` ${number}` : ''}</span>
                 {isCorrect && <span className="lesson-block__solved">✓ Решено</span>}
+                {onAsk && (
+                    <button type="button" className="lesson-block__ask" onClick={() => onAsk()}>
+                        Задать вопрос
+                    </button>
+                )}
             </div>
 
             {content.prompt && (

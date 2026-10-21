@@ -477,7 +477,12 @@ class LessonDetailSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source='sender.username', read_only=True)
+    # Full name when the user has one, else the username (question cards).
+    sender_name = serializers.SerializerMethodField()
     receiver_username = serializers.CharField(source='receiver.username', read_only=True)
+
+    def get_sender_name(self, obj):
+        return obj.sender.get_full_name() or obj.sender.username
 
     class Meta:
         model = Message
@@ -485,11 +490,14 @@ class MessageSerializer(serializers.ModelSerializer):
             'id',
             'sender',
             'sender_username',
+            'sender_name',
             'receiver',
             'receiver_username',
             'course',
             'text',
             'is_read',
             'created_at',
+            'block',    # «Задать вопрос» only (else null): the task asked about
+            'context',  # its snapshot (api/questions.py)
         ]
-        read_only_fields = ['id', 'created_at', 'sender']
+        read_only_fields = ['id', 'created_at', 'sender', 'block', 'context']

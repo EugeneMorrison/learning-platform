@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { MAX_MESSAGE_LENGTH, messageLength } from '../lib/chatSocket';
+import QuestionCard from './QuestionCard';
 import './ChatPanel.css';
 
 // Presentational chat window shared by the lesson page (floating, student →
@@ -208,7 +209,9 @@ function ChatPanel({
                                             </time>
                                         )}
                                     </p>
-                                    <p className="chat-message__text">{msg.text}</p>
+                                    {msg.context
+                                        ? <QuestionCard message={msg} own={own} />
+                                        : <p className="chat-message__text">{msg.text}</p>}
                                 </li>
                             );
                         })}

@@ -7,11 +7,11 @@ import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
 import LessonsPanel from '../components/LessonsPanel';
-import ChatPanel, { ChatIcon, CloseIcon } from '../components/ChatPanel';
+import StudentChat from '../components/StudentChat';
+import QuestionModal from '../components/QuestionModal';
 import LessonProgress from '../components/LessonProgress';
 import { watchFigureOverflow } from '../lib/contentImages';
 import { useSetLessonBar } from '../lib/lessonBar';
-import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
 import './LessonViewer.css';
 
 // Block types that are solvable tasks (have a pass/fail, count toward progress).
@@ -46,14 +46,10 @@ function LessonViewer() {
     const [progress, setProgress] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [showChat, setShowChat] = useState(false);
-    const [messages, setMessages] = useState([]);
-    const [newMessage, setNewMessage] = useState('');
-    const [sendingMessage, setSendingMessage] = useState(false);
-    const [historyError, setHistoryError] = useState(false);
-    const [sendError, setSendError] = useState('');
     const [showLessons, setShowLessons] = useState(false);
-    const chatButtonRef = useRef(null);
+    // «Задать вопрос» open for this task: { blockId, draft? } (draft: CODE editor code).
+    const [question, setQuestion] = useState(null);
+    const chatRef = useRef(null); // StudentChat: open(message?)
     const codeRefetchSeq = useRef({}); // block id → number of its latest read-back
 
     // The one source of truth for "solved" on this page (is_correct, as in the
@@ -134,12 +130,20 @@ function LessonViewer() {
         return watchFigureOverflow(document.querySelector('.lesson-page'));
     }, [loading, blocks]);
 
-    // "#block-<id>" (e.g. back from the editor): the browser's own hash scroll
-    // fires before the blocks have loaded, so scroll once they are on the page.
+    // "#block-<id>" (back from the editor, «Открыть задание» on a question in
+    // the chat): the browser's own hash scroll fires before the blocks have
+    // loaded, so scroll once they are on the page, then briefly highlight it.
     useEffect(() => {
-        if (loading || !hash.startsWith('#block-')) return;
+        if (loading || !hash.startsWith('#block-')) return undefined;
         const el = document.getElementById(hash.slice(1));
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (!el) return undefined;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('lesson-anchor--flash');
+        const timer = setTimeout(() => el.classList.remove('lesson-anchor--flash'), 2000);
+        return () => {
+            clearTimeout(timer);
+            el.classList.remove('lesson-anchor--flash');
+        };
     }, [loading, hash]);
 
     async function loadLesson() {
@@ -198,62 +202,11 @@ function LessonViewer() {
         }
     }
 
-    async function fetchMessages() {
-        if (!course) return;
-        try {
-            const res = await api.get(`/messages/?course=${course.id}`);
-            // Merge: messages that arrived live while this loaded stay.
-            setMessages(prev => mergeMessages(prev, res.data));
-            setHistoryError(false);
-        } catch (err) {
-            console.error('Failed to load messages:', err);
-            setHistoryError(true);
-        }
-    }
-
-    // Socket while the window is open (reconnects by itself after a drop).
-    const { status: chatStatus, send: sendChat, pending: chatPending } = useChatSocket({
-        courseId: course?.id,
-        otherUserId: course?.author,
-        isOwn: msg => msg.sender !== course?.author,
-        enabled: showChat,
-        onMessage: msg => setMessages(prev => mergeMessages(prev, [msg])),
-        onRejected: frame => setSendError(frame.error === 'too_long'
-            ? `Сообщение не отправлено: не больше ${frame.max_length} символов.`
-            : 'Сообщение не отправлено.'),
-        // Server saved it: clear the input, unless the user has typed on since.
-        onConfirmed: text => setNewMessage(current => (current.trim() === text ? '' : current)),
-        onReconnected: fetchMessages, // pick up what was sent while offline
-    });
-
-    async function handleSendMessage(e) {
-        e.preventDefault();
-        const text = newMessage.trim();
-        if (!text || chatStatus !== 'open' || messageLength(text) > MAX_MESSAGE_LENGTH) return;
-        setSendingMessage(true);
-        try {
-            // The input keeps the text until the server confirms it (onConfirmed).
-            if (sendChat(text)) setSendError('');
-        } catch (err) {
-            console.error('Failed to send message:', err);
-        } finally {
-            setSendingMessage(false);
-        }
-    }
-
-    function handleOpenChat() {
-        if (!showChat) {
-            setHistoryError(false);
-            setSendError('');
-        }
-        setShowChat(!showChat);
-        if (!showChat) fetchMessages();
-    }
-
-    // Close button and Esc: focus goes back to the chat button.
-    function handleCloseChat() {
-        setShowChat(false);
-        chatButtonRef.current?.focus();
+    // «Задать вопрос» sent: the dialog closes and the chat opens with the
+    // question in it (also arriving over the socket; merged by id).
+    function handleQuestionSent(message) {
+        setQuestion(null);
+        chatRef.current?.open(message);
     }
 
     const blockNumbers = (() => {
@@ -320,15 +273,18 @@ function LessonViewer() {
                 break;
             case 'QUIZ':
                 inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
-                    onSubmitted={handleAnswerSubmitted} />;
+                    onSubmitted={handleAnswerSubmitted}
+                    onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             case 'CODE':
                 inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
-                    onSubmitted={data => handleCodeSubmitted(block.id, data)} />;
+                    onSubmitted={data => handleCodeSubmitted(block.id, data)}
+                    onAsk={hasChat ? draft => setQuestion({ blockId: block.id, draft }) : undefined} />;
                 break;
             case 'FILL':
                 inner = <FillBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
-                    onSubmitted={handleAnswerSubmitted} />;
+                    onSubmitted={handleAnswerSubmitted}
+                    onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             default:
                 return null;
@@ -406,6 +362,16 @@ function LessonViewer() {
                     </div>
                 )}
 
+                {/* «Задать вопрос» (students: same people as the chat). */}
+                {question && (
+                    <QuestionModal
+                        blockId={question.blockId}
+                        draft={question.draft}
+                        onClose={() => setQuestion(null)}
+                        onSent={handleQuestionSent}
+                    />
+                )}
+
                 {showLessons && (
                     <LessonsPanel
                         courseId={lesson.course}
@@ -459,41 +425,15 @@ function LessonViewer() {
                 </button>
             )}
 
-            {/* Floating chat button — student→teacher chat. Hidden for the course
-                author, who has a dedicated per-student chat on the course page. */}
+            {/* Floating chat button — student→teacher chat (StudentChat). Hidden for
+                the course author, who has a per-student chat on the course page. */}
             {hasChat && (
-                <>
-                    {showChat && (
-                        <ChatPanel
-                            id="lesson-chat"
-                            title="Чат с учителем"
-                            subtitle={course.author_name}
-                            messages={messages}
-                            isOwn={msg => msg.sender !== course.author}
-                            emptyHint="Задайте вопрос по уроку — учитель ответит здесь."
-                            status={chatStatus}
-                            historyError={historyError}
-                            sendError={sendError}
-                            value={newMessage}
-                            onChange={e => { setNewMessage(e.target.value); setSendError(''); }}
-                            onSubmit={handleSendMessage}
-                            sending={sendingMessage || chatPending}
-                            onClose={handleCloseChat}
-                        />
-                    )}
-                    <button
-                        ref={chatButtonRef}
-                        type="button"
-                        className="chat-fab"
-                        onClick={handleOpenChat}
-                        aria-label="Чат с учителем"
-                        aria-expanded={showChat}
-                        aria-controls={showChat ? 'lesson-chat' : undefined}
-                        title={showChat ? 'Закрыть чат' : 'Чат с учителем'}
-                    >
-                        {showChat ? <CloseIcon /> : <ChatIcon />}
-                    </button>
-                </>
+                <StudentChat
+                    ref={chatRef}
+                    course={course}
+                    id="lesson-chat"
+                    emptyHint="Задайте вопрос по уроку — учитель ответит здесь."
+                />
             )}
         </>
     );
