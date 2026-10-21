@@ -1168,6 +1168,24 @@ class StudentContentAndGradingTests(APITestCase):
         self.assertEqual(self.client.post('/api/blocks/', ok, format='json').status_code, 201)
         self.assertEqual(self.client.post('/api/blocks/', bad, format='json').status_code, 400)
 
+    def test_quiz_shuffle_options_is_optional_bool(self):
+        self.as_user(self.author)
+        quiz = {'question': 'q', 'options': ['a', 'b'], 'correct_answer': 0}
+        for i, (extra, status_code) in enumerate([
+                ({}, 201),                            # missing = shuffle
+                ({'shuffle_options': False}, 201),
+                ({'shuffle_options': 'no'}, 400)]):
+            data = {'lesson': str(self.lesson.id), 'type': 'QUIZ', 'order_index': 20 + i,
+                    'content': dict(quiz, **extra)}
+            with self.subTest(extra=extra):
+                self.assertEqual(self.client.post('/api/blocks/', data, format='json').status_code, status_code)
+
+        # Students get the flag (it is not an answer marker).
+        self.quiz.content['shuffle_options'] = False
+        self.quiz.save()
+        self.as_user(self.student)
+        self.assertIs(self.client.get(f'/api/blocks/{self.quiz.id}/').data['content']['shuffle_options'], False)
+
     def test_hidden_code_is_validated(self):
         self.as_user(self.author)
         content = {'prompt': 'p', 'starter_code': ''}

@@ -316,6 +316,9 @@ def block_content_error(block_type, value):
         for field in ['question', 'options', 'correct_answer']:
             if field not in value:
                 return f"QUIZ blocks must have '{field}' field in content"
+        # Optional: show the options to students in random order (missing = true).
+        if 'shuffle_options' in value and not isinstance(value['shuffle_options'], bool):
+            return "QUIZ 'shuffle_options' must be true or false"
 
     elif block_type == 'CODE':
         for field in ['prompt', 'starter_code']:

@@ -785,6 +785,15 @@ function QuizFields({ uid, content, setContent }) {
                     style={{ ...ghostBtn, padding: '6px 12px' }}
                 >+ Вариант</button>
                 <BulkOptions setContent={setContent} />
+                {/* Missing in older quizzes = on. */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 14, color: '#334155' }}>
+                    <input
+                        type="checkbox"
+                        checked={content.shuffle_options !== false}
+                        onChange={e => setContent(c => ({ ...c, shuffle_options: e.target.checked }))}
+                    />
+                    Перемешивать варианты ответа
+                </label>
             </Field>
 
             <Field label="Пояснение (показывается при верном ответе)">
