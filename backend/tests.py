@@ -962,7 +962,7 @@ class LandingHomeTests(PublicPagesTestCase):
     def test_header_is_unchanged(self):
         html = self.client.get('/').content.decode()
         header = html[html.index('<header class="site-header">'):html.index('</header>')]
-        for part in ['class="site-logo"', 'class="site-nav"', 'class="lang-switch"',
+        for part in ['class="site-logo brand-logo"', 'class="site-nav"', 'class="lang-switch"',
                      'id="header-auth-link"', 'data-account-label="Мой кабинет"']:
             self.assertIn(part, header)
 
@@ -1067,7 +1067,15 @@ class BrandTests(PublicPagesTestCase):
         for url, name, home in self.pages():
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
-                self.assertIn(f'<a class="site-logo" href="{home}">{name}</a>', html)
+                if 'Ё' in name:
+                    # The cat logo (brand-logo.css): the text is still the real name.
+                    before, _, after = name.partition('Ё')
+                    self.assertIn(f'<a class="site-logo brand-logo" href="{home}" aria-label="{name} — на главную">'
+                                  f'{before}<span class="brand-logo__yo"><span class="brand-logo__letter">Ё</span>'
+                                  '<span class="brand-logo__cat" aria-hidden="true">', html)
+                    self.assertIn(f'</svg></span></span>{after}</a>', html)
+                else:
+                    self.assertIn(f'<a class="site-logo" href="{home}">{name}</a>', html)
                 self.assertIn(f'<p class="site-footer__name">{name}</p>', html)
                 self.assertRegex(html, rf'<title>(.+ — )?{name}</title>')
                 if url in titles:

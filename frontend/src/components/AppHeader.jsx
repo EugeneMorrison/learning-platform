@@ -3,7 +3,7 @@ import { Link, useLocation, useMatch } from 'react-router-dom';
 import UserBadge from './UserBadge';
 import LessonProgress from './LessonProgress';
 import { ListIcon } from './LessonsPanel';
-import { BRAND_NAME } from '../brand';
+import BrandLogo from './BrandLogo';
 import { useLessonBar } from '../lib/lessonBar';
 import './AppHeader.css';
 
@@ -71,7 +71,8 @@ function AppHeader() {
     return (
         <header className="app-header">
             <div className={onLessonPage ? 'app-header__inner app-header__inner--lesson' : 'app-header__inner'}>
-                <a className="app-header__brand" href="/">{BRAND_NAME}</a>
+                {/* Without the badge the bar is low: the cat grows in place. */}
+                <BrandLogo className="app-header__brand" compact={!token} />
                 {onLessonPage ? (
                     <div className="app-header__lesson">
                         {lessonBar && (

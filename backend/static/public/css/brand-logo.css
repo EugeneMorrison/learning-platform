@@ -1,0 +1,178 @@
+/*
+ * The УЧЁБУС logo's cat: the two dots of «Ё» are its eyes. Shared by the
+ * Django header (.site-logo, templates/public/includes/brand_logo.html) and the
+ * React app header (.app-header__brand, frontend/src/components/BrandLogo.jsx);
+ * both use the same markup. Size, font and colour come from those classes.
+ *
+ * At rest the real «Ё» is shown (the cat is invisible), so the logo looks
+ * exactly as before. While playing (.is-playing, added on hover / keyboard
+ * focus, removed on animationend) the letter's dots are clipped off and the
+ * cat's eyes take their place: same size, same position (measured in
+ * Unbounded 700), so the swap at the start and at the end can't be seen.
+ * Only transform and opacity are animated; the cat never takes clicks.
+ *
+ * Geometry, in em of the logo's font size (Unbounded 700): the dots are
+ * 0.22 × 0.1875, centred 0.2437 and 0.5537 from the letter's start and 0.9005
+ * above the baseline; the letter's box starts at the font ascent, 0.995 above
+ * the baseline; the cap height is 0.75.
+ */
+
+.brand-logo__yo {
+  position: relative;
+}
+
+/* The cat's origin: midway between the two dots. */
+.brand-logo__cat {
+  position: absolute;
+  left: 0.3987em;
+  top: 0.0945em;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+  /* Rises so the whiskers clear the letter: the eyes end 1.35em above the
+     baseline (cap 0.75 + gap 0.12 + 0.24 × scale); the ear tips 0.33 × scale
+     above them, at 2.01em, inside the app bar (2.2em of room above the
+     baseline, React and Django headers alike). */
+  --brand-cat-rise: 0.45em;
+  --brand-cat-scale: 2;
+}
+
+/* A low header (React app bar without the user badge): no room above the
+   letter, so the cat grows in place and the letter fades meanwhile. */
+.brand-logo--compact .brand-logo__cat {
+  --brand-cat-rise: -0.05em;
+  --brand-cat-scale: 1.5;
+}
+
+.brand-logo__eyes {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.brand-logo__eye {
+  position: absolute;
+  top: -0.0938em;
+  width: 0.22em;
+  height: 0.1875em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.brand-logo__eye--left {
+  left: -0.265em;
+}
+
+.brand-logo__eye--right {
+  left: 0.045em;
+}
+
+/* Ears, nose, mouth and whiskers (viewBox units: 0.01em, origin as the cat). */
+.brand-logo__face {
+  position: absolute;
+  left: -0.6em;
+  top: -0.45em;
+  width: 1.2em;
+  height: 0.8em;
+  max-width: none; /* base.css limits svg to its container, which is 0 wide here */
+  overflow: visible;
+}
+
+.brand-logo__ear {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.brand-logo__nose {
+  fill: currentColor;
+}
+
+.brand-logo__mouth,
+.brand-logo__whiskers {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+.brand-logo__mouth {
+  stroke-width: 5;
+}
+
+.brand-logo__whiskers {
+  stroke-width: 3.5;
+}
+
+.brand-logo__ear,
+.brand-logo__details {
+  opacity: 0;
+}
+
+/* No animation at all with reduced motion: the logo stays as it is. */
+@media (prefers-reduced-motion: no-preference) {
+  .brand-logo.is-playing .brand-logo__letter {
+    clip-path: inset(0.215em -0.5em -0.5em -0.5em); /* everything above 0.78em: the dots */
+  }
+
+  .brand-logo.is-playing .brand-logo__cat {
+    opacity: 1;
+    animation: brand-cat-face 2.8s ease-in-out both;
+  }
+
+  .brand-logo.is-playing .brand-logo__eyes {
+    animation: brand-cat-look 2.8s ease-in-out both;
+  }
+
+  .brand-logo.is-playing .brand-logo__ear {
+    animation: brand-cat-ears 2.8s ease-in-out both;
+  }
+
+  .brand-logo.is-playing .brand-logo__details {
+    animation: brand-cat-details 2.8s ease-in-out both;
+  }
+
+  .brand-logo--compact.is-playing .brand-logo__letter {
+    animation: brand-cat-letter 2.8s ease-in-out both;
+  }
+}
+
+/* Rise and grow, stay, come back: eyes end exactly on the dots again. */
+@keyframes brand-cat-face {
+  0% { transform: translateY(0) scale(1); }
+  16% { transform: translateY(calc(-1 * var(--brand-cat-rise))) scale(var(--brand-cat-scale)); }
+  84% { transform: translateY(calc(-1 * var(--brand-cat-rise))) scale(var(--brand-cat-scale)); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Look left, look right, blink. */
+@keyframes brand-cat-look {
+  0%, 24% { transform: translateX(0) scaleY(1); }
+  32%, 44% { transform: translateX(-0.06em) scaleY(1); }
+  54%, 64% { transform: translateX(0.06em) scaleY(1); }
+  70% { transform: translateX(0) scaleY(1); }
+  73% { transform: translateX(0) scaleY(0.15); }
+  76%, 100% { transform: translateX(0) scaleY(1); }
+}
+
+@keyframes brand-cat-ears {
+  0%, 14% { opacity: 0; transform: scale(0.2); }
+  24%, 78% { opacity: 1; transform: scale(1); }
+  88%, 100% { opacity: 0; transform: scale(0.2); }
+}
+
+@keyframes brand-cat-details {
+  0%, 18% { opacity: 0; }
+  28%, 76% { opacity: 1; }
+  86%, 100% { opacity: 0; }
+}
+
+@keyframes brand-cat-letter {
+  0%, 6% { opacity: 1; }
+  16%, 84% { opacity: 0; }
+  94%, 100% { opacity: 1; }
+}

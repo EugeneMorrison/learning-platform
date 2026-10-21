@@ -1,0 +1,20 @@
+{% load i18n %}{% spaceless %}
+{# The header logo. A name with «Ё» gets the cat (static/public/css/brand-logo.css; same markup as #}
+{# frontend/src/components/BrandLogo.jsx); its text stays the real name. Otherwise the plain name.  #}
+{% if yo %}
+<a class="site-logo brand-logo" href="{% url 'landing' %}" aria-label="{{ name }} — {% translate "на главную" %}">{{ before }}<span class="brand-logo__yo"><span class="brand-logo__letter">{{ yo }}</span><span class="brand-logo__cat" aria-hidden="true">
+  <span class="brand-logo__eyes"><span class="brand-logo__eye brand-logo__eye--left"></span><span class="brand-logo__eye brand-logo__eye--right"></span></span>
+  <svg class="brand-logo__face" viewBox="-60 -45 120 80" focusable="false" aria-hidden="true">
+    <polygon class="brand-logo__ear" points="-36,-14 -30,-33 -14,-19"/>
+    <polygon class="brand-logo__ear" points="36,-14 30,-33 14,-19"/>
+    <g class="brand-logo__details">
+      <polygon class="brand-logo__nose" points="-4,7 4,7 0,12"/>
+      <path class="brand-logo__mouth" d="M-11 13 Q-5.5 22 0 13 Q5.5 22 11 13"/>
+      <path class="brand-logo__whiskers" d="M-16 10 L-46 6 M-16 14 L-47 15 M-16 18 L-44 24 M16 10 L46 6 M16 14 L47 15 M16 18 L44 24"/>
+    </g>
+  </svg>
+</span></span>{{ after }}</a>
+{% else %}
+<a class="site-logo" href="{% url 'landing' %}">{{ name }}</a>
+{% endif %}
+{% endspaceless %}

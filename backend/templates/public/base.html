@@ -13,12 +13,13 @@
   <link rel="stylesheet" href="{% static 'public/css/tokens.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/base.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/components.css' %}">
+  <link rel="stylesheet" href="{% static 'public/css/brand-logo.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
   <header class="site-header">
     <div class="container site-header__inner">
-      <a class="site-logo" href="{% url 'landing' %}">{% brand_name %}</a>
+      {% brand_logo %}
 
       <nav class="site-nav" aria-label="{% translate "Основная навигация" %}">
         <ul class="site-nav__list">
@@ -90,6 +91,28 @@
         links[i].setAttribute('href', links[i].getAttribute('data-account-href'));
         links[i].textContent = links[i].getAttribute('data-account-label');
       }
+    })();
+  </script>
+  <script>
+    // The logo's cat (static/public/css/brand-logo.css): hover or keyboard focus plays it
+    // once, to the end; a new hover during a play doesn't restart it. Reduced motion: never.
+    (function () {
+      var logo = document.querySelector('.brand-logo');
+      if (!logo) return;
+      var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+      function play() {
+        if (logo.classList.contains('is-playing') || (calm && calm.matches)) return;
+        logo.classList.add('is-playing');
+      }
+      function stop(e) {
+        if (e.animationName === 'brand-cat-face') logo.classList.remove('is-playing');
+      }
+      logo.addEventListener('mouseenter', play);
+      logo.addEventListener('focus', function () {
+        try { if (logo.matches(':focus-visible')) play(); } catch (e) { /* old browser */ }
+      });
+      logo.addEventListener('animationend', stop);
+      logo.addEventListener('animationcancel', stop);
     })();
   </script>
 </body>

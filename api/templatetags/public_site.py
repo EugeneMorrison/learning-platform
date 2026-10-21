@@ -22,6 +22,16 @@ def brand_name():
     return get_brand_name()
 
 
+@register.inclusion_tag('public/includes/brand_logo.html')
+def brand_logo():
+    """The header logo: {% brand_logo %}. The name is split at «Ё», whose dots
+    become the cat's eyes (static/public/css/brand-logo.css); a name without
+    «Ё» (English) is rendered as plain text, as before."""
+    name = get_brand_name()
+    before, yo, after = name.partition('Ё')
+    return {'name': name, 'before': before, 'yo': yo, 'after': after}
+
+
 @register.simple_tag(takes_context=True)
 def reviews_published(context):
     """Whether the landing page's "Отзывы" section has content (used by the header
