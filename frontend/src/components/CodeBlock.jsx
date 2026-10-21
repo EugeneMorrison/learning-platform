@@ -277,23 +277,24 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted }) {
                 </div>
             )}
 
-            {/* Buttons row: wraps on narrow screens */}
-            <div className="code-actions">
-                <div className="code-actions__main">
-                    <button className="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? '⏳ Проверяется...' : '✔ Отправить'}
-                    </button>
-
-                    {hasSubmitted && (
+            {/* Action row (shared with QUIZ / FILL): "Сбросить" on the left, run and
+                submit on the right, submit (primary) rightmost. */}
+            <div className="lesson-block__actions code-actions">
+                {hasSubmitted && (
+                    <div className="lesson-block__actions-start">
                         <button className="btn btn-secondary" onClick={handleReset}>
                             🔄 Сбросить
                         </button>
-                    )}
+                    </div>
+                )}
+                <div className="lesson-block__actions-end">
+                    <button className="btn btn-secondary" onClick={handleRun} disabled={isRunning}>
+                        {isRunning ? '⏳ Выполняется...' : '▶ Запустить код'}
+                    </button>
+                    <button className="btn btn-primary" onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? '⏳ Проверяется...' : '✔ Отправить'}
+                    </button>
                 </div>
-
-                <button className="btn btn-secondary" onClick={handleRun} disabled={isRunning}>
-                    {isRunning ? '⏳ Выполняется...' : '▶ Запустить код'}
-                </button>
             </div>
 
             {/* Submit results - success */}

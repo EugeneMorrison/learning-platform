@@ -64,12 +64,49 @@
     font-size: var(--text-sm);
 }
 
-/* Buttons under a task. Wraps on phones (no sideways scroll at 390px). */
+/* Action row of every task block (QUIZ, FILL, CODE): secondary things on the
+   left (.lesson-block__actions-start: "Вернуться к теории", "Сбросить"), the
+   actions on the right (.lesson-block__actions-end, primary button last). */
 .lesson-block__actions {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
     gap: var(--space-3);
     margin-top: var(--space-4);
+}
+
+.lesson-block__actions-start,
+.lesson-block__actions-end {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/* Stays on the right when there is nothing on the left. */
+.lesson-block__actions-end {
+    margin-left: auto;
+}
+
+.lesson-block__actions .lesson-block__text-btn {
+    margin-top: 0;
+}
+
+/* Phones: one column, the primary button on top and full width; the
+   left-hand items below it. */
+@media (max-width: 30rem) {
+    .lesson-block__actions,
+    .lesson-block__actions-end {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .lesson-block__actions-end {
+        margin-left: 0;
+    }
+
+    .lesson-block__actions-start {
+        align-self: flex-start;
+    }
 }
 
 /* Quiet text button: "↑ Вернуться к теории". */
@@ -517,19 +554,9 @@
     color: var(--color-danger);
 }
 
-/* Отправить / Сбросить on the left, Запустить код on the right; wraps at 390px. */
+/* CODE: the action row sits above the run / test results. */
 .code-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-4);
-}
-
-.code-actions__main {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
+    margin: 0 0 var(--space-4);
 }
 
 /* Verdict after "Отправить" */

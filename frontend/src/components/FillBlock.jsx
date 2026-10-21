@@ -114,18 +114,6 @@ function FillBlock({ content, blockId, savedProgress, number, onSubmitted }) {
                 })}
             </div>
 
-            {!submitted && (
-                <div className="lesson-block__actions">
-                    <button
-                        className="btn btn-primary"
-                        onClick={handleSubmit}
-                        disabled={!allFilled || checking}
-                    >
-                        {checking ? 'Проверяем…' : 'Проверить'}
-                    </button>
-                </div>
-            )}
-
             {checkError && (
                 <div className="check-error" role="alert">{checkError}</div>
             )}
@@ -139,13 +127,32 @@ function FillBlock({ content, blockId, savedProgress, number, onSubmitted }) {
                 </div>
             )}
 
-            {submitted && (
-                <div className="lesson-block__actions">
-                    <button className="btn btn-secondary" onClick={handleReset}>
-                        {isCorrect ? 'Решить снова' : 'Попробовать снова'}
+            {/* Action row, after the feedback (same as QUIZ). */}
+            <div className="lesson-block__actions">
+                <div className="lesson-block__actions-start">
+                    <button
+                        className="lesson-block__text-btn"
+                        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    >
+                        ↑ Вернуться к теории
                     </button>
                 </div>
-            )}
+                <div className="lesson-block__actions-end">
+                    {submitted ? (
+                        <button className="btn btn-secondary" onClick={handleReset}>
+                            {isCorrect ? 'Решить снова' : 'Попробовать снова'}
+                        </button>
+                    ) : (
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleSubmit}
+                            disabled={!allFilled || checking}
+                        >
+                            {checking ? 'Проверяем…' : 'Проверить'}
+                        </button>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
