@@ -249,6 +249,12 @@ function LessonEditor() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lessonId]);
 
+    // A fresh editor starts at the top («Следующий урок →» keeps the scroll
+    // position otherwise); a ?block= target is scrolled to once loaded.
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
     // The highlight goes away after a moment.
     useEffect(() => {
         if (!flashId) return undefined;
@@ -578,9 +584,19 @@ function LessonEditor() {
                         }}
                     />
                 </div>
-                <button onClick={() => navigate(previewPath())} style={ghostBtn}>
-                    👁 Предпросмотр
-                </button>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
+                    <button onClick={() => navigate(previewPath())} style={ghostBtn}>
+                        👁 Предпросмотр
+                    </button>
+                    {/* The next lesson's editor: next_lesson_id is the lesson
+                        page's own "next" (GET /api/lessons/<id>/); none on the
+                        last lesson. Unsaved changes ask first (useBlocker). */}
+                    {lesson.next_lesson_id && (
+                        <button onClick={() => navigate(`/lesson/${lesson.next_lesson_id}/edit/`)} style={ghostBtn}>
+                            Следующий урок →
+                        </button>
+                    )}
+                </div>
             </div>
             <hr style={{ margin: '20px 0' }} />
             <p className="visually-hidden" role="status">{copyStatus}</p>
@@ -1169,4 +1185,12 @@ const previewBlank = {
     padding: '2px 12px', color: '#15803d', fontWeight: 600,
 };
 
-export default LessonEditor;
+// The router reuses the component when only :lessonId changes («Следующий
+// урок →»); a key per lesson remounts it, so the next lesson starts with no
+// drafts of the previous one (as LessonViewerPage does for the lesson page).
+function LessonEditorPage() {
+    const { lessonId } = useParams();
+    return <LessonEditor key={lessonId} />;
+}
+
+export default LessonEditorPage;
