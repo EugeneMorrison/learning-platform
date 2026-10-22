@@ -23,7 +23,7 @@
 
       <nav class="site-nav" aria-label="{% translate "Основная навигация" %}">
         <ul class="site-nav__list">
-          <li><a class="site-nav__link" href="{% url 'landing' %}#catalog">{% translate "Курсы" %}</a></li>
+          <li><a class="site-nav__link" href="{% url 'courses' %}"{% if request.resolver_match.url_name == 'courses' %} aria-current="page"{% endif %}>{% translate "Курсы" %}</a></li>
           {# Always listed (as in the mockup), but a link only while the landing page has published #}
           {# reviews (api/templatetags/public_site.py); until then plain text, never a dead link.   #}
           {% reviews_published as has_reviews %}

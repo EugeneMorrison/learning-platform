@@ -99,6 +99,16 @@ class LandingCatalogTests(PublicPagesTestCase):
         self.assertContains(response, 'Уроков: 3')
         self.assertContains(response, 'Уроков: 0')
 
+    def test_all_courses_link_under_the_cards(self):
+        self.make_course('Course')
+
+        ru = self.client.get('/').content.decode()
+        en = self.client.get('/en/').content.decode()
+
+        self.assertIn('<a class="btn btn-secondary" href="/courses/">Все курсы →</a>', ru)
+        self.assertIn('<a class="btn btn-secondary" href="/en/courses/">All courses →</a>', en)
+        self.assertLess(ru.index('</ol>'), ru.index('href="/courses/">Все курсы'))
+
     def test_empty_state_when_no_published_courses(self):
         self.make_course('Draft only', is_published=False)
 
@@ -106,6 +116,7 @@ class LandingCatalogTests(PublicPagesTestCase):
 
         self.assertContains(response, 'Курсы скоро появятся')
         self.assertNotContains(response, 'catalog__list')
+        self.assertNotContains(response, 'Все курсы →')
 
     def test_english_catalog_heading(self):
         self.make_course('Основы', price=0)
@@ -134,6 +145,125 @@ class LandingCatalogTests(PublicPagesTestCase):
         with self.assertNumQueries(2):
             response = self.client.get('/')
         self.assertEqual(len(self.card_titles(response)), 6)
+
+
+class CoursesCatalogPageTests(PublicPagesTestCase):
+    """/courses/: every published course as a card with the data-* attributes
+    public/js/catalog.js filters and sorts on; the filters are in the page but
+    hidden until the script shows them."""
+
+    def items(self, response):
+        """data-* attributes of each card's <li>, in page order."""
+        html = response.content.decode()
+        return [dict(re.findall(r'data-([a-z-]+)="([^"]*)"', li))
+                for li in re.findall(r'<li (data-title=.*?)>', html, re.S)]
+
+    def test_lists_only_published_courses_under_ru_and_en(self):
+        self.make_course('Опубликован')
+        self.make_course('Черновик', is_published=False)
+        for url in ['/courses/', '/en/courses/']:
+            response = self.client.get(url)
+            with self.subTest(url=url):
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self.card_titles(response), ['Опубликован'])
+                self.assertNotContains(response, 'Черновик')
+
+    def test_server_order_is_sort_order_then_title(self):
+        self.make_course('Б', sort_order=1)
+        self.make_course('А', sort_order=1)
+        self.make_course('В', sort_order=0)
+
+        response = self.client.get('/courses/')
+
+        self.assertEqual(self.card_titles(response), ['В', 'А', 'Б'])
+        self.assertEqual([item['rank'] for item in self.items(response)], ['0', '1', '2'])
+
+    def test_price_attributes_free_paid_and_discount(self):
+        self.make_course('Free', price=0, sort_order=1)
+        self.make_course('Paid', price=Decimal('1990.50'), sort_order=2)
+        self.make_course('Discount', price=Decimal('1990'), old_price=Decimal('2990'), sort_order=3)
+        self.make_course('Free was paid', price=0, old_price=Decimal('500'), sort_order=4)
+        self.make_course('Same old price', price=Decimal('100'), old_price=Decimal('100'), sort_order=5)
+
+        # Unlocalized in both languages: "1990.50", never "1990,50" or "1 990,50".
+        for url in ['/courses/', '/en/courses/']:
+            items = self.items(self.client.get(url))
+            with self.subTest(url=url):
+                self.assertEqual(
+                    [(item['price'], item['old-price']) for item in items],
+                    [('0.00', ''), ('1990.50', ''), ('1990.00', '2990.00'),
+                     ('0.00', '500.00'), ('100.00', '100.00')],
+                )
+
+    def test_title_level_created_and_id_attributes(self):
+        course = self.make_course('  Ёлочные   ИГРУШКИ ', level='INTERMEDIATE')
+        no_level = self.make_course('Без уровня', sort_order=1)
+
+        items = self.items(self.client.get('/courses/'))
+
+        self.assertEqual(items[0]['title'], 'елочные игрушки')  # lower case, ё = е, single spaces
+        self.assertEqual(items[0]['level'], 'intermediate')
+        self.assertEqual(items[1]['level'], '')
+        self.assertEqual(items[0]['id'], str(course.id))
+        # Fixed-width UTC, so the script can compare them as strings.
+        self.assertRegex(items[0]['created'], r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}Z$')
+        self.assertLessEqual(items[0]['created'], items[1]['created'])
+        self.assertEqual(items[1]['id'], str(no_level.id))
+
+    def test_filters_hidden_until_the_script_shows_them(self):
+        self.make_course('Course')
+        html = self.client.get('/courses/').content.decode()
+
+        self.assertRegex(html, r'<form class="catalog-filters"[^>]* hidden')
+        self.assertRegex(html, r'<div class="catalog-toolbar" hidden')
+        self.assertRegex(html, r'<p class="catalog__empty" hidden[^>]*>Курсы не найдены</p>')
+        self.assertRegex(html, r'<script src="/static/public/js/catalog\.js" defer></script>')
+        self.assertIn('aria-live="polite"', html)
+
+    def test_filter_texts_in_ru_and_en(self):
+        self.make_course('Course')
+        ru = self.client.get('/courses/')
+        en = self.client.get('/en/courses/')
+
+        for text in ['Каталог курсов', 'placeholder="Поиск курсов по названию"', 'Уровень', 'Любой',
+                     'Начальный', 'Средний', 'Продвинутый', 'Доступ', 'Все', 'Бесплатные', 'Платные',
+                     'Только со скидкой', 'Сбросить фильтры', 'Найдено:', 'Рекомендуемые',
+                     'По сложности', 'Сначала новые', 'Сначала старые', 'Курсы не найдены']:
+            self.assertContains(ru, text)
+        for text in ['Course catalog', 'placeholder="Search courses by title"', 'Level', 'Any',
+                     'Beginner', 'Intermediate', 'Advanced', 'Access', 'All', 'Free', 'Paid',
+                     'Discounted only', 'Reset filters', 'Found:', 'Recommended', 'By difficulty',
+                     'Newest first', 'Oldest first', 'No courses found']:
+            self.assertContains(en, text)
+
+    def test_cards_have_no_step_badges_and_link_to_the_course_page(self):
+        course = self.make_course('Linked')
+        response = self.client.get('/courses/')
+
+        self.assertNotContains(response, 'step-badge')
+        self.assertContains(response, f'href="/course/{course.slug}/"')
+
+    def test_empty_state_without_published_courses(self):
+        self.make_course('Draft only', is_published=False)
+        response = self.client.get('/courses/')
+
+        self.assertContains(response, 'Курсы скоро появятся')
+        self.assertNotContains(response, 'catalog-filters')
+        self.assertNotContains(response, 'catalog.js')
+
+    def test_query_count_does_not_grow_with_courses(self):
+        # 2 = courses + published reviews (the header's «Отзывы» link).
+        for n in range(1, 6):
+            course = self.make_course(f'Course {n}', level='BEGINNER')
+            Lesson.objects.create(course=course, title='Lesson', order_index=1)
+        with self.assertNumQueries(2):
+            response = self.client.get('/courses/')
+        self.assertEqual(len(self.card_titles(response)), 5)
+
+    def test_author_react_course_page_still_goes_to_the_spa(self):
+        course = self.make_course('Course')
+        response = self.client.get(f'/courses/{course.id}/')
+        self.assertTemplateUsed(response, 'index.html')
 
 
 class CourseDetailTests(PublicPagesTestCase):
@@ -315,16 +445,17 @@ class CourseDetailTests(PublicPagesTestCase):
                       'Fill-ins: 1', 'Lessons unlock after you enroll in the course.',
                       'All courses', 'Start for free']:
             self.assertContains(en, label)
-        self.assertContains(en, 'href="/en/#catalog">← All courses<')
+        self.assertContains(ru, 'href="/courses/">← Все курсы<')
+        self.assertContains(en, 'href="/en/courses/">← All courses<')
 
-    def test_header_courses_link_returns_to_landing_catalog(self):
+    def test_header_courses_link_goes_to_the_catalog_page(self):
         course = self.make_course('Python basics')
 
         ru = self.client.get(f'/course/{course.slug}/')
         en = self.client.get(f'/en/course/{course.slug}/')
 
-        self.assertContains(ru, 'class="site-nav__link" href="/#catalog">Курсы<')
-        self.assertContains(en, 'class="site-nav__link" href="/en/#catalog">Courses<')
+        self.assertContains(ru, 'class="site-nav__link" href="/courses/">Курсы<')
+        self.assertContains(en, 'class="site-nav__link" href="/en/courses/">Courses<')
 
     def test_landing_cards_link_to_course_page(self):
         course = self.make_course('Linked')
@@ -582,6 +713,23 @@ class ProductionStaticFilesTests(TestCase):
         # No unhashed public stylesheet left in the page.
         self.assertNotRegex(html, r'href="/static/public/css/[a-z]+\.css"')
 
+    def test_catalog_page_links_hashed_script_and_stylesheets(self):
+        import os
+
+        Course.objects.create(
+            title='Course', is_published=True,
+            author=User.objects.create_user(username='author', password='x', role='AUTHOR'),
+        )
+        html = self.client.get('/courses/').content.decode()
+
+        for pattern in [r'src="/static/(public/js/catalog\.[0-9a-f]{12}\.js)" defer',
+                        r'href="/static/(public/css/catalog\.[0-9a-f]{12}\.css)"',
+                        r'href="/static/(public/css/courses\.[0-9a-f]{12}\.css)"']:
+            found = re.search(pattern, html)
+            with self.subTest(pattern=pattern):
+                self.assertIsNotNone(found)
+                self.assertTrue(os.path.exists(os.path.join(self.static_root, found.group(1))))
+
     def test_hero_images_are_collected_and_hashed(self):
         import os
 
@@ -820,7 +968,7 @@ class AboutPageTests(PublicPagesTestCase):
             html = self.get(url)
             with self.subTest(url=url):
                 self.assertIn(f'<a class="site-nav__link" href="{href}">{label}</a>', html)
-                self.assertIn('#catalog"', html)  # the other items stay
+                self.assertIn('courses/">', html)  # the other items stay
         self.assertIn('href="/about/" aria-current="page">Обо мне</a>', self.get('/about/'))
 
     def test_landing_no_longer_has_the_author_section(self):
@@ -843,8 +991,10 @@ class HeaderNavTests(PublicPagesTestCase):
     CASES = [
         ('/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
         ('/about/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
+        ('/courses/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
         ('/en/', ['Courses', 'Reviews', 'About me'], '/en/'),
         ('/en/about/', ['Courses', 'Reviews', 'About me'], '/en/'),
+        ('/en/courses/', ['Courses', 'Reviews', 'About me'], '/en/'),
     ]
 
     def nav(self, url):
@@ -862,12 +1012,14 @@ class HeaderNavTests(PublicPagesTestCase):
             with self.subTest(url=url):
                 self.assertEqual(self.items(self.nav(url)), labels)
 
-    def test_links_go_to_the_landing_page_from_every_page(self):
+    def test_links_from_every_page(self):
+        # «Курсы» → the catalog page; «Отзывы» → the landing section (see below).
         course = self.make_course('Course')
         for url, _, landing in self.CASES + [(f'/course/{course.slug}/', None, '/')]:
             nav = self.nav(url)
             with self.subTest(url=url):
-                self.assertIn(f'href="{landing}#catalog"', nav)
+                self.assertIn(f'href="{landing}courses/"', nav)
+                self.assertNotIn('#catalog', nav)
                 self.assertIn(f'href="{landing}about/"', nav)
                 self.assertNotRegex(nav, r'href="#')  # never a bare anchor
 
@@ -896,6 +1048,13 @@ class HeaderNavTests(PublicPagesTestCase):
                 self.assertIn(f'<a class="site-nav__link" href="{landing}#reviews">{labels[1]}</a>', nav)
                 self.assertNotIn('site-nav__link--soon', nav)
                 self.assertEqual(self.items(nav), labels)
+
+    def test_courses_is_marked_current_only_on_courses(self):
+        self.assertIn('href="/courses/" aria-current="page">Курсы</a>', self.nav('/courses/'))
+        self.assertIn('href="/en/courses/" aria-current="page">Courses</a>', self.nav('/en/courses/'))
+        for url in ['/', '/about/', '/en/']:
+            self.assertNotIn('href="/courses/" aria-current', self.nav(url))
+            self.assertNotIn('href="/en/courses/" aria-current', self.nav(url))
 
     def test_about_is_marked_current_only_on_about(self):
         self.assertIn('href="/about/" aria-current="page"', self.nav('/about/'))

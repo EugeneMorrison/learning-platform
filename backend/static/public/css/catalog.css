@@ -34,6 +34,11 @@
   list-style: none;
 }
 
+/* Landing: «Все курсы →» under the cards, to the /courses/ page. */
+.catalog__more {
+  margin: var(--space-6) 0 0;
+}
+
 .catalog__empty {
   padding: var(--space-6);
   border: var(--border-width) dashed var(--color-line);

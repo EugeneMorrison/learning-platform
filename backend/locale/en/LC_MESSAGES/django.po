@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 00:42+0300\n"
+"POT-Creation-Date: 2026-10-23 00:55+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -44,15 +44,15 @@ msgid ""
 "%(seconds)d с."
 msgstr "You can post in discussions once a minute. Try again in %(seconds)d s."
 
-#: .\api\models.py:187
+#: .\api\models.py:187 .\backend\templates\public\courses.html:37
 msgid "Начальный"
 msgstr "Beginner"
 
-#: .\api\models.py:188
+#: .\api\models.py:188 .\backend\templates\public\courses.html:38
 msgid "Средний"
 msgstr "Intermediate"
 
-#: .\api\models.py:189
+#: .\api\models.py:189 .\backend\templates\public\courses.html:39
 msgid "Продвинутый"
 msgstr "Advanced"
 
@@ -468,7 +468,7 @@ msgstr "Courses"
 
 #: .\backend\templates\public\base.html:31
 #: .\backend\templates\public\base.html:33
-#: .\backend\templates\public\landing.html:34
+#: .\backend\templates\public\landing.html:36
 msgid "Отзывы"
 msgstr "Reviews"
 
@@ -505,6 +505,7 @@ msgid "Контакты"
 msgstr "Contacts"
 
 #: .\backend\templates\public\course_detail.html:31
+#: .\backend\templates\public\landing.html:25
 msgid "Все курсы"
 msgstr "All courses"
 
@@ -540,6 +541,97 @@ msgstr "Lessons unlock after you enroll in the course."
 #: .\backend\templates\public\course_detail.html:106
 msgid "Программа скоро появится"
 msgstr "The syllabus is coming soon"
+
+#: .\backend\templates\public\courses.html:4
+#: .\backend\templates\public\courses.html:17
+msgid "Каталог курсов"
+msgstr "Course catalog"
+
+#: .\backend\templates\public\courses.html:5
+msgid ""
+"Все курсы: поиск по названию, уровень, бесплатные и платные курсы, скидки."
+msgstr "All courses: search by title, level, free and paid courses, discounts."
+
+#: .\backend\templates\public\courses.html:18
+#: .\backend\templates\public\landing.html:15
+msgid "Короткие уроки с практикой прямо в браузере. Выберите курс и начните."
+msgstr ""
+"Short lessons with hands-on practice right in your browser. Pick a course "
+"and start."
+
+#: .\backend\templates\public\courses.html:26
+msgid "Фильтры"
+msgstr "Filters"
+
+#: .\backend\templates\public\courses.html:28
+#: .\backend\templates\public\courses.html:30
+msgid "Поиск курсов по названию"
+msgstr "Search courses by title"
+
+#: .\backend\templates\public\courses.html:34
+msgid "Уровень"
+msgstr "Level"
+
+#: .\backend\templates\public\courses.html:36
+msgid "Любой"
+msgstr "Any"
+
+#: .\backend\templates\public\courses.html:44
+msgid "Доступ"
+msgstr "Access"
+
+#: .\backend\templates\public\courses.html:46
+msgid "Все"
+msgstr "All"
+
+#: .\backend\templates\public\courses.html:47
+msgid "Бесплатные"
+msgstr "Free"
+
+#: .\backend\templates\public\courses.html:48
+msgid "Платные"
+msgstr "Paid"
+
+#: .\backend\templates\public\courses.html:54
+msgid "Только со скидкой"
+msgstr "Discounted only"
+
+#: .\backend\templates\public\courses.html:57
+msgid "Сбросить фильтры"
+msgstr "Reset filters"
+
+#: .\backend\templates\public\courses.html:63
+msgid "Найдено:"
+msgstr "Found:"
+
+#: .\backend\templates\public\courses.html:66
+msgid "Сортировка"
+msgstr "Sort by"
+
+#: .\backend\templates\public\courses.html:68
+msgid "Рекомендуемые"
+msgstr "Recommended"
+
+#: .\backend\templates\public\courses.html:69
+msgid "По сложности"
+msgstr "By difficulty"
+
+#: .\backend\templates\public\courses.html:70
+msgid "Сначала новые"
+msgstr "Newest first"
+
+#: .\backend\templates\public\courses.html:71
+msgid "Сначала старые"
+msgstr "Oldest first"
+
+#: .\backend\templates\public\courses.html:92
+msgid "Курсы не найдены"
+msgstr "No courses found"
+
+#: .\backend\templates\public\courses.html:96
+#: .\backend\templates\public\landing.html:27
+msgid "Курсы скоро появятся. Загляните позже."
+msgstr "Courses are coming soon. Check back later."
 
 #: .\backend\templates\public\includes\block_counts.html:3
 msgid "Теория:"
@@ -617,13 +709,3 @@ msgstr "Browse courses"
 #: .\backend\templates\public\includes\hero.html:35
 msgid "Людмила Колесникова"
 msgstr "Lyudmila Kolesnikova"
-
-#: .\backend\templates\public\landing.html:15
-msgid "Короткие уроки с практикой прямо в браузере. Выберите курс и начните."
-msgstr ""
-"Short lessons with hands-on practice right in your browser. Pick a course "
-"and start."
-
-#: .\backend\templates\public\landing.html:25
-msgid "Курсы скоро появятся. Загляните позже."
-msgstr "Courses are coming soon. Check back later."

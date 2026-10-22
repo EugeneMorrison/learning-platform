@@ -1,0 +1,102 @@
+{% extends "public/base.html" %}
+{% load i18n l10n static public_site %}
+
+{% block title %}{% translate "Каталог курсов" %} — {% brand_name %}{% endblock %}
+{% block meta_description %}{% translate "Все курсы: поиск по названию, уровень, бесплатные и платные курсы, скидки." %}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/catalog.css' %}">
+  {% if courses %}
+    <link rel="stylesheet" href="{% static 'public/css/courses.css' %}">
+    <script src="{% static 'public/js/catalog.js' %}" defer></script>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <section class="catalog" aria-labelledby="catalog-title" data-catalog>
+    <div class="container">
+      <header class="catalog__header">
+        <h1 id="catalog-title" class="catalog__title">{% translate "Каталог курсов" %}</h1>
+        <p class="catalog__subtitle">{% translate "Короткие уроки с практикой прямо в браузере. Выберите курс и начните." %}</p>
+      </header>
+
+      {% if courses %}
+        <div class="catalog-layout">
+          {# Search, filters and sorting: public/js/catalog.js shows them (hidden) and runs them #}
+          {# on the cards' data-* attributes. Without JS the page is the full list, as rendered. #}
+          {# autocomplete="off": the browser must not restore old values over the URL's state.  #}
+          <form class="catalog-filters" id="catalog-filters" aria-label="{% translate "Фильтры" %}" autocomplete="off" hidden data-catalog-filters>
+            <div>
+              <label class="visually-hidden" for="catalog-q">{% translate "Поиск курсов по названию" %}</label>
+              <input class="catalog-input" id="catalog-q" name="q" type="search" maxlength="100"
+                     placeholder="{% translate "Поиск курсов по названию" %}">
+            </div>
+
+            <fieldset class="catalog-filters__group">
+              <legend class="catalog-filters__legend">{% translate "Уровень" %}</legend>
+              <div class="chip-row">
+                <label class="chip"><input type="radio" name="level" value="" checked><span>{% translate "Любой" %}</span></label>
+                <label class="chip"><input type="radio" name="level" value="beginner"><span>{% translate "Начальный" %}</span></label>
+                <label class="chip"><input type="radio" name="level" value="intermediate"><span>{% translate "Средний" %}</span></label>
+                <label class="chip"><input type="radio" name="level" value="advanced"><span>{% translate "Продвинутый" %}</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="catalog-filters__group">
+              <legend class="catalog-filters__legend">{% translate "Доступ" %}</legend>
+              <div class="chip-row">
+                <label class="chip"><input type="radio" name="access" value="" checked><span>{% translate "Все" %}</span></label>
+                <label class="chip"><input type="radio" name="access" value="free"><span>{% translate "Бесплатные" %}</span></label>
+                <label class="chip"><input type="radio" name="access" value="paid"><span>{% translate "Платные" %}</span></label>
+              </div>
+            </fieldset>
+
+            <label class="catalog-check">
+              <input type="checkbox" name="discount" value="1">
+              <span>{% translate "Только со скидкой" %}</span>
+            </label>
+
+            <button class="btn btn-secondary catalog-filters__reset" type="button" data-catalog-reset>{% translate "Сбросить фильтры" %}</button>
+          </form>
+
+          <div class="catalog-results">
+            <div class="catalog-toolbar" hidden data-catalog-toolbar>
+              <p class="catalog-count" aria-live="polite" aria-atomic="true">
+                {% translate "Найдено:" %} <span class="catalog-count__number" data-catalog-count>{{ courses|length|unlocalize }}</span>
+              </p>
+              <label class="catalog-sort">
+                <span>{% translate "Сортировка" %}</span>
+                <select class="catalog-input catalog-sort__select" name="sort" form="catalog-filters">
+                  <option value="" selected>{% translate "Рекомендуемые" %}</option>
+                  <option value="difficulty">{% translate "По сложности" %}</option>
+                  <option value="new">{% translate "Сначала новые" %}</option>
+                  <option value="old">{% translate "Сначала старые" %}</option>
+                </select>
+              </label>
+            </div>
+
+            {# Server order = «Рекомендуемые» (sort_order, then title): data-rank. Search compares #}
+            {# data-title (lower case, ё = е). Numbers unlocalized: "1990.50", never "1990,50".   #}
+            <ul class="catalog__list" data-catalog-list>
+              {% for course in courses %}
+                <li data-title="{{ course.search_title }}"
+                    data-level="{{ course.level|default_if_none:''|lower }}"
+                    data-price="{{ course.price|unlocalize }}"
+                    data-old-price="{% if course.old_price is not None %}{{ course.old_price|unlocalize }}{% endif %}"
+                    data-created="{{ course.created_key }}"
+                    data-rank="{{ forloop.counter0|unlocalize }}"
+                    data-id="{{ course.id }}">
+                  {% include "public/includes/course_card.html" %}
+                </li>
+              {% endfor %}
+            </ul>
+
+            <p class="catalog__empty" hidden data-catalog-empty>{% translate "Курсы не найдены" %}</p>
+          </div>
+        </div>
+      {% else %}
+        <p class="catalog__empty">{% translate "Курсы скоро появятся. Загляните позже." %}</p>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

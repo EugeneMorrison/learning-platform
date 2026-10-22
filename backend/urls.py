@@ -3,6 +3,8 @@ Main URL Configuration for Learning Platform
 
 Includes:
 - Landing page: / (Russian) and /en/ (English), rendered by Django
+- Course catalog: /courses/ and /en/courses/ (Django; the author's course page
+  /courses/<uuid>/ is a React route and still goes to the SPA catch-all)
 - Course page: /course/<slug>/ and /en/course/<slug>/ (Django)
 - About me ("Обо мне"): /about/ and /en/about/ (Django)
 - Language switch: /i18n/setlang/ (Django's set_language view)
@@ -22,7 +24,7 @@ from django.views.static import serve
 from django.conf import settings
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from .views import about_view, course_detail_view, favicon_view, landing_view
+from .views import about_view, course_detail_view, courses_view, favicon_view, landing_view
 
 
 @xframe_options_exempt
@@ -74,6 +76,7 @@ urlpatterns = [
 # Must come before the SPA catch-all, which would otherwise answer at /.
 urlpatterns += i18n_patterns(
     path('', landing_view, name='landing'),
+    path('courses/', courses_view, name='courses'),
     path('course/<slug:slug>/', course_detail_view, name='course_detail'),
     path('about/', about_view, name='about'),
     prefix_default_language=False,

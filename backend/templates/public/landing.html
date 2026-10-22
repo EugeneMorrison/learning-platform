@@ -21,6 +21,8 @@
             <li>{% include "public/includes/course_card.html" with step=forloop.counter %}</li>
           {% endfor %}
         </ol>
+        {# The full catalog with search and filters. #}
+        <p class="catalog__more"><a class="btn btn-secondary" href="{% url 'courses' %}">{% translate "Все курсы" %} →</a></p>
       {% else %}
         <p class="catalog__empty">{% translate "Курсы скоро появятся. Загляните позже." %}</p>
       {% endif %}

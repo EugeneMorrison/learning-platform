@@ -1,0 +1,185 @@
+/*
+ * Course catalog page (/courses/): filters beside the card grid, stacked above
+ * it on narrow screens. The section header, grid and cards are in catalog.css.
+ * public/js/catalog.js adds .is-enhanced to the section and shows the filters;
+ * without it the page is the plain list. Uses only the variables from tokens.css.
+ */
+
+/* Elements styled with a display value keep the hidden attribute working. */
+.catalog-filters[hidden],
+.catalog-toolbar[hidden] {
+  display: none;
+}
+
+.is-enhanced .catalog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, calc(var(--container-width) / 4)) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
+
+/* Filters panel */
+.catalog-filters {
+  position: sticky;
+  top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-soft);
+}
+
+.catalog-filters__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.catalog-filters__legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.catalog-filters__reset {
+  align-self: flex-start;
+}
+
+/* Search box and the sort select */
+.catalog-input {
+  width: 100%;
+  padding: var(--space-3);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-small);
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-tight);
+}
+
+.catalog-input::placeholder {
+  color: var(--color-muted);
+}
+
+.catalog-input:hover {
+  border-color: var(--color-muted);
+}
+
+/* Choice chips (Уровень, Доступ): a real radio button under each label. The
+   radio is transparent but still there, so clicks, arrow keys and screen
+   readers work as with plain radios; the chip shows its state and focus. */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  position: relative;
+  display: inline-flex;
+}
+
+.chip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.chip span {
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.chip:hover span {
+  border-color: var(--color-accent);
+}
+
+/* Selected: the same dark pill as the RU / EN switch. */
+.chip input:checked + span {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-ground);
+}
+
+.chip input:focus-visible + span {
+  outline: var(--space-1) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* «Только со скидкой» */
+.catalog-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+
+.catalog-check input {
+  width: var(--space-4);
+  height: var(--space-4);
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* Results: «Найдено: N» and the sort select above the grid */
+.catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.catalog-count {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.catalog-count__number {
+  color: var(--color-ink);
+  font-weight: var(--weight-bold);
+}
+
+.catalog-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.catalog-sort__select {
+  width: auto;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+/* Narrow screens: filters stacked above the list, not sticky. */
+@media (max-width: 40rem) {
+  .is-enhanced .catalog-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+
+  .catalog-filters {
+    position: static;
+    padding: var(--space-4);
+  }
+}

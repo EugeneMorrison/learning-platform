@@ -1,9 +1,12 @@
 """
-Server-rendered public pages (landing, course and about pages; legal pages later).
+Server-rendered public pages (landing, course catalog, course and about pages;
+legal pages later).
 
 Templates live in backend/templates/public/, styles in backend/static/public/.
 The React app is served separately by spa_view / lesson_view in backend/urls.py.
 """
+
+from datetime import timezone
 
 from django.contrib.staticfiles import finders
 from django.db.models import Count, Q
@@ -24,10 +27,10 @@ BLOCK_COUNTS = [
 ]
 
 
-def landing_view(request):
-    """Landing page: Russian at /, English at /en/ (see i18n_patterns in urls.py)."""
-    # Explicit order_by: Meta.ordering is ['sort_order', '-created_at'], the landing
-    # wants title as the tiebreak. annotate() gives lesson counts in the same query.
+def published_courses():
+    """Published courses for the catalogs (landing, /courses/), with lesson_count
+    and price labels, in the author's order: sort_order, then title. Explicit
+    order_by: Meta.ordering is ['sort_order', '-created_at']. One query."""
     courses = list(
         Course.objects.filter(is_published=True)
         .annotate(lesson_count=Count('lessons'))
@@ -35,6 +38,18 @@ def landing_view(request):
     )
     for course in courses:
         add_price_labels(course)
+    return courses
+
+
+def normalize_title(title):
+    """Title as the /courses/ search compares it: lower case, ё = е, single
+    spaces. public/js/catalog.js normalizes the typed query the same way."""
+    return ' '.join(title.lower().replace('ё', 'е').split())
+
+
+def landing_view(request):
+    """Landing page: Russian at /, English at /en/ (see i18n_patterns in urls.py)."""
+    courses = published_courses()
 
     # Reviews are edited in the Django admin; the section is hidden while there
     # are none. /en/ shows the English text, falling back to Russian.
@@ -47,6 +62,19 @@ def landing_view(request):
         'courses': courses,
         'reviews': reviews,
     })
+
+
+def courses_view(request):
+    """Course catalog (/courses/, /en/courses/): every published course as a card,
+    in the author's order. Search, filters and sorting run in the browser
+    (public/js/catalog.js) on the data-* attributes set here; without JS the page
+    is the full list."""
+    courses = published_courses()
+    for course in courses:
+        course.search_title = normalize_title(course.title)
+        # Fixed-width UTC timestamp: string order is time order for the script.
+        course.created_key = course.created_at.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    return render(request, 'public/courses.html', {'courses': courses})
 
 
 def about_view(request):
