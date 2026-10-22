@@ -550,7 +550,7 @@ class Message(models.Model):
 
     class Meta:
         db_table = 'messages'
-        ordering = ['created_at']
+        ordering = ['created_at', 'id']  # the id: messages saved in the same instant
         indexes = [
             # Unread counts: GET /api/messages/unread/ and POST /api/messages/read/.
             models.Index(fields=['receiver', 'is_read'], name='messages_receiver_unread_idx'),

@@ -43,6 +43,8 @@ def task_view(block):
 def latest_submission(block, student):
     """The student's latest recorded submission (an Attempt; Progress for work
     saved before attempts were kept), in the context's shape, or None."""
+    # No id tie-break: Attempt ids are UUIDs, not in creation order. Real
+    # submissions (graded on the server) are never saved in the same instant.
     attempt = Attempt.objects.filter(student=student, block=block).order_by('-created_at').first()
     if attempt is not None:
         answer, is_correct, when = attempt.answer, attempt.is_correct, attempt.created_at

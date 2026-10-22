@@ -1896,6 +1896,14 @@ class ChatMessageEndpointTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(Message.objects.count(), 0)
 
+    def test_history_keeps_the_order_of_messages_saved_in_the_same_instant(self):
+        for text in ['раз', 'два', 'три']:
+            self.post(self.student, self.author, text)
+        Message.objects.update(created_at=Message.objects.first().created_at)
+        self.client.force_authenticate(self.author)
+        response = self.client.get('/api/messages/', {'course': str(self.course.id)})
+        self.assertEqual([m['text'] for m in response.data], ['раз', 'два', 'три'])
+
     def test_cannot_write_to_an_outsider(self):
         self.assertEqual(self.post(self.author, self.outsider).status_code, 403)
         self.assertEqual(self.post(self.student, self.outsider).status_code, 403)
@@ -1989,7 +1997,14 @@ class QuestionTests(APITestCase):
             self.assertEqual(response.status_code, code)
 
     def test_context_is_the_students_view_and_latest_submission(self):
-        Attempt.objects.create(student=self.student, block=self.code, answer={'code': 'print(0)'}, is_correct=False)
+        from datetime import timedelta
+        from django.utils import timezone
+
+        # A second apart: created back to back they can share a timestamp
+        # (the clock is coarse on Windows), and Attempt ids are UUIDs.
+        earlier = Attempt.objects.create(student=self.student, block=self.code, answer={'code': 'print(0)'},
+                                         is_correct=False)
+        Attempt.objects.filter(pk=earlier.pk).update(created_at=timezone.now() - timedelta(seconds=1))
         Attempt.objects.create(student=self.student, block=self.code, answer={'code': 'print(2)'}, is_correct=False)
         self.client.force_authenticate(self.student)
         self.client.post('/api/progress/submit/', {'block': str(self.quiz.id), 'answer': {'selected': 1}}, format='json')
@@ -2129,6 +2144,13 @@ class UnreadMessagesTests(APITestCase):
         anna_side = self.get_unread(self.anna)
         self.assertEqual(anna_side['total'], 1)
         self.assertTrue(anna_side['conversations'][0]['other_is_author'])
+
+    def test_last_message_is_the_latest_even_in_the_same_instant(self):
+        self.message(self.anna, self.author, self.python, 'first')
+        self.message(self.anna, self.author, self.python, 'second')
+        Message.objects.update(created_at=Message.objects.first().created_at)
+        anna = self.get_unread(self.author)['conversations'][0]
+        self.assertEqual(anna['last_message']['preview'], 'second')
 
     def test_preview_is_one_short_line(self):
         self.message(self.anna, self.author, self.python, 'line one\n\n' + 'x' * 200)

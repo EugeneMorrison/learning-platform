@@ -1241,12 +1241,13 @@ class MessageView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get all messages in this course where user is sender or receiver
+        # Get all messages in this course where user is sender or receiver.
+        # The id keeps the order of messages saved in the same instant.
         messages = Message.objects.filter(
             course_id=course_id
         ).filter(
             models.Q(sender=request.user) | models.Q(receiver=request.user)
-        ).order_by('created_at')
+        ).order_by('created_at', 'id')
 
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)
@@ -1379,8 +1380,10 @@ class UnreadMessagesView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        # Oldest first, so each conversation ends on its latest message (the id
+        # breaks ties between messages saved in the same instant).
         unread = (Message.objects.filter(receiver=request.user, is_read=False)
-                  .select_related('sender', 'course').order_by('created_at'))
+                  .select_related('sender', 'course').order_by('created_at', 'id'))
         groups = {}
         for message in unread:
             key = (message.course_id, message.sender_id)

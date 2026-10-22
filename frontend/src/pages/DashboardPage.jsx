@@ -129,7 +129,8 @@ function StudentQuestions() {
     const conversations = (notifications?.conversations || [])
         .filter(c => !c.other_is_author)
         .sort((a, b) => (Number(b.has_question) - Number(a.has_question))
-            || String(b.last_message.created_at).localeCompare(String(a.last_message.created_at)));
+            || String(b.last_message.created_at).localeCompare(String(a.last_message.created_at))
+            || b.last_message.id - a.last_message.id);
 
     return (
         <section className="section">
