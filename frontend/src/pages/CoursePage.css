@@ -80,3 +80,33 @@
     font-weight: var(--weight-medium);
     overflow-wrap: anywhere;
 }
+
+/* Level select under the course title (owner only), saved on change. */
+.course-level {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    margin-top: var(--space-3);
+}
+
+.course-level__label {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+.course-level__select {
+    width: auto;
+    padding-top: var(--space-1);
+    padding-bottom: var(--space-1);
+    font-size: var(--text-sm);
+}
+
+.course-level__status {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.course-level__status--error {
+    color: var(--color-danger);
+}

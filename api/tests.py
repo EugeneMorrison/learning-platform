@@ -228,6 +228,73 @@ class RenameTests(APITestCase):
             self.assertEqual(self.rename(self.author, kind, obj, 'y' * 255).status_code, 200)
 
 
+class CourseLevelTests(APITestCase):
+    """Course.level: optional, set by the author (API) or in the admin."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.other = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.course = Course.objects.create(title='Python', author=cls.author, is_published=True)
+
+    def patch_level(self, user, level):
+        self.client.force_authenticate(user)
+        return self.client.patch(f'/api/courses/{self.course.id}/', {'level': level}, format='json')
+
+    def test_new_course_has_no_level(self):
+        self.assertIsNone(self.course.level)
+        self.client.force_authenticate(self.author)
+        response = self.client.get(f'/api/courses/{self.course.id}/')
+        self.assertIsNone(response.data['level'])
+
+    def test_author_creates_course_with_or_without_level(self):
+        self.client.force_authenticate(self.author)
+        for level in ['INTERMEDIATE', None]:
+            response = self.client.post('/api/courses/', {'title': 'C', 'level': level}, format='json')
+            self.assertEqual(response.status_code, 201)
+            self.assertEqual(Course.objects.get(id=response.data['id']).level, level)
+        response = self.client.post('/api/courses/', {'title': 'No level field'}, format='json')
+        self.assertIsNone(Course.objects.get(id=response.data['id']).level)
+
+    def test_owner_sets_and_clears_level(self):
+        response = self.patch_level(self.author, 'ADVANCED')
+        self.assertEqual((response.status_code, response.data['level']), (200, 'ADVANCED'))
+        # «Не указан»: null and '' are both stored as NULL.
+        for empty in [None, '']:
+            self.patch_level(self.author, 'BEGINNER')
+            response = self.patch_level(self.author, empty)
+            self.assertEqual((response.status_code, response.data['level']), (200, None))
+            self.course.refresh_from_db()
+            self.assertIsNone(self.course.level)
+
+    def test_unknown_level_is_rejected(self):
+        self.assertEqual(self.patch_level(self.author, 'EXPERT').status_code, 400)
+        self.assertEqual(self.patch_level(self.author, 'beginner').status_code, 400)
+
+    def test_others_cannot_set_level(self):
+        self.assertEqual(self.patch_level(self.other, 'ADVANCED').status_code, 403)
+        self.course.refresh_from_db()
+        self.assertIsNone(self.course.level)
+
+    def test_admin_list_column_filter_and_form(self):
+        admin_user = User.objects.create_superuser('boss', 'b@example.com', 'x')
+        self.client.force_login(admin_user)
+        Course.objects.filter(id=self.course.id).update(level='INTERMEDIATE')
+        Course.objects.create(title='Beginner course', author=self.author, level='BEGINNER')
+
+        response = self.client.get('/admin/api/course/')
+        self.assertContains(response, 'column-level')
+        self.assertContains(response, '?level__exact=ADVANCED')  # the list filter
+
+        response = self.client.get('/admin/api/course/?level__exact=BEGINNER')
+        self.assertContains(response, 'Beginner course')
+        self.assertNotContains(response, '>Python<')
+
+        response = self.client.get(f'/admin/api/course/{self.course.id}/change/')
+        self.assertContains(response, 'name="level"')
+        self.assertContains(response, '<option value="INTERMEDIATE" selected>')
+
+
 class LessonNavigationTests(APITestCase):
     """GET /api/lessons/{id}/ carries course_title and next_lesson_id (the next
     lesson of the same course by order_index; null on the last lesson)."""

@@ -88,12 +88,17 @@ class CourseSerializer(serializers.ModelSerializer):
             'author',
             'author_name',  # Extra: author's username
             'is_published',
+            'level',  # BEGINNER / INTERMEDIATE / ADVANCED, or null (not specified)
             'lesson_count',  # Extra: number of lessons
             'created_at',
             'updated_at'
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at']
         extra_kwargs = {'title': {'error_messages': TITLE_ERRORS}}
+
+    def validate_level(self, value):
+        """«Не указан» is stored as NULL, whether the client sends null or ''."""
+        return value or None
 
     def get_lesson_count(self, obj):
         """Count lessons in this course"""

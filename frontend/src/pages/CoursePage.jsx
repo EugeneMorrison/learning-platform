@@ -5,6 +5,7 @@ import ChatPanel from '../components/ChatPanel';
 import EditableTitle from '../components/EditableTitle';
 import StudentChat from '../components/StudentChat';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
+import { COURSE_LEVELS, NO_LEVEL_LABEL } from '../lib/courseLevels';
 import { badgeText, useActiveChat, useNotifications } from '../lib/notifications';
 import '../components/Notifications.css';
 import './CoursePage.css';
@@ -42,6 +43,11 @@ function CoursePage() {
     const [moveStatus, setMoveStatus] = useState(''); // for screen readers
     const movingRef = useRef(false);
     const moveButtonRefs = useRef({});
+
+    // Level select: saved on change. Only the latest change's answer counts
+    // (no disabling while saving: that would drop keyboard focus).
+    const [levelStatus, setLevelStatus] = useState(''); // '' | 'saving' | 'saved' | 'error'
+    const levelRequestRef = useRef(0);
 
     // Student form state
     const [showStudentForm, setShowStudentForm] = useState(false);
@@ -154,6 +160,33 @@ function CoursePage() {
     async function handleRenameCourse(title) {
         const res = await api.patch(`/courses/${courseId}/`, { title });
         setCourse(prev => ({ ...prev, title: res.data.title }));
+    }
+
+    // Level: shown at once, saved by PATCH; a failed save puts the server's
+    // value back (refetched, since earlier changes may have been saved).
+    async function handleLevelChange(e) {
+        const level = e.target.value || null;
+        const request = ++levelRequestRef.current;
+        setCourse(prev => ({ ...prev, level }));
+        setLevelStatus('saving');
+        try {
+            const res = await api.patch(`/courses/${courseId}/`, { level });
+            if (request !== levelRequestRef.current) return;
+            setCourse(prev => ({ ...prev, level: res.data.level }));
+            setLevelStatus('saved');
+        } catch (err) {
+            if (request !== levelRequestRef.current) return;
+            console.error('Failed to save course level:', err);
+            setLevelStatus('error');
+            try {
+                const res = await api.get(`/courses/${courseId}/`);
+                if (request === levelRequestRef.current) {
+                    setCourse(prev => ({ ...prev, level: res.data.level }));
+                }
+            } catch {
+                // Offline: the select keeps the unsaved value, the error says so.
+            }
+        }
     }
 
     async function handleRenameLesson(lessonId, title) {
@@ -298,6 +331,32 @@ function CoursePage() {
                         canEdit={isOwner}
                         onSave={handleRenameCourse}
                     />
+                    {isOwner && (
+                        <div className="course-level">
+                            <label className="course-level__label" htmlFor="course-level">Уровень</label>
+                            <select
+                                id="course-level"
+                                className="input course-level__select"
+                                value={course.level || ''}
+                                onChange={handleLevelChange}
+                                aria-describedby="course-level-status"
+                            >
+                                <option value="">{NO_LEVEL_LABEL}</option>
+                                {COURSE_LEVELS.map(level => (
+                                    <option key={level.value} value={level.value}>{level.label}</option>
+                                ))}
+                            </select>
+                            <span
+                                id="course-level-status"
+                                className={levelStatus === 'error' ? 'course-level__status course-level__status--error' : 'course-level__status'}
+                                role="status"
+                            >
+                                {levelStatus === 'saving' && 'Сохранение…'}
+                                {levelStatus === 'saved' && 'Сохранено'}
+                                {levelStatus === 'error' && 'Не удалось сохранить уровень. Попробуйте ещё раз.'}
+                            </span>
+                        </div>
+                    )}
                     {course.description && <p className="page__lead">{course.description}</p>}
                 </div>
             </div>

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 22:52+0300\n"
+"POT-Creation-Date: 2026-10-23 00:42+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\api\discussions.py:61 .\api\views.py:1301
+#: .\api\discussions.py:61 .\api\views.py:1302
 msgid "Задание не найдено."
 msgstr "Task not found."
 
@@ -28,7 +28,7 @@ msgstr "Only tasks have discussions."
 msgid "Напишите сообщение."
 msgstr "Write a message."
 
-#: .\api\discussions.py:74 .\api\views.py:1273 .\api\views.py:1355
+#: .\api\discussions.py:74 .\api\views.py:1274 .\api\views.py:1356
 #, python-format
 msgid "Сообщение слишком длинное: не больше %(max)d символов."
 msgstr "The message is too long: %(max)d characters at most."
@@ -44,11 +44,23 @@ msgid ""
 "%(seconds)d с."
 msgstr "You can post in discussions once a minute. Try again in %(seconds)d s."
 
-#: .\api\serializers.py:141
+#: .\api\models.py:187
+msgid "Начальный"
+msgstr "Beginner"
+
+#: .\api\models.py:188
+msgid "Средний"
+msgstr "Intermediate"
+
+#: .\api\models.py:189
+msgid "Продвинутый"
+msgstr "Advanced"
+
+#: .\api\serializers.py:146
 msgid "Название не может быть пустым."
 msgstr ""
 
-#: .\api\serializers.py:144
+#: .\api\serializers.py:149
 msgid "Название должно быть не короче 2 символов."
 msgstr ""
 
@@ -104,58 +116,58 @@ msgstr ""
 msgid "Задачи с кодом проверяются запуском тестов."
 msgstr "Code tasks are checked by running the tests."
 
-#: .\api\views.py:1269
+#: .\api\views.py:1270
 msgid ""
 "Писать в чат курса могут только его автор и записанные на курс учащиеся."
 msgstr ""
 
-#: .\api\views.py:1298
+#: .\api\views.py:1299
 msgid "Укажите задание: block_id."
 msgstr "Specify the task: block_id."
 
-#: .\api\views.py:1303
+#: .\api\views.py:1304
 msgid "Вопрос можно задать только по заданию."
 msgstr "Questions can only be asked about a task."
 
-#: .\api\views.py:1305
+#: .\api\views.py:1306
 msgid "Задать вопрос могут только записанные на курс учащиеся."
 msgstr "Only students enrolled in the course can ask questions."
 
-#: .\api\views.py:1310
+#: .\api\views.py:1311
 msgid "draft должен быть строкой."
 msgstr ""
 
-#: .\api\views.py:1313
+#: .\api\views.py:1314
 #, python-format
 msgid "Код в редакторе слишком длинный: не больше %(max)d символов."
 msgstr ""
 
-#: .\api\views.py:1352
+#: .\api\views.py:1353
 msgid "Напишите вопрос."
 msgstr ""
 
-#: .\api\views.py:1432
+#: .\api\views.py:1435
 msgid "Укажите course_id и other_user_id."
 msgstr ""
 
-#: .\api\views.py:1457
+#: .\api\views.py:1460
 msgid "Обсуждение не найдено."
 msgstr "Discussion not found."
 
-#: .\api\views.py:1547
+#: .\api\views.py:1550
 #, python-format
 msgid "%(field)s: нужно true или false."
 msgstr "%(field)s: must be true or false."
 
-#: .\api\views.py:1550
+#: .\api\views.py:1553
 msgid "Укажите is_resolved или is_pinned."
 msgstr "Specify is_resolved or is_pinned."
 
-#: .\api\views.py:1552
+#: .\api\views.py:1555
 msgid "Закреплять обсуждения может только автор курса."
 msgstr "Only the course author can pin discussions."
 
-#: .\api\views.py:1554
+#: .\api\views.py:1557
 msgid ""
 "Отметить обсуждение решённым может только тот, кто его начал, или автор "
 "курса."
@@ -163,63 +175,64 @@ msgstr ""
 "Only whoever started the discussion or the course author can mark it "
 "resolved."
 
-#: .\api\views.py:1569
+#: .\api\views.py:1572
 msgid "Удалять обсуждения может только автор курса."
 msgstr "Only the course author can delete discussions."
 
-#: .\api\views.py:1599
+#: .\api\views.py:1602
 msgid "Сообщение не найдено."
 msgstr "Message not found."
 
-#: .\api\views.py:1617
+#: .\api\views.py:1620
 msgid "Удалять сообщения может только автор курса."
 msgstr "Only the course author can delete messages."
 
-#: .\api\views.py:1640
+#: .\api\views.py:1643
 msgid "Автор курса не отправляет жалобы: он может удалить сообщение."
 msgstr "The course author does not report comments: they can delete them."
 
-#: .\api\views.py:1642
+#: .\api\views.py:1645
 msgid "Нельзя пожаловаться на своё сообщение."
 msgstr "You cannot report your own message."
 
-#: .\api\views.py:1644
+#: .\api\views.py:1647
 msgid "Это сообщение автора курса: жалобы на него некому разбирать."
-msgstr "This is the course author's message: there is no one to review reports on it."
+msgstr ""
+"This is the course author's message: there is no one to review reports on it."
 
-#: .\api\views.py:1646
+#: .\api\views.py:1649
 msgid "Сообщение уже удалено."
 msgstr "The message has already been deleted."
 
-#: .\api\views.py:1665
+#: .\api\views.py:1668
 msgid "Жалобы разбирает только автор курса."
 msgstr "Only the course author handles reports."
 
-#: .\api\views.py:1736
+#: .\api\views.py:1739
 msgid "Укажите пользователя: user_id."
 msgstr "Specify the user: user_id."
 
-#: .\api\views.py:1738
+#: .\api\views.py:1741
 msgid "Блокировать в обсуждениях может только автор курса."
 msgstr "Only a course author can ban users from discussions."
 
-#: .\api\views.py:1740
+#: .\api\views.py:1743
 msgid "Нельзя заблокировать себя."
 msgstr "You cannot ban yourself."
 
-#: .\api\views.py:1742
+#: .\api\views.py:1745
 msgid "Среди учащихся ваших курсов такого нет."
 msgstr "No such student in your courses."
 
-#: .\api\views.py:1757
+#: .\api\views.py:1760
 msgid "Этот пользователь не заблокирован."
 msgstr "This user is not banned."
 
-#: .\api\views.py:1776
+#: .\api\views.py:1779
 msgid "Укажите урок: lesson."
 msgstr "Specify the lesson: lesson."
 
-#: .\api\views.py:1779
+#: .\api\views.py:1782
 msgid "Урок не найден."
 msgstr "Lesson not found."
 
@@ -449,13 +462,13 @@ msgid "Основная навигация"
 msgstr "Main navigation"
 
 #: .\backend\templates\public\base.html:26
-#: .\backend\templates\public\landing.html:13
+#: .\backend\templates\public\landing.html:14
 msgid "Курсы"
 msgstr "Courses"
 
 #: .\backend\templates\public\base.html:31
 #: .\backend\templates\public\base.html:33
-#: .\backend\templates\public\landing.html:51
+#: .\backend\templates\public\landing.html:34
 msgid "Отзывы"
 msgstr "Reviews"
 
@@ -516,7 +529,7 @@ msgid "Программа курса"
 msgstr "Course syllabus"
 
 #: .\backend\templates\public\course_detail.html:80
-#: .\backend\templates\public\landing.html:33
+#: .\backend\templates\public\includes\course_card.html:16
 msgid "Уроков:"
 msgstr "Lessons:"
 
@@ -605,12 +618,12 @@ msgstr "Browse courses"
 msgid "Людмила Колесникова"
 msgstr "Lyudmila Kolesnikova"
 
-#: .\backend\templates\public\landing.html:14
+#: .\backend\templates\public\landing.html:15
 msgid "Короткие уроки с практикой прямо в браузере. Выберите курс и начните."
 msgstr ""
 "Short lessons with hands-on practice right in your browser. Pick a course "
 "and start."
 
-#: .\backend\templates\public\landing.html:42
+#: .\backend\templates\public\landing.html:25
 msgid "Курсы скоро появятся. Загляните позже."
 msgstr "Courses are coming soon. Check back later."

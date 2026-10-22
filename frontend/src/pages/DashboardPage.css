@@ -46,6 +46,17 @@
     flex-basis: 100%;
 }
 
+/* Level (optional): label and select on one line, before the submit button. */
+.dash-form__level {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.dash-form__level > .input {
+    width: auto;
+}
+
 /* One-time "Вы успешно зарегистрированы" after sign-up. */
 .dash-notice {
     margin-bottom: var(--space-5);

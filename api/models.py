@@ -12,6 +12,7 @@ Model Relationships:
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils.translation import gettext_lazy as _
 from slugify import slugify
 
 from .block_content import TASK_TYPES
@@ -174,6 +175,27 @@ class Course(models.Model):
     sort_order = models.PositiveIntegerField(
         default=0,
         help_text="Manual ordering on the landing page (lower = earlier)"
+    )
+
+    # Difficulty, chosen by the author (React course page / dashboard form, or
+    # the admin). Optional: no level = «Не указан». The /courses/ catalog
+    # filters and sorts by it, in this order (LEVEL_CHOICES order = difficulty).
+    LEVEL_BEGINNER = 'BEGINNER'
+    LEVEL_INTERMEDIATE = 'INTERMEDIATE'
+    LEVEL_ADVANCED = 'ADVANCED'
+    LEVEL_CHOICES = [
+        (LEVEL_BEGINNER, _('Начальный')),
+        (LEVEL_INTERMEDIATE, _('Средний')),
+        (LEVEL_ADVANCED, _('Продвинутый')),
+    ]
+
+    level = models.CharField(
+        max_length=12,
+        choices=LEVEL_CHOICES,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Difficulty; leave empty if not specified"
     )
 
     stepik_id = models.PositiveIntegerField(

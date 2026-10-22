@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
+import { COURSE_LEVELS, NO_LEVEL_LABEL } from '../lib/courseLevels';
 import { badgeText, conversationLink, formatMessageTime, useNotifications } from '../lib/notifications';
 import DiscussionReports from '../components/DiscussionReports';
 import '../components/Notifications.css';
@@ -172,6 +173,7 @@ function AuthorDashboard() {
     const [showForm, setShowForm] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [newDescription, setNewDescription] = useState('');
+    const [newLevel, setNewLevel] = useState(''); // '' = «Не указан» (null)
     const [creating, setCreating] = useState(false);
 
     useEffect(() => {
@@ -197,9 +199,11 @@ function AuthorDashboard() {
             await api.post('/courses/', {
                 title: newTitle,
                 description: newDescription,
+                level: newLevel || null,
             });
             setNewTitle('');
             setNewDescription('');
+            setNewLevel('');
             setShowForm(false);
             await fetchCourses();
         } catch (err) {
@@ -238,6 +242,19 @@ function AuthorDashboard() {
                         value={newDescription}
                         onChange={e => setNewDescription(e.target.value)}
                     />
+                    <label className="dash-form__level">
+                        <span className="field__label">Уровень</span>
+                        <select
+                            className="input"
+                            value={newLevel}
+                            onChange={e => setNewLevel(e.target.value)}
+                        >
+                            <option value="">{NO_LEVEL_LABEL}</option>
+                            {COURSE_LEVELS.map(level => (
+                                <option key={level.value} value={level.value}>{level.label}</option>
+                            ))}
+                        </select>
+                    </label>
                     <button type="submit" className="btn btn-primary" disabled={creating}>
                         {creating ? 'Создание...' : 'Создать'}
                     </button>
