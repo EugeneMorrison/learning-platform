@@ -143,9 +143,11 @@ function LessonViewer() {
             .then(res => setDiscussionCounts(res.data.counts))
             .catch(err => console.error('Failed to load discussion counts:', err));
     }, [lessonId]);
+    // Changes only when a task becomes solved, not on every submission.
+    const solvedKey = [...solvedBlockIds].sort().join(',');
     useEffect(() => {
         if (!loading && discussionsOn) loadDiscussionCounts();
-    }, [loading, discussionsOn, loadDiscussionCounts, solvedBlockIds]);
+    }, [loading, discussionsOn, loadDiscussionCounts, solvedKey]);
 
     // Fade at the right edge of formula boxes that scroll sideways (phones).
     useEffect(() => {
