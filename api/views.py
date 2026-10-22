@@ -32,10 +32,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import render
 from rest_framework.views import APIView
 
-from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt, Thread, Comment
+from .models import (Course, Lesson, Block, Enrollment, Progress, Message, Attempt, Thread, Comment,
+                     CommentReport, DiscussionBan)
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed, message_preview, notify_user, push_message
 from .questions import MAX_DRAFT_LENGTH, build_context
-from .discussions import can_see_all, check_post_interval, clean_text, discussion_block, is_course_author
+from .discussions import (can_see_all, check_not_banned, check_post_interval, clean_text, discussion_block,
+                          is_banned, is_course_author, open_reports)
 from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
@@ -49,6 +51,7 @@ from .serializers import (
     MessageSerializer,
     ThreadSerializer,
     CommentSerializer,
+    display_name,
 )
 from .permissions import (
     IsAuthor,
@@ -1455,9 +1458,28 @@ def visible_thread(request, thread_id):
     return thread
 
 
-def discussion_context(request, block):
-    """Serializer context of the discussion serializers (the viewer)."""
-    return {'request': request, 'course_author_id': block.lesson.course.author_id}
+def discussion_context(request, block, comment_ids=()):
+    """Serializer context of the discussion serializers: the viewer and, for
+    the comments being sent (`comment_ids`), what their moderation flags
+    need. The course author gets open report counts and her banned users;
+    anyone else, which of these comments they have reported."""
+    author_id = block.lesson.course.author_id
+    context = {'request': request, 'course_author_id': author_id}
+    if request.user.id == author_id:
+        context['report_counts'] = dict(
+            open_reports().filter(comment_id__in=comment_ids).order_by()
+            .values('comment').annotate(n=models.Count('id')).values_list('comment', 'n'))
+        context['banned_ids'] = set(
+            DiscussionBan.objects.filter(author_id=author_id).values_list('user_id', flat=True))
+    else:
+        context['reported_ids'] = set(
+            CommentReport.objects.filter(reporter=request.user, comment_id__in=comment_ids)
+            .values_list('comment_id', flat=True))
+    return context
+
+
+def thread_comment_ids(*threads):
+    return [c.id for thread in threads for c in thread.comments.all()]
 
 
 class BlockThreadsView(APIView):
@@ -1468,10 +1490,12 @@ class BlockThreadsView(APIView):
     GET: {"threads": [ThreadSerializer, ...] (pinned first, then open, then
     resolved; newest first), "can_see_all": the user sees every thread (the
     course author, or solved the block), "hidden_count": threads not shown
-    until the block is solved}.
+    until the block is solved, "can_post": false when the course author has
+    banned the user}.
     POST 201: the new thread. 400: empty / too long text, a TEXT block.
-    404: no such block, or the user is neither the course's author nor an
-    enrolled student. 429: posted less than a minute ago (not the course author).
+    403: banned by the course author. 404: no such block, or the user is
+    neither the course's author nor an enrolled student. 429: posted less
+    than a minute ago (not the course author).
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1480,22 +1504,25 @@ class BlockThreadsView(APIView):
         threads = list(discussion_threads().visible_to(request.user).filter(block=block))
         sees_all = can_see_all(request.user, block)
         hidden = 0 if sees_all else Thread.objects.filter(block=block).count() - len(threads)
+        context = discussion_context(request, block, thread_comment_ids(*threads))
         return Response({
-            'threads': ThreadSerializer(threads, many=True, context=discussion_context(request, block)).data,
+            'threads': ThreadSerializer(threads, many=True, context=context).data,
             'can_see_all': sees_all,
             'hidden_count': hidden,
+            'can_post': not is_banned(request.user, block),
         })
 
     def post(self, request, block_id):
         block = discussion_block(request.user, block_id)
         text = clean_text(request.data.get('text'))
+        check_not_banned(request.user, block)
         check_post_interval(request.user, block)
         with transaction.atomic():
             thread = Thread.objects.create(block=block, starter=request.user)
             Comment.objects.create(thread=thread, user=request.user, text=text)
         thread = discussion_threads().get(pk=thread.pk)
-        return Response(ThreadSerializer(thread, context=discussion_context(request, block)).data,
-                        status=status.HTTP_201_CREATED)
+        context = discussion_context(request, block, thread_comment_ids(thread))
+        return Response(ThreadSerializer(thread, context=context).data, status=status.HTTP_201_CREATED)
 
 
 class ThreadDetailView(APIView):
@@ -1533,7 +1560,8 @@ class ThreadDetailView(APIView):
             thread.is_pinned = changes['is_pinned']
         thread.save(update_fields=['is_resolved', 'resolved_by', 'is_pinned'])
         thread = discussion_threads().get(pk=thread.pk)
-        return Response(ThreadSerializer(thread, context=discussion_context(request, thread.block)).data)
+        context = discussion_context(request, thread.block, thread_comment_ids(thread))
+        return Response(ThreadSerializer(thread, context=context).data)
 
     def delete(self, request, thread_id):
         thread = visible_thread(request, thread_id)
@@ -1548,17 +1576,28 @@ class ThreadCommentsView(APIView):
     POST /api/threads/<id>/comments/   Body: {"text": "..."}: reply
 
     201: the comment (CommentSerializer). 400: empty / too long text.
-    404: a thread the user can't read. 429: as for a new thread.
+    403: banned by the course author. 404: a thread the user can't read.
+    429: as for a new thread.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, thread_id):
         thread = visible_thread(request, thread_id)
         text = clean_text(request.data.get('text'))
+        check_not_banned(request.user, thread.block)
         check_post_interval(request.user, thread.block)
         comment = Comment.objects.create(thread=thread, user=request.user, text=text)
-        return Response(CommentSerializer(comment, context=discussion_context(request, thread.block)).data,
-                        status=status.HTTP_201_CREATED)
+        context = discussion_context(request, thread.block, [comment.id])
+        return Response(CommentSerializer(comment, context=context).data, status=status.HTTP_201_CREATED)
+
+
+def visible_comment(request, comment_id):
+    """A comment in a thread the user may read, else 404."""
+    comment = (Comment.objects.select_related('user', 'thread__block__lesson__course')
+               .filter(pk=comment_id, thread__in=Thread.objects.visible_to(request.user)).first())
+    if comment is None:
+        raise NotFound(gettext('Сообщение не найдено.'))
+    return comment
 
 
 class CommentDetailView(APIView):
@@ -1572,10 +1611,7 @@ class CommentDetailView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def delete(self, request, comment_id):
-        comment = (Comment.objects.select_related('user', 'thread__block__lesson__course')
-                   .filter(pk=comment_id, thread__in=Thread.objects.visible_to(request.user)).first())
-        if comment is None:
-            raise NotFound(gettext('Сообщение не найдено.'))
+        comment = visible_comment(request, comment_id)
         block = comment.thread.block
         if not is_course_author(request.user, block):
             raise PermissionDenied(gettext('Удалять сообщения может только автор курса.'))
@@ -1583,7 +1619,143 @@ class CommentDetailView(APIView):
             comment.is_deleted = True
             comment.deleted_by = request.user
             comment.save(update_fields=['is_deleted', 'deleted_by'])
-        return Response(CommentSerializer(comment, context=discussion_context(request, block)).data)
+        return Response(CommentSerializer(comment, context=discussion_context(request, block, [comment.id])).data)
+
+
+class CommentReportView(APIView):
+    """
+    POST /api/comments/<id>/report/   a student flags a comment for the course author
+
+    Once per comment and user: 201 the first time, 200 after (the comment,
+    with reported: true). 400: own, deleted, or the course author's comment.
+    403: the course author (she deletes or bans instead). 404: a comment the
+    user can't read.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = visible_comment(request, comment_id)
+        block = comment.thread.block
+        if is_course_author(request.user, block):
+            raise PermissionDenied(gettext('Автор курса не отправляет жалобы: он может удалить сообщение.'))
+        if comment.user_id == request.user.id:
+            raise ParseError(gettext('Нельзя пожаловаться на своё сообщение.'))
+        if comment.user_id == block.lesson.course.author_id:
+            raise ParseError(gettext('Это сообщение автора курса: жалобы на него некому разбирать.'))
+        if comment.is_deleted:
+            raise ParseError(gettext('Сообщение уже удалено.'))
+        _, created = CommentReport.objects.get_or_create(comment=comment, reporter=request.user)
+        return Response(CommentSerializer(comment, context=discussion_context(request, block, [comment.id])).data,
+                        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class CommentDismissReportsView(APIView):
+    """
+    POST /api/comments/<id>/dismiss-reports/   the course author: nothing wrong here
+
+    Closes the comment's open reports (they stay, dismissed). 200: the
+    comment. 403: not the course author. 404: a comment the user can't read.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, comment_id):
+        comment = visible_comment(request, comment_id)
+        block = comment.thread.block
+        if not is_course_author(request.user, block):
+            raise PermissionDenied(gettext('Жалобы разбирает только автор курса.'))
+        comment.reports.filter(is_dismissed=False).update(is_dismissed=True)
+        return Response(CommentSerializer(comment, context=discussion_context(request, block, [comment.id])).data)
+
+
+class DiscussionReportsView(APIView):
+    """
+    GET /api/discussions/reports/   open reports in my courses (course author)
+
+    {"reports": [{"comment": CommentSerializer, "report_count": N,
+    "last_reported_at", "thread_id", "block_id", "block_type", "lesson_id",
+    "lesson_title", "course_id", "course_title"}]}: one entry per reported
+    comment, latest report first. Empty for anyone without courses.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        rows = (open_reports().filter(comment__thread__block__lesson__course__author=request.user)
+                .order_by().values('comment')
+                .annotate(n=models.Count('id'), last=models.Max('created_at'))
+                .order_by('-last', '-comment'))
+        counts = {row['comment']: row for row in rows}
+        comments = (Comment.objects.filter(pk__in=counts)
+                    .select_related('user', 'thread__block__lesson__course').in_bulk())
+        banned = set(DiscussionBan.objects.filter(author=request.user).values_list('user_id', flat=True))
+        reports = []
+        for comment_id, row in counts.items():
+            comment = comments[comment_id]
+            block = comment.thread.block
+            context = {'request': request, 'course_author_id': request.user.id,
+                       'report_counts': {comment_id: row['n']}, 'banned_ids': banned}
+            reports.append({
+                'comment': CommentSerializer(comment, context=context).data,
+                'report_count': row['n'],
+                'last_reported_at': row['last'],
+                'thread_id': comment.thread_id,
+                'block_id': str(block.id),
+                'block_type': block.type,
+                'lesson_id': str(block.lesson_id),
+                'lesson_title': block.lesson.title,
+                'course_id': str(block.lesson.course_id),
+                'course_title': block.lesson.course.title,
+            })
+        return Response({'reports': reports})
+
+
+def ban_entry(ban):
+    return {'user_id': ban.user_id, 'user_name': display_name(ban.user), 'username': ban.user.username,
+            'created_at': ban.created_at}
+
+
+class DiscussionBansView(APIView):
+    """
+    GET  /api/discussions/bans/   users I (a course author) have banned
+    POST /api/discussions/bans/   Body: {"user_id": N}: ban one
+
+    A banned user can't start threads or reply in any of my courses but can
+    still read them. POST 201 (200 if already banned): {user_id, user_name,
+    username, created_at}. 400: bad user_id, or myself. 403: I have no
+    courses. 404: not a student enrolled in one of my courses.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        bans = DiscussionBan.objects.filter(author=request.user).select_related('user')
+        return Response({'bans': [ban_entry(ban) for ban in bans]})
+
+    def post(self, request):
+        try:
+            user_id = int(request.data.get('user_id'))
+        except (TypeError, ValueError):
+            raise ParseError(gettext('Укажите пользователя: user_id.'))
+        if not Course.objects.filter(author=request.user).exists():
+            raise PermissionDenied(gettext('Блокировать в обсуждениях может только автор курса.'))
+        if user_id == request.user.id:
+            raise ParseError(gettext('Нельзя заблокировать себя.'))
+        if not Enrollment.objects.filter(student_id=user_id, course__author=request.user).exists():
+            raise NotFound(gettext('Среди учащихся ваших курсов такого нет.'))
+        ban, created = DiscussionBan.objects.get_or_create(author=request.user, user_id=user_id)
+        ban = DiscussionBan.objects.select_related('user').get(pk=ban.pk)
+        return Response(ban_entry(ban), status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class DiscussionBanDetailView(APIView):
+    """
+    DELETE /api/discussions/bans/<user_id>/   lift my ban. 204; 404: no such ban.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, user_id):
+        deleted, _ = DiscussionBan.objects.filter(author=request.user, user_id=user_id).delete()
+        if not deleted:
+            raise NotFound(gettext('Этот пользователь не заблокирован.'))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DiscussionCountsView(APIView):
@@ -1591,7 +1763,8 @@ class DiscussionCountsView(APIView):
     GET /api/discussions/counts/?lesson=<id>
 
     {"counts": {"<block id>": N}}: for each task block of the lesson that has
-    any, the number of threads the user may read (the «💬 N» badges).
+    any, the number of threads the user may read (the «💬 N» badges); the
+    course author also gets {"reports": {"<block id>": N}}, open reports.
     400: lesson missing or malformed. 404: a lesson the user can't read.
     """
     permission_classes = [permissions.IsAuthenticated]
@@ -1601,8 +1774,14 @@ class DiscussionCountsView(APIView):
             lesson_id = uuid.UUID(str(request.query_params.get('lesson')))
         except ValueError:
             raise ParseError(gettext('Укажите урок: lesson.'))
-        if not Lesson.objects.visible_to(request.user).filter(pk=lesson_id).exists():
+        lesson = Lesson.objects.visible_to(request.user).select_related('course').filter(pk=lesson_id).first()
+        if lesson is None:
             raise NotFound(gettext('Урок не найден.'))
-        rows = (Thread.objects.visible_to(request.user).filter(block__lesson_id=lesson_id)
+        rows = (Thread.objects.visible_to(request.user).filter(block__lesson=lesson)
                 .order_by().values('block').annotate(n=models.Count('id')))
-        return Response({'counts': {str(row['block']): row['n'] for row in rows}})
+        data = {'counts': {str(row['block']): row['n'] for row in rows}}
+        if lesson.course.author_id == request.user.id:
+            reports = (open_reports().filter(comment__thread__block__lesson=lesson)
+                       .order_by().values('comment__thread__block').annotate(n=models.Count('id')))
+            data['reports'] = {str(row['comment__thread__block']): row['n'] for row in reports}
+        return Response(data)

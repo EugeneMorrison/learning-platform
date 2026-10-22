@@ -1,7 +1,7 @@
 """
 Discussions (api/discussions.py): who may read which threads (the solved-block
 rule, enforced on the server), enrolment, who may resolve / pin / delete, the
-one-post-a-minute limit, and plain text only.
+one-post-a-minute limit, plain text only, and moderation (bans, reports).
 
 Run with: python manage.py test api.test_discussions
 """
@@ -15,7 +15,8 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from .discussions import MAX_COMMENT_LENGTH
-from .models import Block, Comment, Course, Enrollment, Lesson, Progress, Thread, User
+from .models import (Block, Comment, CommentReport, Course, DiscussionBan, Enrollment, Lesson, Progress, Thread,
+                     User)
 
 PANEL_SOURCE = Path(settings.BASE_DIR, 'frontend', 'src', 'components', 'DiscussionPanel.jsx')
 
@@ -318,3 +319,138 @@ class PlainTextTests(DiscussionTestCase):
         source = PANEL_SOURCE.read_text('utf-8')
         self.assertNotIn('dangerouslySetInnerHTML', source)
         self.assertNotIn('innerHTML', source)
+
+
+class BanTests(DiscussionTestCase):
+
+    def ban(self, user, target):
+        return self.as_user(user).post('/api/discussions/bans/', {'user_id': target.id}, format='json')
+
+    def test_banned_user_can_read_but_not_post(self):
+        self.assertEqual(self.ban(self.author, self.student).status_code, 201)
+        response = self.threads(self.student, self.code)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['can_post'])
+        for posted in (self.start(self.student, self.fill), self.reply(self.student, self.own)):
+            self.assertEqual(posted.status_code, 403)
+            self.assertIn('закрыл', posted.data['detail'])
+        self.assertEqual(Comment.objects.filter(user=self.student).count(), 1)  # the setup's
+        self.assertTrue(self.threads(self.solver, self.code).data['can_post'])  # only her
+
+    def test_unban_lets_them_post_again(self):
+        self.ban(self.author, self.student)
+        self.assertEqual(self.as_user(self.author).delete(f'/api/discussions/bans/{self.student.id}/').status_code, 204)
+        self.assertEqual(self.reply(self.student, self.own).status_code, 201)
+        self.assertEqual(self.as_user(self.author).delete(f'/api/discussions/bans/{self.student.id}/').status_code, 404)
+
+    def test_ban_covers_all_her_courses_and_no_one_elses(self):
+        second = Course.objects.create(title='SQL', author=self.author)
+        second_lesson = Lesson.objects.create(course=second, title='Select', order_index=1)
+        second_code = Block.objects.create(lesson=second_lesson, type='CODE', order_index=1, content={'tests': []})
+        others = Course.objects.create(title='Go', author=self.other_author)
+        others_lesson = Lesson.objects.create(course=others, title='Intro', order_index=1)
+        others_code = Block.objects.create(lesson=others_lesson, type='CODE', order_index=1, content={'tests': []})
+        for course in (second, others):
+            Enrollment.objects.create(student=self.student, course=course)
+        self.ban(self.author, self.student)
+        self.assertEqual(self.start(self.student, second_code).status_code, 403)
+        self.assertEqual(self.start(self.student, others_code).status_code, 201)
+
+    def test_only_a_course_author_bans_her_own_students(self):
+        self.assertEqual(self.ban(self.student, self.solver).status_code, 403)       # no courses
+        self.assertEqual(self.ban(self.other_author, self.student).status_code, 403)
+        Course.objects.create(title='Go', author=self.other_author)
+        self.assertEqual(self.ban(self.other_author, self.student).status_code, 404)  # not her student
+        self.assertEqual(self.ban(self.author, self.outsider).status_code, 404)
+        self.assertEqual(self.ban(self.author, self.author).status_code, 400)
+        self.assertEqual(self.as_user(self.author).post('/api/discussions/bans/', {'user_id': 'x'},
+                                                        format='json').status_code, 400)
+        self.assertFalse(DiscussionBan.objects.exists())
+
+    def test_ban_twice_is_one_ban_and_listed_for_her_only(self):
+        self.assertEqual(self.ban(self.author, self.student).status_code, 201)
+        self.assertEqual(self.ban(self.author, self.student).status_code, 200)
+        bans = self.as_user(self.author).get('/api/discussions/bans/').data['bans']
+        self.assertEqual([(b['user_id'], b['username']) for b in bans], [(self.student.id, 'student')])
+        self.assertEqual(self.as_user(self.other_author).get('/api/discussions/bans/').data['bans'], [])
+
+    def test_ban_flags_go_to_the_course_author_only(self):
+        self.ban(self.author, self.student)
+        own = next(t for t in self.threads(self.author, self.code).data['threads'] if t['id'] == self.own.id)
+        self.assertEqual((own['comments'][0]['user_is_banned'], own['comments'][0]['can_ban']), (True, True))
+        self.assertEqual(own['comments'][1]['user_is_banned'], False)  # solver
+        own = next(t for t in self.threads(self.solver, self.code).data['threads'] if t['id'] == self.own.id)
+        self.assertEqual((own['comments'][0]['user_is_banned'], own['comments'][0]['can_ban']), (None, False))
+
+
+class ReportTests(DiscussionTestCase):
+
+    def report(self, user, comment):
+        return self.as_user(user).post(f'/api/comments/{comment.id}/report/')
+
+    def reports(self, user):
+        return self.as_user(user).get('/api/discussions/reports/').data['reports']
+
+    def test_student_reports_once(self):
+        spoiler = self.solvers.comments.first()
+        response = self.report(self.student, self.own.comments.last())  # solver's reply in her thread
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['reported'])
+        self.assertFalse(response.data['can_report'])
+        self.assertIsNone(response.data['report_count'])  # counts are for the course author
+        self.assertEqual(self.report(self.student, self.own.comments.last()).status_code, 200)
+        self.assertEqual(CommentReport.objects.count(), 1)
+        self.assertEqual(self.report(self.solver, spoiler).status_code, 400)  # own comment
+
+    def test_cannot_report_what_one_cannot_read(self):
+        spoiler = self.solvers.comments.first()  # student hasn't solved CODE
+        self.assertEqual(self.report(self.student, spoiler).status_code, 404)
+        self.assertEqual(self.report(self.outsider, spoiler).status_code, 404)
+        self.assertFalse(CommentReport.objects.exists())
+
+    def test_course_author_does_not_report_and_is_not_reported(self):
+        self.assertEqual(self.report(self.author, self.solvers.comments.first()).status_code, 403)
+        hint = make_thread(self.code, self.author, 'Подсказка', pinned=True).comments.first()
+        self.assertEqual(self.report(self.student, hint).status_code, 400)
+        thread = next(t for t in self.threads(self.student, self.code).data['threads'] if t['starter'] == self.author.id)
+        self.assertFalse(thread['comments'][0]['can_report'])
+        self.assertFalse(CommentReport.objects.exists())
+
+    def test_deleted_comment_cannot_be_reported(self):
+        comment = self.own.comments.last()
+        self.as_user(self.author).delete(f'/api/comments/{comment.id}/')
+        self.assertEqual(self.report(self.student, comment).status_code, 400)
+
+    def test_author_sees_open_reports_in_her_courses(self):
+        spoiler = self.solvers.comments.first()  # seen only by those who solved CODE
+        for user in (self.classmate, self.student):
+            solve(user, self.code)
+            self.assertEqual(self.report(user, spoiler).status_code, 201)
+        reports = self.reports(self.author)
+        self.assertEqual(len(reports), 1)
+        entry = reports[0]
+        self.assertEqual((entry['report_count'], entry['comment']['id'], entry['comment']['text']),
+                         (2, spoiler.id, 'Моё решение: print(1)'))
+        self.assertEqual((entry['block_id'], entry['lesson_title'], entry['course_title']),
+                         (str(self.code.id), 'Lists', 'Python basics'))
+        self.assertEqual(self.reports(self.other_author), [])
+        self.assertEqual(self.reports(self.student), [])
+        # In the panel and on the «💬 N» badge too.
+        thread = next(t for t in self.threads(self.author, self.code).data['threads'] if t['id'] == self.solvers.id)
+        self.assertEqual(thread['comments'][0]['report_count'], 2)
+        self.assertEqual(self.counts(self.author).data['reports'], {str(self.code.id): 2})
+        self.assertNotIn('reports', self.counts(self.student).data)
+
+    def test_dismissing_or_deleting_closes_reports(self):
+        spoiler, reply = self.solvers.comments.first(), self.own.comments.last()
+        solve(self.classmate, self.code)
+        self.assertEqual(self.report(self.classmate, spoiler).status_code, 201)
+        self.assertEqual(self.report(self.student, reply).status_code, 201)
+        self.assertEqual(self.as_user(self.student).post(f'/api/comments/{reply.id}/dismiss-reports/').status_code, 403)
+        response = self.as_user(self.author).post(f'/api/comments/{reply.id}/dismiss-reports/')
+        self.assertEqual((response.status_code, response.data['report_count']), (200, 0))
+        self.as_user(self.author).delete(f'/api/comments/{spoiler.id}/')
+        self.assertEqual(self.reports(self.author), [])
+        self.assertEqual(CommentReport.objects.filter(is_dismissed=True).count(), 1)
+        # The reporter still sees that they reported it (no second report).
+        self.assertEqual(self.report(self.student, reply).status_code, 200)

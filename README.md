@@ -431,10 +431,16 @@ POST   /api/threads/{id}/comments/             Reply {"text"}
 PATCH  /api/threads/{id}/                      {"is_resolved"} (starter / course author), {"is_pinned"} (course author)
 DELETE /api/threads/{id}/                      Delete a thread (course author)
 DELETE /api/comments/{id}/                     Delete a comment, softly (course author)
-GET    /api/discussions/counts/?lesson={id}    Threads I may read, per block («💬 N»)
+GET    /api/discussions/counts/?lesson={id}    Threads I may read, per block («💬 N»; + open reports for the course author)
+POST   /api/comments/{id}/report/              Report a comment (students; once each)
+POST   /api/comments/{id}/dismiss-reports/     Dismiss its reports (course author)
+GET    /api/discussions/reports/               Open reports in my courses (course author's dashboard)
+GET    /api/discussions/bans/                  Users I banned from posting
+POST   /api/discussions/bans/                  Ban a student of my courses {"user_id"}
+DELETE /api/discussions/bans/{user_id}/        Lift a ban
 ```
 
-Course author and enrolled students only. Before solving a task, a student sees only the pinned threads and their own; after solving, all of them (checked on the server, `api/discussions.py`). Plain text up to 2000 characters, one post a minute (the course author is exempt).
+Course author and enrolled students only. Before solving a task, a student sees only the pinned threads and their own; after solving, all of them (checked on the server, `api/discussions.py`). Plain text up to 2000 characters, one post a minute (the course author is exempt). A ban covers all of the author's courses: the user can still read, but not post.
 
 ### WebSocket — real-time chat
 

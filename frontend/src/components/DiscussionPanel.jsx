@@ -5,18 +5,21 @@ import { messageLength } from '../lib/chatSocket';
 import { useKeyboardInset } from '../lib/keyboardInset';
 import { formatMessageTime } from '../lib/notifications';
 import './Discussion.css';
+import './Notifications.css'; // .unread-badge
 
 // Longest post, in characters (code points): api/discussions.py MAX_COMMENT_LENGTH.
 const MAX_COMMENT_LENGTH = 2000;
 
 /**
  * «💬 N» in a task block's head: N = threads this user may read; opens and
- * closes the block's discussion. discussion: { count, open, onToggle, panelId }
+ * closes the block's discussion. For the course author, a red count of open
+ * reports on it. discussion: { count, reports, open, onToggle, panelId }
  * (LessonViewer), or nothing (no discussions: embeds, logged out).
  */
 export function DiscussionBadge({ blockId, discussion }) {
     if (!discussion) return null;
-    const { count, open, onToggle, panelId } = discussion;
+    const { count, reports = 0, open, onToggle, panelId } = discussion;
+    const label = `Обсуждение задания: ${count}` + (reports > 0 ? `, жалоб: ${reports}` : '');
     return (
         <button
             type="button"
@@ -25,10 +28,11 @@ export function DiscussionBadge({ blockId, discussion }) {
             onClick={onToggle}
             aria-expanded={open}
             aria-controls={open ? panelId : undefined}
-            aria-label={`Обсуждение задания: ${count}`}
-            title="Обсуждение задания"
+            aria-label={label}
+            title={label}
         >
             <span aria-hidden="true">💬</span> {count}
+            {reports > 0 && <span className="unread-badge" aria-hidden="true">{reports > 9 ? '9+' : reports}</span>}
         </button>
     );
 }
@@ -99,13 +103,19 @@ function PostForm({ id, label, hideLabel, placeholder, submitLabel, onSend, onCa
     );
 }
 
-/** One post. User text is always a text node, never HTML. */
-function CommentItem({ comment, onDelete }) {
+/**
+ * One post. User text is always a text node, never HTML. Moderation, as the
+ * server allows (can_* flags): students report; the course author sees open
+ * reports, dismisses them, deletes, bans and unbans the writer.
+ */
+function CommentItem({ comment, actions }) {
+    const reports = comment.report_count || 0;
     return (
-        <li className="discussion-comment">
+        <li className={reports > 0 ? 'discussion-comment discussion-comment--reported' : 'discussion-comment'}>
             <p className="discussion-comment__meta">
                 <span className="discussion-comment__author">{comment.user_name}</span>
                 {comment.is_course_author && <span className="discussion-chip">Автор курса</span>}
+                {comment.user_is_banned && <span className="discussion-chip discussion-chip--muted">Заблокирован</span>}
                 <time className="discussion-comment__time" dateTime={comment.created_at}>
                     {formatMessageTime(comment.created_at)}
                 </time>
@@ -119,16 +129,39 @@ function CommentItem({ comment, onDelete }) {
             ) : (
                 <p className="discussion-comment__text">{comment.text}</p>
             )}
-            {comment.can_delete && (
-                <button type="button" className="discussion-link discussion-link--danger" onClick={() => onDelete(comment)}>
-                    Удалить
-                </button>
+            {reports > 0 && (
+                <p className="discussion-comment__reports">
+                    <span className="discussion-chip discussion-chip--danger">Жалоб: {reports}</span>
+                    <button type="button" className="discussion-link" onClick={() => actions.dismiss(comment)}>
+                        Отклонить жалобы
+                    </button>
+                </p>
+            )}
+            {(comment.can_delete || comment.can_ban || comment.can_report || comment.reported) && (
+                <p className="discussion-comment__actions">
+                    {comment.can_delete && (
+                        <button type="button" className="discussion-link discussion-link--danger" onClick={() => actions.remove(comment)}>
+                            Удалить
+                        </button>
+                    )}
+                    {comment.can_ban && (
+                        <button type="button" className="discussion-link" onClick={() => actions.ban(comment)}>
+                            {comment.user_is_banned ? 'Разблокировать' : 'Заблокировать'}
+                        </button>
+                    )}
+                    {comment.can_report && (
+                        <button type="button" className="discussion-link discussion-link--quiet" onClick={() => actions.report(comment)}>
+                            Пожаловаться
+                        </button>
+                    )}
+                    {comment.reported && <span className="discussion-comment__note">Жалоба отправлена</span>}
+                </p>
             )}
         </li>
     );
 }
 
-function ThreadItem({ thread, onChange, onRemove }) {
+function ThreadItem({ thread, canPost, onChange, onRemove, onModerated, onBan }) {
     // Resolved threads start collapsed (one line); the rest are open.
     const [expanded, setExpanded] = useState(!thread.is_resolved);
     const [replying, setReplying] = useState(false);
@@ -163,16 +196,35 @@ function ThreadItem({ thread, onChange, onRemove }) {
         }
     }
 
-    async function removeComment(comment) {
-        if (!window.confirm('Удалить комментарий?')) return;
+    // A request that answers with the comment, which then replaces it here.
+    async function commentAction(comment, confirmText, request, fallback) {
+        if (confirmText && !window.confirm(confirmText)) return;
         setError('');
         try {
-            const res = await api.delete(`/comments/${comment.id}/`);
+            const res = await request();
             onChange({ ...thread, comments: thread.comments.map(c => (c.id === comment.id ? res.data : c)) });
+            onModerated();
         } catch (err) {
-            setError(errorText(err, 'Не удалось удалить. Попробуйте ещё раз.'));
+            setError(errorText(err, fallback));
         }
     }
+
+    const commentActions = {
+        remove: comment => commentAction(comment, 'Удалить комментарий?',
+            () => api.delete(`/comments/${comment.id}/`), 'Не удалось удалить. Попробуйте ещё раз.'),
+        report: comment => commentAction(comment, 'Пожаловаться на комментарий? Его увидит автор курса.',
+            () => api.post(`/comments/${comment.id}/report/`), 'Жалоба не отправлена. Попробуйте ещё раз.'),
+        dismiss: comment => commentAction(comment, null,
+            () => api.post(`/comments/${comment.id}/dismiss-reports/`), 'Не получилось. Попробуйте ещё раз.'),
+        ban: async comment => {
+            setError('');
+            try {
+                await onBan(comment);
+            } catch (err) {
+                setError(errorText(err, 'Не получилось. Попробуйте ещё раз.'));
+            }
+        },
+    };
 
     async function sendReply(text) {
         const res = await api.post(`/threads/${thread.id}/comments/`, { text });
@@ -207,7 +259,7 @@ function ThreadItem({ thread, onChange, onRemove }) {
             ) : (
                 <div id={bodyId}>
                     <ol className="discussion-comments">
-                        {thread.comments.map(c => <CommentItem key={c.id} comment={c} onDelete={removeComment} />)}
+                        {thread.comments.map(c => <CommentItem key={c.id} comment={c} actions={commentActions} />)}
                     </ol>
 
                     {error && <p className="discussion-form__error" role="alert">{error}</p>}
@@ -225,7 +277,9 @@ function ThreadItem({ thread, onChange, onRemove }) {
                         />
                     ) : (
                         <div className="discussion-thread__actions">
-                            <button type="button" className="discussion-link" onClick={() => setReplying(true)}>Ответить</button>
+                            {canPost && (
+                                <button type="button" className="discussion-link" onClick={() => setReplying(true)}>Ответить</button>
+                            )}
                             {thread.can_resolve && (
                                 <button type="button" className="discussion-link" disabled={busy}
                                     onClick={() => patch({ is_resolved: !thread.is_resolved })}>
@@ -272,8 +326,9 @@ function sortThreads(threads) {
  * changes: solving shows every thread); the server decides what this user may
  * read and do (can_* flags). A right-hand panel; a bottom sheet on phones
  * (Discussion.css). Not modal: Esc and the close button call onClose, which
- * returns focus. onThreadsChanged: a thread was started or deleted (the
- * block's «💬 N»).
+ * returns focus. onThreadsChanged: a thread was started or deleted, or
+ * reports changed (the block's «💬 N» and, for the course author, its open
+ * reports).
  */
 function DiscussionPanel({ id, blockId, title, solved, onClose, onThreadsChanged }) {
     const [data, setData] = useState(null);
@@ -334,6 +389,25 @@ function DiscussionPanel({ id, blockId, title, solved, onClose, onThreadsChanged
         onThreadsChanged();
     }
 
+    // Ban / unban a comment's writer (all the author's courses): every post
+    // of theirs here shows it.
+    async function toggleBan(comment) {
+        const banned = comment.user_is_banned;
+        const question = banned
+            ? `Разблокировать ${comment.user_name}? Снова сможет писать в обсуждения.`
+            : `Заблокировать ${comment.user_name}? Не сможет писать в обсуждения ваших курсов, но сможет их читать.`;
+        if (!window.confirm(question)) return;
+        if (banned) await api.delete(`/discussions/bans/${comment.user}/`);
+        else await api.post('/discussions/bans/', { user_id: comment.user });
+        setData(current => ({
+            ...current,
+            threads: current.threads.map(t => ({
+                ...t,
+                comments: t.comments.map(c => (c.user === comment.user ? { ...c, user_is_banned: !banned } : c)),
+            })),
+        }));
+    }
+
     async function startThread(text) {
         const res = await api.post(`/blocks/${blockId}/threads/`, { text });
         setData(current => ({ ...current, threads: sortThreads([res.data, ...current.threads]) }));
@@ -371,13 +445,19 @@ function DiscussionPanel({ id, blockId, title, solved, onClose, onThreadsChanged
 
                 {data && (
                     <>
-                        <PostForm
-                            id={`${id}-new`}
-                            label="Новое обсуждение"
-                            placeholder="Вопрос или подсказка для других. Готовое решение не публикуйте."
-                            submitLabel="Опубликовать"
-                            onSend={startThread}
-                        />
+                        {data.can_post ? (
+                            <PostForm
+                                id={`${id}-new`}
+                                label="Новое обсуждение"
+                                placeholder="Вопрос или подсказка для других. Готовое решение не публикуйте."
+                                submitLabel="Опубликовать"
+                                onSend={startThread}
+                            />
+                        ) : (
+                            <p className="notice notice-warning">
+                                Автор курса закрыл вам возможность писать в обсуждения. Читать их можно.
+                            </p>
+                        )}
 
                         {data.hidden_count > 0 && (
                             <p className="discussion-panel__note">
@@ -390,7 +470,8 @@ function DiscussionPanel({ id, blockId, title, solved, onClose, onThreadsChanged
                         ) : (
                             <ol className="discussion-list">
                                 {data.threads.map(t => (
-                                    <ThreadItem key={t.id} thread={t} onChange={replaceThread} onRemove={removeThread} />
+                                    <ThreadItem key={t.id} thread={t} canPost={data.can_post} onChange={replaceThread}
+                                        onRemove={removeThread} onModerated={onThreadsChanged} onBan={toggleBan} />
                                 ))}
                             </ol>
                         )}

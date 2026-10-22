@@ -272,8 +272,53 @@
     color: var(--color-danger);
 }
 
-.discussion-comment .discussion-link {
-    margin-top: var(--space-1);
+/* Under a post: «Удалить», «Заблокировать», «Пожаловаться» / «Жалоба отправлена». */
+.discussion-comment__actions,
+.discussion-comment__reports {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    margin: var(--space-1) 0 0;
+}
+
+.discussion-comment__note {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* Course author: a post with open reports. */
+.discussion-comment--reported {
+    margin-right: calc(-1 * var(--space-2));
+    margin-left: calc(-1 * var(--space-2));
+    padding: var(--space-2);
+    border-radius: var(--radius-small);
+    box-shadow: inset 0 0 0 var(--border-width) var(--color-danger);
+}
+
+/* A reply with reports keeps its indent line. */
+.discussion-comment + .discussion-comment--reported {
+    padding-left: calc(var(--space-4) + var(--space-2));
+}
+
+.discussion-chip--danger {
+    background: var(--color-danger);
+    color: var(--color-ground);
+}
+
+.discussion-chip--muted {
+    background: var(--color-line);
+    color: var(--color-ink);
+}
+
+/* «Пожаловаться»: there, but not competing with the content. */
+.discussion-link--quiet {
+    color: var(--color-muted);
+    font-weight: var(--weight-regular);
+}
+
+.discussion-panel__body > .notice {
+    margin: 0;
 }
 
 .discussion-link:focus-visible,
@@ -305,4 +350,45 @@
     .discussion-panel--keyboard {
         height: calc(var(--chat-viewport) - var(--discussion-top, 0px));
     }
+}
+
+/* ---- «Жалобы в обсуждениях» (author dashboard, DiscussionReports.jsx) ---- */
+
+.report-item {
+    padding: var(--space-3) var(--space-4);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-ground);
+}
+
+.report-item__where {
+    margin: 0 0 var(--space-1);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.report-item__text {
+    margin: var(--space-1) 0;
+}
+
+.report-bans__title {
+    margin: var(--space-6) 0 var(--space-3);
+    font-family: var(--font-heading);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+}
+
+.report-bans {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.report-bans__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: var(--border-width) solid var(--color-line);
 }

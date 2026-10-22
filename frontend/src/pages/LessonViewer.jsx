@@ -42,7 +42,7 @@ function nextStep(lesson) {
 
 function LessonViewer() {
     const isInIframe = window.self !== window.top;
-    const { hash } = useLocation();
+    const { hash, search } = useLocation();
 
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]);
@@ -55,9 +55,11 @@ function LessonViewer() {
     // «Задать вопрос» open for this task: { blockId, draft? } (draft: CODE editor code).
     const [question, setQuestion] = useState(null);
     const chatRef = useRef(null); // StudentChat: open(message?), close()
-    // The task whose discussion is open (one at a time), and «💬 N» per task.
+    // The task whose discussion is open (one at a time), «💬 N» per task and,
+    // for the course author, open reports per task.
     const [discussionBlockId, setDiscussionBlockId] = useState(null);
     const [discussionCounts, setDiscussionCounts] = useState({});
+    const [discussionReports, setDiscussionReports] = useState({});
     const codeRefetchSeq = useRef({}); // block id → number of its latest read-back
 
     // The one source of truth for "solved" on this page (is_correct, as in the
@@ -140,7 +142,10 @@ function LessonViewer() {
     const loadDiscussionCounts = useCallback(() => {
         if (!lessonId) return;
         api.get('/discussions/counts/', { params: { lesson: lessonId } })
-            .then(res => setDiscussionCounts(res.data.counts))
+            .then(res => {
+                setDiscussionCounts(res.data.counts);
+                setDiscussionReports(res.data.reports || {});
+            })
             .catch(err => console.error('Failed to load discussion counts:', err));
     }, [lessonId]);
     // Changes only when a task becomes solved, not on every submission.
@@ -148,6 +153,16 @@ function LessonViewer() {
     useEffect(() => {
         if (!loading && discussionsOn) loadDiscussionCounts();
     }, [loading, discussionsOn, loadDiscussionCounts, solvedKey]);
+
+    // "?discussion=<block id>" (a report on the author's dashboard): open that
+    // task's discussion once the lesson is on the page.
+    const discussionParam = new URLSearchParams(search).get('discussion');
+    useEffect(() => {
+        if (loading || !discussionsOn || !discussionParam) return;
+        if (blocks.some(b => b.id === discussionParam && TASK_TYPES.has(b.type))) {
+            setDiscussionBlockId(discussionParam);
+        }
+    }, [loading, discussionsOn, discussionParam, blocks]);
 
     // Fade at the right edge of formula boxes that scroll sideways (phones).
     useEffect(() => {
@@ -311,6 +326,7 @@ function LessonViewer() {
         const number = blockNumbers[block.id];
         const discussion = discussionsOn ? {
             count: discussionCounts[block.id] || 0,
+            reports: discussionReports[block.id] || 0,
             open: discussionBlockId === block.id,
             onToggle: () => toggleDiscussion(block.id),
             panelId: DISCUSSION_PANEL_ID,

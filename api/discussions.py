@@ -16,6 +16,10 @@ Who may do what (views.Thread*View):
     pin / unpin             the course author
     delete a comment        the course author (soft: Comment.is_deleted)
     delete a thread         the course author (with all its comments)
+    report a comment        anyone who can read it but its writer and the
+                            course author (once; the author sees open reports)
+    ban / unban a user      the course author, for all her courses: a banned
+                            user can read but not post (DiscussionBan)
 """
 
 import math
@@ -23,10 +27,10 @@ from datetime import timedelta
 
 from django.utils import timezone
 from django.utils.translation import gettext
-from rest_framework.exceptions import NotFound, ParseError, Throttled
+from rest_framework.exceptions import NotFound, ParseError, PermissionDenied, Throttled
 
 from .block_content import TASK_TYPES
-from .models import Block, Comment, Progress
+from .models import Block, Comment, CommentReport, DiscussionBan, Progress
 
 # Longest post, in characters (code points); the panel uses the same number
 # (frontend/src/components/DiscussionPanel.jsx).
@@ -70,6 +74,22 @@ def clean_text(value):
             gettext('Сообщение слишком длинное: не больше %(max)d символов.') % {'max': MAX_COMMENT_LENGTH}
         )
     return text
+
+
+def is_banned(user, block):
+    """The course author has banned the user from posting (in all her courses)."""
+    return DiscussionBan.objects.filter(author_id=block.lesson.course.author_id, user=user).exists()
+
+
+def check_not_banned(user, block):
+    if is_banned(user, block):
+        raise PermissionDenied(gettext('Автор курса закрыл вам возможность писать в обсуждения.'))
+
+
+def open_reports():
+    """Reports the course author still has to look at: not dismissed, on a
+    comment that is still there."""
+    return CommentReport.objects.filter(is_dismissed=False, comment__is_deleted=False)
 
 
 def check_post_interval(user, block):

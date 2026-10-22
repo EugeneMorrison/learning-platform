@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 import { badgeText, conversationLink, formatMessageTime, useNotifications } from '../lib/notifications';
+import DiscussionReports from '../components/DiscussionReports';
 import '../components/Notifications.css';
 import './DashboardPage.css';
 
@@ -52,6 +53,7 @@ function DashboardPage() {
                 </div>
             </div>
             {user.role === 'AUTHOR' && <StudentQuestions />}
+            {user.role === 'AUTHOR' && <DiscussionReports />}
             {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard user={user} />}
         </div>
     );

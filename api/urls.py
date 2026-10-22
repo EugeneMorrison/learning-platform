@@ -36,7 +36,13 @@ urlpatterns = [
     path('threads/<int:thread_id>/', views.ThreadDetailView.as_view(), name='thread-detail'),
     path('threads/<int:thread_id>/comments/', views.ThreadCommentsView.as_view(), name='thread-comments'),
     path('comments/<int:comment_id>/', views.CommentDetailView.as_view(), name='comment-detail'),
+    path('comments/<int:comment_id>/report/', views.CommentReportView.as_view(), name='comment-report'),
+    path('comments/<int:comment_id>/dismiss-reports/', views.CommentDismissReportsView.as_view(),
+         name='comment-dismiss-reports'),
     path('discussions/counts/', views.DiscussionCountsView.as_view(), name='discussion-counts'),
+    path('discussions/reports/', views.DiscussionReportsView.as_view(), name='discussion-reports'),
+    path('discussions/bans/', views.DiscussionBansView.as_view(), name='discussion-bans'),
+    path('discussions/bans/<int:user_id>/', views.DiscussionBanDetailView.as_view(), name='discussion-ban-detail'),
     path('enrollments/', views.EnrollmentListCreateView.as_view(), name='enrollment-list'),
     path('enrollments/<uuid:course_id>/', views.EnrollmentDeleteView.as_view(), name='enrollment-delete'),
     path('courses/<uuid:course_id>/enrollments/', views.CourseEnrollmentsView.as_view(), name='course-enrollments'),
@@ -97,5 +103,11 @@ DISCUSSIONS (public threads per task block; api/discussions.py):
 - PATCH  /api/threads/{id}/                   → Resolve (starter / course author), pin (course author)
 - DELETE /api/threads/{id}/                   → Delete a thread (course author)
 - DELETE /api/comments/{id}/                  → Delete a comment, softly (course author)
-- GET    /api/discussions/counts/?lesson={id} → Threads I may read, per block
+- GET    /api/discussions/counts/?lesson={id} → Threads I may read, per block (+ open reports: course author)
+- POST   /api/comments/{id}/report/           → Report a comment (students)
+- POST   /api/comments/{id}/dismiss-reports/  → Dismiss its reports (course author)
+- GET    /api/discussions/reports/            → Open reports in my courses (course author)
+- GET    /api/discussions/bans/               → Users I banned from posting (course author)
+- POST   /api/discussions/bans/               → Ban a student of my courses {"user_id"}
+- DELETE /api/discussions/bans/{user_id}/     → Lift a ban
 """

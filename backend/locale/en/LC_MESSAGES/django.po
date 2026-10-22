@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-22 21:56+0300\n"
+"POT-Creation-Date: 2026-10-22 22:52+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -16,24 +16,28 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: .\api\discussions.py:57 .\api\views.py:1298
+#: .\api\discussions.py:61 .\api\views.py:1301
 msgid "Задание не найдено."
 msgstr "Task not found."
 
-#: .\api\discussions.py:59
+#: .\api\discussions.py:63
 msgid "Обсуждения есть только у заданий."
 msgstr "Only tasks have discussions."
 
-#: .\api\discussions.py:67
+#: .\api\discussions.py:71
 msgid "Напишите сообщение."
 msgstr "Write a message."
 
-#: .\api\discussions.py:70 .\api\views.py:1270 .\api\views.py:1352
+#: .\api\discussions.py:74 .\api\views.py:1273 .\api\views.py:1355
 #, python-format
 msgid "Сообщение слишком длинное: не больше %(max)d символов."
 msgstr "The message is too long: %(max)d characters at most."
 
-#: .\api\discussions.py:89
+#: .\api\discussions.py:86
+msgid "Автор курса закрыл вам возможность писать в обсуждения."
+msgstr "The course author has stopped you from posting in discussions."
+
+#: .\api\discussions.py:109
 #, python-format
 msgid ""
 "Писать в обсуждения можно не чаще раза в минуту. Попробуйте через "
@@ -48,132 +52,174 @@ msgstr ""
 msgid "Название должно быть не короче 2 символов."
 msgstr ""
 
-#: .\api\views.py:95
+#: .\api\views.py:98
 msgid "Блок не найден."
 msgstr "Block not found."
 
-#: .\api\views.py:152
+#: .\api\views.py:155
 msgid "Не указан block_id."
 msgstr "block_id is required."
 
-#: .\api\views.py:153
+#: .\api\views.py:156
 msgid "Запускать код могут только записанные на курс учащиеся и автор курса."
 msgstr ""
 "Only students enrolled in the course and the course author can run code."
 
-#: .\api\views.py:156
+#: .\api\views.py:159
 msgid "Код можно запускать только в блоке с задачей."
 msgstr "Code can only be run in an exercise block."
 
-#: .\api\views.py:608
+#: .\api\views.py:611
 msgid "Урок недоступен."
 msgstr "This lesson is not available."
 
-#: .\api\views.py:628
+#: .\api\views.py:631
 msgid "Укажите курс: ?course=<id>."
 msgstr ""
 
-#: .\api\views.py:922
+#: .\api\views.py:925
 msgid "Записаться на курс может только учащийся."
 msgstr "Only students can enroll in a course."
 
-#: .\api\views.py:928
+#: .\api\views.py:931
 msgid "Курс не найден."
 msgstr "Course not found."
 
-#: .\api\views.py:933
+#: .\api\views.py:936
 msgid ""
 "Это платный курс: самостоятельно записаться можно только на бесплатные курсы."
 msgstr "This is a paid course: you can only enroll yourself in free courses."
 
-#: .\api\views.py:1014
+#: .\api\views.py:1017
 msgid "Не указан блок."
 msgstr "block is required."
 
-#: .\api\views.py:1015
+#: .\api\views.py:1018
 msgid "Отвечать могут только записанные на курс учащиеся и автор курса."
 msgstr ""
 "Only students enrolled in the course and the course author can submit "
 "answers."
 
-#: .\api\views.py:1018
+#: .\api\views.py:1021
 msgid "Задачи с кодом проверяются запуском тестов."
 msgstr "Code tasks are checked by running the tests."
 
-#: .\api\views.py:1266
+#: .\api\views.py:1269
 msgid ""
 "Писать в чат курса могут только его автор и записанные на курс учащиеся."
 msgstr ""
 
-#: .\api\views.py:1295
+#: .\api\views.py:1298
 msgid "Укажите задание: block_id."
 msgstr "Specify the task: block_id."
 
-#: .\api\views.py:1300
+#: .\api\views.py:1303
 msgid "Вопрос можно задать только по заданию."
 msgstr "Questions can only be asked about a task."
 
-#: .\api\views.py:1302
+#: .\api\views.py:1305
 msgid "Задать вопрос могут только записанные на курс учащиеся."
 msgstr "Only students enrolled in the course can ask questions."
 
-#: .\api\views.py:1307
+#: .\api\views.py:1310
 msgid "draft должен быть строкой."
 msgstr ""
 
-#: .\api\views.py:1310
+#: .\api\views.py:1313
 #, python-format
 msgid "Код в редакторе слишком длинный: не больше %(max)d символов."
 msgstr ""
 
-#: .\api\views.py:1349
+#: .\api\views.py:1352
 msgid "Напишите вопрос."
 msgstr ""
 
-#: .\api\views.py:1429
+#: .\api\views.py:1432
 msgid "Укажите course_id и other_user_id."
 msgstr ""
 
-#: .\api\views.py:1454
+#: .\api\views.py:1457
 msgid "Обсуждение не найдено."
 msgstr "Discussion not found."
 
-#: .\api\views.py:1520
+#: .\api\views.py:1547
 #, python-format
 msgid "%(field)s: нужно true или false."
 msgstr "%(field)s: must be true or false."
 
-#: .\api\views.py:1523
+#: .\api\views.py:1550
 msgid "Укажите is_resolved или is_pinned."
 msgstr "Specify is_resolved or is_pinned."
 
-#: .\api\views.py:1525
+#: .\api\views.py:1552
 msgid "Закреплять обсуждения может только автор курса."
 msgstr "Only the course author can pin discussions."
 
-#: .\api\views.py:1527
+#: .\api\views.py:1554
 msgid ""
 "Отметить обсуждение решённым может только тот, кто его начал, или автор "
 "курса."
-msgstr "Only whoever started the discussion or the course author can mark it resolved."
+msgstr ""
+"Only whoever started the discussion or the course author can mark it "
+"resolved."
 
-#: .\api\views.py:1541
+#: .\api\views.py:1569
 msgid "Удалять обсуждения может только автор курса."
 msgstr "Only the course author can delete discussions."
 
-#: .\api\views.py:1578
+#: .\api\views.py:1599
 msgid "Сообщение не найдено."
 msgstr "Message not found."
 
-#: .\api\views.py:1581
+#: .\api\views.py:1617
 msgid "Удалять сообщения может только автор курса."
 msgstr "Only the course author can delete messages."
 
-#: .\api\views.py:1603
+#: .\api\views.py:1640
+msgid "Автор курса не отправляет жалобы: он может удалить сообщение."
+msgstr "The course author does not report comments: they can delete them."
+
+#: .\api\views.py:1642
+msgid "Нельзя пожаловаться на своё сообщение."
+msgstr "You cannot report your own message."
+
+#: .\api\views.py:1644
+msgid "Это сообщение автора курса: жалобы на него некому разбирать."
+msgstr "This is the course author's message: there is no one to review reports on it."
+
+#: .\api\views.py:1646
+msgid "Сообщение уже удалено."
+msgstr "The message has already been deleted."
+
+#: .\api\views.py:1665
+msgid "Жалобы разбирает только автор курса."
+msgstr "Only the course author handles reports."
+
+#: .\api\views.py:1736
+msgid "Укажите пользователя: user_id."
+msgstr "Specify the user: user_id."
+
+#: .\api\views.py:1738
+msgid "Блокировать в обсуждениях может только автор курса."
+msgstr "Only a course author can ban users from discussions."
+
+#: .\api\views.py:1740
+msgid "Нельзя заблокировать себя."
+msgstr "You cannot ban yourself."
+
+#: .\api\views.py:1742
+msgid "Среди учащихся ваших курсов такого нет."
+msgstr "No such student in your courses."
+
+#: .\api\views.py:1757
+msgid "Этот пользователь не заблокирован."
+msgstr "This user is not banned."
+
+#: .\api\views.py:1776
 msgid "Укажите урок: lesson."
 msgstr "Specify the lesson: lesson."
 
-#: .\api\views.py:1605
+#: .\api\views.py:1779
 msgid "Урок не найден."
 msgstr "Lesson not found."
 

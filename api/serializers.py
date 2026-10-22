@@ -510,7 +510,10 @@ def display_name(user):
 
 class DiscussionViewerMixin:
     """Discussion serializers answer per viewer: context needs `request` and
-    `course_author_id` (the author of the block's course)."""
+    `course_author_id` (the author of the block's course); views.
+    discussion_context also adds what the viewer's flags need: `reported_ids`
+    (comments the viewer reported), `report_counts` and `banned_ids` (course
+    author only)."""
 
     def viewer_id(self):
         return self.context['request'].user.id
@@ -521,11 +524,35 @@ class DiscussionViewerMixin:
 
 class CommentSerializer(DiscussionViewerMixin, serializers.ModelSerializer):
     """A discussion post. A deleted one keeps its place, but its text goes
-    only to the course author (text: null for everyone else)."""
+    only to the course author (text: null for everyone else). Moderation:
+    the viewer's own report (reported, can_report); for the course author
+    only, open reports (report_count) and whether its writer is banned
+    (user_is_banned, can_ban), null for everyone else."""
     user_name = serializers.SerializerMethodField()
     is_course_author = serializers.SerializerMethodField()
     text = serializers.SerializerMethodField()
     can_delete = serializers.SerializerMethodField()
+    reported = serializers.SerializerMethodField()
+    can_report = serializers.SerializerMethodField()
+    report_count = serializers.SerializerMethodField()
+    user_is_banned = serializers.SerializerMethodField()
+    can_ban = serializers.SerializerMethodField()
+
+    def get_reported(self, obj):
+        return obj.id in self.context.get('reported_ids', ())
+
+    def get_can_report(self, obj):
+        return not (self.viewer_is_author() or obj.is_deleted or obj.user_id == self.viewer_id()
+                    or obj.user_id == self.context['course_author_id'] or self.get_reported(obj))
+
+    def get_report_count(self, obj):
+        return self.context.get('report_counts', {}).get(obj.id, 0) if self.viewer_is_author() else None
+
+    def get_user_is_banned(self, obj):
+        return obj.user_id in self.context.get('banned_ids', ()) if self.viewer_is_author() else None
+
+    def get_can_ban(self, obj):
+        return self.viewer_is_author() and obj.user_id != self.context['course_author_id']
 
     def get_user_name(self, obj):
         return display_name(obj.user)
@@ -544,7 +571,8 @@ class CommentSerializer(DiscussionViewerMixin, serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ['id', 'thread', 'user', 'user_name', 'is_course_author', 'text', 'is_deleted',
-                  'created_at', 'can_delete']
+                  'created_at', 'can_delete', 'reported', 'can_report', 'report_count',
+                  'user_is_banned', 'can_ban']
         read_only_fields = fields
 
 

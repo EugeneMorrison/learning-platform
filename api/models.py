@@ -647,6 +647,43 @@ class Comment(models.Model):
         return f"{self.user.username} in thread #{self.thread_id}: {self.text[:50]}"
 
 
+class DiscussionBan(models.Model):
+    """
+    A course author has stopped a user posting in the discussions of all her
+    courses (per author, not per course). The user can still read them.
+    """
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussion_bans_given')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussion_bans')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'discussion_bans'
+        unique_together = ['author', 'user']
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"{self.author.username} banned {self.user.username}"
+
+
+class CommentReport(models.Model):
+    """
+    A student flags a comment for the course author. Open until the author
+    dismisses it or deletes the comment. One per comment and reporter.
+    """
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name='reports')
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comment_reports')
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_dismissed = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'comment_reports'
+        unique_together = ['comment', 'reporter']
+        ordering = ['created_at', 'id']
+
+    def __str__(self):
+        return f"{self.reporter.username} reported comment #{self.comment_id}"
+
+
 # =============================================================================
 # LANDING PAGE CONTENT (managed in the Django admin)
 # =============================================================================
