@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { MAX_MESSAGE_LENGTH, messageLength } from '../lib/chatSocket';
+import { useKeyboardInset } from '../lib/keyboardInset';
 import QuestionCard from './QuestionCard';
 import './ChatPanel.css';
 
@@ -44,31 +45,6 @@ function SendIcon() {
     );
 }
 
-// Phones: keep the floating window above the on-screen keyboard. The keyboard
-// shrinks the visual viewport but not the layout viewport that position: fixed
-// uses, so the gap between them is exposed as --chat-keyboard / --chat-viewport.
-function useKeyboardInset(ref, enabled) {
-    useEffect(() => {
-        const vv = window.visualViewport;
-        const el = ref.current;
-        if (!enabled || !vv || !el) return undefined;
-        function update() {
-            const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-            el.style.setProperty('--chat-keyboard', `${inset}px`);
-            el.style.setProperty('--chat-viewport', `${Math.round(vv.height)}px`);
-            // Ignore small differences (browser toolbars collapsing).
-            el.classList.toggle('chat-panel--keyboard', inset > 80);
-        }
-        update();
-        vv.addEventListener('resize', update);
-        vv.addEventListener('scroll', update);
-        return () => {
-            vv.removeEventListener('resize', update);
-            vv.removeEventListener('scroll', update);
-        };
-    }, [ref, enabled]);
-}
-
 function ChatPanel({
     id,
     variant = 'floating',
@@ -100,7 +76,7 @@ function ChatPanel({
     const showCounter = length >= MAX_MESSAGE_LENGTH * 0.9;
     const Heading = `h${headingLevel}`;
 
-    useKeyboardInset(panelRef, floating);
+    useKeyboardInset(panelRef, floating, 'chat-panel--keyboard');
 
     // Move focus into the window when it opens (not into the input: on phones
     // that would raise the keyboard over the history straight away).

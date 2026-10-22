@@ -10,7 +10,7 @@ Serializers convert between:
 from django.utils.translation import gettext
 from rest_framework import serializers
 from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
-from .models import User, Course, Lesson, Block, Enrollment, Progress, Message
+from .models import User, Course, Lesson, Block, Enrollment, Progress, Message, Thread, Comment
 
 
 # =============================================================================
@@ -501,3 +501,80 @@ class MessageSerializer(serializers.ModelSerializer):
             'context',  # its snapshot (api/questions.py)
         ]
         read_only_fields = ['id', 'created_at', 'sender', 'block', 'context']
+
+
+def display_name(user):
+    """Full name when the user has one, else the username."""
+    return user.get_full_name() or user.username
+
+
+class DiscussionViewerMixin:
+    """Discussion serializers answer per viewer: context needs `request` and
+    `course_author_id` (the author of the block's course)."""
+
+    def viewer_id(self):
+        return self.context['request'].user.id
+
+    def viewer_is_author(self):
+        return self.viewer_id() == self.context['course_author_id']
+
+
+class CommentSerializer(DiscussionViewerMixin, serializers.ModelSerializer):
+    """A discussion post. A deleted one keeps its place, but its text goes
+    only to the course author (text: null for everyone else)."""
+    user_name = serializers.SerializerMethodField()
+    is_course_author = serializers.SerializerMethodField()
+    text = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+
+    def get_user_name(self, obj):
+        return display_name(obj.user)
+
+    def get_is_course_author(self, obj):
+        return obj.user_id == self.context['course_author_id']
+
+    def get_text(self, obj):
+        if obj.is_deleted and not self.viewer_is_author():
+            return None
+        return obj.text
+
+    def get_can_delete(self, obj):
+        return self.viewer_is_author() and not obj.is_deleted
+
+    class Meta:
+        model = Comment
+        fields = ['id', 'thread', 'user', 'user_name', 'is_course_author', 'text', 'is_deleted',
+                  'created_at', 'can_delete']
+        read_only_fields = fields
+
+
+class ThreadSerializer(DiscussionViewerMixin, serializers.ModelSerializer):
+    """A thread with all its comments (the first one opened it) and what the
+    viewer may do with it (api/discussions.py)."""
+    starter_name = serializers.SerializerMethodField()
+    resolved_by_name = serializers.SerializerMethodField()
+    comments = CommentSerializer(many=True, read_only=True)
+    can_resolve = serializers.SerializerMethodField()
+    can_pin = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+
+    def get_starter_name(self, obj):
+        return display_name(obj.starter)
+
+    def get_resolved_by_name(self, obj):
+        return display_name(obj.resolved_by) if obj.resolved_by else None
+
+    def get_can_resolve(self, obj):
+        return self.viewer_is_author() or obj.starter_id == self.viewer_id()
+
+    def get_can_pin(self, obj):
+        return self.viewer_is_author()
+
+    def get_can_delete(self, obj):
+        return self.viewer_is_author()
+
+    class Meta:
+        model = Thread
+        fields = ['id', 'block', 'starter', 'starter_name', 'created_at', 'is_resolved',
+                  'resolved_by_name', 'is_pinned', 'comments', 'can_resolve', 'can_pin', 'can_delete']
+        read_only_fields = fields

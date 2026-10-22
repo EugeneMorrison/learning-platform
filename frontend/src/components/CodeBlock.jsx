@@ -5,10 +5,11 @@ import { pycharmDarcula } from './pycharmDarcula';
 import { wrapImages } from '../lib/contentImages';
 import api from '../api';
 import './blocks.css';
+import { DiscussionBadge } from './DiscussionPanel';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
-function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk }) {
+function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk, discussion }) {
     const wasSolved = savedProgress?.is_correct === true;
     const savedCode = savedProgress?.answer?.code;
 
@@ -144,6 +145,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
                         Задать вопрос
                     </button>
                 )}
+                <DiscussionBadge blockId={blockId} discussion={discussion} />
             </div>
 
             {/* Task prompt */}

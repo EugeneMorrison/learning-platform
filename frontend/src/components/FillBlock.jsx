@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '../api';
 import './blocks.css';
+import { DiscussionBadge } from './DiscussionPanel';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages } from '../lib/contentImages';
 import { parseTemplate } from '../lib/fillTemplate';
@@ -22,7 +23,7 @@ function toResult(isCorrect, feedback) {
     };
 }
 
-function FillBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk }) {
+function FillBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk, discussion }) {
     const segments = parseTemplate(content.template);
     const blanks = segments.filter(s => s.type === 'blank');
 
@@ -85,6 +86,7 @@ function FillBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
                         Задать вопрос
                     </button>
                 )}
+                <DiscussionBadge blockId={blockId} discussion={discussion} />
             </div>
 
             {content.prompt && (

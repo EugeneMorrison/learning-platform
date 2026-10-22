@@ -32,9 +32,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import render
 from rest_framework.views import APIView
 
-from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt
+from .models import Course, Lesson, Block, Enrollment, Progress, Message, Attempt, Thread, Comment
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed, message_preview, notify_user, push_message
 from .questions import MAX_DRAFT_LENGTH, build_context
+from .discussions import can_see_all, check_post_interval, clean_text, discussion_block, is_course_author
 from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
@@ -45,8 +46,9 @@ from .serializers import (
     BlockSerializer,
     EnrollmentSerializer,
     ProgressSerializer,
-    MessageSerializer
-
+    MessageSerializer,
+    ThreadSerializer,
+    CommentSerializer,
 )
 from .permissions import (
     IsAuthor,
@@ -1433,3 +1435,174 @@ class MarkReadView(APIView):
                 'type': 'read', 'course_id': str(course_id), 'other_user_id': other_user_id,
             })
         return Response({'marked': marked})
+
+
+# =============================================================================
+# DISCUSSIONS (public threads per task block; rules in api/discussions.py)
+# =============================================================================
+
+def discussion_threads():
+    """Threads with what ThreadSerializer reads, comments in order."""
+    return Thread.objects.select_related('starter', 'resolved_by', 'block__lesson__course').prefetch_related(
+        models.Prefetch('comments', queryset=Comment.objects.select_related('user')))
+
+
+def visible_thread(request, thread_id):
+    """A thread the user may read (Thread.objects.visible_to), else 404."""
+    thread = discussion_threads().visible_to(request.user).filter(pk=thread_id).first()
+    if thread is None:
+        raise NotFound(gettext('Обсуждение не найдено.'))
+    return thread
+
+
+def discussion_context(request, block):
+    """Serializer context of the discussion serializers (the viewer)."""
+    return {'request': request, 'course_author_id': block.lesson.course.author_id}
+
+
+class BlockThreadsView(APIView):
+    """
+    GET  /api/blocks/<block_id>/threads/   the block's threads the user may read
+    POST /api/blocks/<block_id>/threads/   Body: {"text": "..."}: start one
+
+    GET: {"threads": [ThreadSerializer, ...] (pinned first, then open, then
+    resolved; newest first), "can_see_all": the user sees every thread (the
+    course author, or solved the block), "hidden_count": threads not shown
+    until the block is solved}.
+    POST 201: the new thread. 400: empty / too long text, a TEXT block.
+    404: no such block, or the user is neither the course's author nor an
+    enrolled student. 429: posted less than a minute ago (not the course author).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, block_id):
+        block = discussion_block(request.user, block_id)
+        threads = list(discussion_threads().visible_to(request.user).filter(block=block))
+        sees_all = can_see_all(request.user, block)
+        hidden = 0 if sees_all else Thread.objects.filter(block=block).count() - len(threads)
+        return Response({
+            'threads': ThreadSerializer(threads, many=True, context=discussion_context(request, block)).data,
+            'can_see_all': sees_all,
+            'hidden_count': hidden,
+        })
+
+    def post(self, request, block_id):
+        block = discussion_block(request.user, block_id)
+        text = clean_text(request.data.get('text'))
+        check_post_interval(request.user, block)
+        with transaction.atomic():
+            thread = Thread.objects.create(block=block, starter=request.user)
+            Comment.objects.create(thread=thread, user=request.user, text=text)
+        thread = discussion_threads().get(pk=thread.pk)
+        return Response(ThreadSerializer(thread, context=discussion_context(request, block)).data,
+                        status=status.HTTP_201_CREATED)
+
+
+class ThreadDetailView(APIView):
+    """
+    PATCH  /api/threads/<id>/   Body: {"is_resolved": bool} and/or {"is_pinned": bool}
+    DELETE /api/threads/<id>/   the thread and all its comments
+
+    Resolve / reopen: the thread's starter or the course author. Pin and
+    delete: the course author only. 200: the thread; 204 on delete.
+    400: neither field, or not a boolean. 403: not allowed. 404: a thread the
+    user can't read.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, thread_id):
+        thread = visible_thread(request, thread_id)
+        author = is_course_author(request.user, thread.block)
+        changes = {}
+        for field in ('is_resolved', 'is_pinned'):
+            if field in request.data:
+                if not isinstance(request.data[field], bool):
+                    raise ParseError(gettext('%(field)s: нужно true или false.') % {'field': field})
+                changes[field] = request.data[field]
+        if not changes:
+            raise ParseError(gettext('Укажите is_resolved или is_pinned.'))
+        if 'is_pinned' in changes and not author:
+            raise PermissionDenied(gettext('Закреплять обсуждения может только автор курса.'))
+        if 'is_resolved' in changes and not (author or thread.starter_id == request.user.id):
+            raise PermissionDenied(gettext('Отметить обсуждение решённым может только тот, кто его начал, или автор курса.'))
+
+        if 'is_resolved' in changes:
+            thread.is_resolved = changes['is_resolved']
+            thread.resolved_by = request.user if thread.is_resolved else None
+        if 'is_pinned' in changes:
+            thread.is_pinned = changes['is_pinned']
+        thread.save(update_fields=['is_resolved', 'resolved_by', 'is_pinned'])
+        thread = discussion_threads().get(pk=thread.pk)
+        return Response(ThreadSerializer(thread, context=discussion_context(request, thread.block)).data)
+
+    def delete(self, request, thread_id):
+        thread = visible_thread(request, thread_id)
+        if not is_course_author(request.user, thread.block):
+            raise PermissionDenied(gettext('Удалять обсуждения может только автор курса.'))
+        thread.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ThreadCommentsView(APIView):
+    """
+    POST /api/threads/<id>/comments/   Body: {"text": "..."}: reply
+
+    201: the comment (CommentSerializer). 400: empty / too long text.
+    404: a thread the user can't read. 429: as for a new thread.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, thread_id):
+        thread = visible_thread(request, thread_id)
+        text = clean_text(request.data.get('text'))
+        check_post_interval(request.user, thread.block)
+        comment = Comment.objects.create(thread=thread, user=request.user, text=text)
+        return Response(CommentSerializer(comment, context=discussion_context(request, thread.block)).data,
+                        status=status.HTTP_201_CREATED)
+
+
+class CommentDetailView(APIView):
+    """
+    DELETE /api/comments/<id>/   the course author removes a comment
+
+    Soft: the comment stays in its thread marked deleted, and its text is no
+    longer sent to anyone but the course author. 200: the comment.
+    403: not the course author. 404: a comment the user can't read.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, comment_id):
+        comment = (Comment.objects.select_related('user', 'thread__block__lesson__course')
+                   .filter(pk=comment_id, thread__in=Thread.objects.visible_to(request.user)).first())
+        if comment is None:
+            raise NotFound(gettext('Сообщение не найдено.'))
+        block = comment.thread.block
+        if not is_course_author(request.user, block):
+            raise PermissionDenied(gettext('Удалять сообщения может только автор курса.'))
+        if not comment.is_deleted:
+            comment.is_deleted = True
+            comment.deleted_by = request.user
+            comment.save(update_fields=['is_deleted', 'deleted_by'])
+        return Response(CommentSerializer(comment, context=discussion_context(request, block)).data)
+
+
+class DiscussionCountsView(APIView):
+    """
+    GET /api/discussions/counts/?lesson=<id>
+
+    {"counts": {"<block id>": N}}: for each task block of the lesson that has
+    any, the number of threads the user may read (the «💬 N» badges).
+    400: lesson missing or malformed. 404: a lesson the user can't read.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            lesson_id = uuid.UUID(str(request.query_params.get('lesson')))
+        except ValueError:
+            raise ParseError(gettext('Укажите урок: lesson.'))
+        if not Lesson.objects.visible_to(request.user).filter(pk=lesson_id).exists():
+            raise NotFound(gettext('Урок не найден.'))
+        rows = (Thread.objects.visible_to(request.user).filter(block__lesson_id=lesson_id)
+                .order_by().values('block').annotate(n=models.Count('id')))
+        return Response({'counts': {str(row['block']): row['n'] for row in rows}})

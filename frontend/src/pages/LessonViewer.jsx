@@ -10,12 +10,17 @@ import LessonsPanel from '../components/LessonsPanel';
 import StudentChat from '../components/StudentChat';
 import QuestionModal from '../components/QuestionModal';
 import LessonProgress from '../components/LessonProgress';
+import DiscussionPanel from '../components/DiscussionPanel';
 import { watchFigureOverflow } from '../lib/contentImages';
 import { useSetLessonBar } from '../lib/lessonBar';
 import './LessonViewer.css';
 
 // Block types that are solvable tasks (have a pass/fail, count toward progress).
 const TASK_TYPES = new Set(['QUIZ', 'CODE', 'FILL']);
+
+// Task names as on the blocks' badges ("Задача 2"), for the discussion panel.
+const TASK_LABELS = { CODE: 'Задача', QUIZ: 'Тест', FILL: 'Пропуски' };
+const DISCUSSION_PANEL_ID = 'lesson-discussion';
 
 const DEV_LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
 
@@ -49,7 +54,10 @@ function LessonViewer() {
     const [showLessons, setShowLessons] = useState(false);
     // «Задать вопрос» open for this task: { blockId, draft? } (draft: CODE editor code).
     const [question, setQuestion] = useState(null);
-    const chatRef = useRef(null); // StudentChat: open(message?)
+    const chatRef = useRef(null); // StudentChat: open(message?), close()
+    // The task whose discussion is open (one at a time), and «💬 N» per task.
+    const [discussionBlockId, setDiscussionBlockId] = useState(null);
+    const [discussionCounts, setDiscussionCounts] = useState({});
     const codeRefetchSeq = useRef({}); // block id → number of its latest read-back
 
     // The one source of truth for "solved" on this page (is_correct, as in the
@@ -123,6 +131,21 @@ function LessonViewer() {
         });
         return () => setLessonBar(null);
     }, [loading, error, lesson, taskIds, solvedBlockIds, showLessons, openLessons, scrollToContent, setLessonBar]);
+
+    // «💬 N»: threads this user may read, per task. Again after a solve (a
+    // solved task shows every thread) and when the panel starts or deletes one.
+    // No discussions in an embed.
+    const discussionsOn = Boolean(user) && !isInIframe;
+    const lessonId = lesson?.id;
+    const loadDiscussionCounts = useCallback(() => {
+        if (!lessonId) return;
+        api.get('/discussions/counts/', { params: { lesson: lessonId } })
+            .then(res => setDiscussionCounts(res.data.counts))
+            .catch(err => console.error('Failed to load discussion counts:', err));
+    }, [lessonId]);
+    useEffect(() => {
+        if (!loading && discussionsOn) loadDiscussionCounts();
+    }, [loading, discussionsOn, loadDiscussionCounts, solvedBlockIds]);
 
     // Fade at the right edge of formula boxes that scroll sideways (phones).
     useEffect(() => {
@@ -209,6 +232,24 @@ function LessonViewer() {
         chatRef.current?.open(message);
     }
 
+    // One panel on the right at a time: the discussion closes the chat window,
+    // and the chat (StudentChat onOpen) closes the discussion.
+    function toggleDiscussion(blockId) {
+        if (discussionBlockId === blockId) {
+            closeDiscussion();
+            return;
+        }
+        chatRef.current?.close();
+        setDiscussionBlockId(blockId);
+    }
+
+    // Focus goes back to the block's «💬 N».
+    function closeDiscussion() {
+        const badge = document.getElementById(`discuss-${discussionBlockId}`);
+        setDiscussionBlockId(null);
+        badge?.focus();
+    }
+
     const blockNumbers = (() => {
         const map = {};
         let quizCount = 0;
@@ -266,6 +307,12 @@ function LessonViewer() {
     function renderBlock(block) {
         const blockProgress = progress.find(p => p.block === block.id) || null;
         const number = blockNumbers[block.id];
+        const discussion = discussionsOn ? {
+            count: discussionCounts[block.id] || 0,
+            open: discussionBlockId === block.id,
+            onToggle: () => toggleDiscussion(block.id),
+            panelId: DISCUSSION_PANEL_ID,
+        } : undefined;
         let inner = null;
         switch (block.type) {
             case 'TEXT':
@@ -273,17 +320,17 @@ function LessonViewer() {
                 break;
             case 'QUIZ':
                 inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
-                    onSubmitted={handleAnswerSubmitted}
+                    onSubmitted={handleAnswerSubmitted} discussion={discussion}
                     onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             case 'CODE':
                 inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
-                    onSubmitted={data => handleCodeSubmitted(block.id, data)}
+                    onSubmitted={data => handleCodeSubmitted(block.id, data)} discussion={discussion}
                     onAsk={hasChat ? draft => setQuestion({ blockId: block.id, draft }) : undefined} />;
                 break;
             case 'FILL':
                 inner = <FillBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
-                    onSubmitted={handleAnswerSubmitted}
+                    onSubmitted={handleAnswerSubmitted} discussion={discussion}
                     onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             default:
@@ -335,8 +382,12 @@ function LessonViewer() {
         </div>
     );
 
+    const discussionBlock = discussionsOn && blocks.find(b => b.id === discussionBlockId);
+
+    // .lesson-viewer--discussion: room for the docked panel, the floating
+    // buttons moved or hidden (LessonViewer.css).
     return (
-        <>
+        <div className={discussionBlock ? 'lesson-viewer lesson-viewer--discussion' : 'lesson-viewer'}>
             <div className="page page--narrow lesson-page">
 
                 {/* The lessons button, lesson title and progress are in the app
@@ -433,9 +484,23 @@ function LessonViewer() {
                     course={course}
                     id="lesson-chat"
                     emptyHint="Задайте вопрос по уроку — учитель ответит здесь."
+                    onOpen={() => setDiscussionBlockId(null)}
                 />
             )}
-        </>
+
+            {/* The open task's public discussion (right panel / bottom sheet). */}
+            {discussionBlock && (
+                <DiscussionPanel
+                    key={discussionBlock.id}
+                    id={DISCUSSION_PANEL_ID}
+                    blockId={discussionBlock.id}
+                    title={`${TASK_LABELS[discussionBlock.type]} ${blockNumbers[discussionBlock.id]}`}
+                    solved={solvedBlockIds.has(discussionBlock.id)}
+                    onClose={closeDiscussion}
+                    onThreadsChanged={loadDiscussionCounts}
+                />
+            )}
+        </div>
     );
 }
 

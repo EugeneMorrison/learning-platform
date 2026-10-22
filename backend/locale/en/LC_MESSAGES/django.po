@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-19 04:40+0300\n"
+"POT-Creation-Date: 2026-10-22 21:56+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -16,6 +16,30 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+#: .\api\discussions.py:57 .\api\views.py:1298
+msgid "Задание не найдено."
+msgstr "Task not found."
+
+#: .\api\discussions.py:59
+msgid "Обсуждения есть только у заданий."
+msgstr "Only tasks have discussions."
+
+#: .\api\discussions.py:67
+msgid "Напишите сообщение."
+msgstr "Write a message."
+
+#: .\api\discussions.py:70 .\api\views.py:1270 .\api\views.py:1352
+#, python-format
+msgid "Сообщение слишком длинное: не больше %(max)d символов."
+msgstr "The message is too long: %(max)d characters at most."
+
+#: .\api\discussions.py:89
+#, python-format
+msgid ""
+"Писать в обсуждения можно не чаще раза в минуту. Попробуйте через "
+"%(seconds)d с."
+msgstr "You can post in discussions once a minute. Try again in %(seconds)d s."
+
 #: .\api\serializers.py:141
 msgid "Название не может быть пустым."
 msgstr ""
@@ -24,71 +48,138 @@ msgstr ""
 msgid "Название должно быть не короче 2 символов."
 msgstr ""
 
-#: .\api\views.py:92
+#: .\api\views.py:95
 msgid "Блок не найден."
 msgstr "Block not found."
 
-#: .\api\views.py:149
+#: .\api\views.py:152
 msgid "Не указан block_id."
 msgstr "block_id is required."
 
-#: .\api\views.py:150
+#: .\api\views.py:153
 msgid "Запускать код могут только записанные на курс учащиеся и автор курса."
 msgstr ""
 "Only students enrolled in the course and the course author can run code."
 
-#: .\api\views.py:153
+#: .\api\views.py:156
 msgid "Код можно запускать только в блоке с задачей."
 msgstr "Code can only be run in an exercise block."
 
-#: .\api\views.py:605
+#: .\api\views.py:608
 msgid "Урок недоступен."
 msgstr "This lesson is not available."
 
-#: .\api\views.py:625
+#: .\api\views.py:628
 msgid "Укажите курс: ?course=<id>."
 msgstr ""
 
-#: .\api\views.py:919
+#: .\api\views.py:922
 msgid "Записаться на курс может только учащийся."
 msgstr "Only students can enroll in a course."
 
-#: .\api\views.py:925
+#: .\api\views.py:928
 msgid "Курс не найден."
 msgstr "Course not found."
 
-#: .\api\views.py:930
+#: .\api\views.py:933
 msgid ""
 "Это платный курс: самостоятельно записаться можно только на бесплатные курсы."
 msgstr "This is a paid course: you can only enroll yourself in free courses."
 
-#: .\api\views.py:1011
+#: .\api\views.py:1014
 msgid "Не указан блок."
 msgstr "block is required."
 
-#: .\api\views.py:1012
+#: .\api\views.py:1015
 msgid "Отвечать могут только записанные на курс учащиеся и автор курса."
 msgstr ""
 "Only students enrolled in the course and the course author can submit "
 "answers."
 
-#: .\api\views.py:1015
+#: .\api\views.py:1018
 msgid "Задачи с кодом проверяются запуском тестов."
 msgstr "Code tasks are checked by running the tests."
 
-#: .\api\views.py:1263
+#: .\api\views.py:1266
 msgid ""
 "Писать в чат курса могут только его автор и записанные на курс учащиеся."
 msgstr ""
 
-#: .\api\views.py:1267
-#, python-format
-msgid "Сообщение слишком длинное: не больше %(max)d символов."
+#: .\api\views.py:1295
+msgid "Укажите задание: block_id."
+msgstr "Specify the task: block_id."
+
+#: .\api\views.py:1300
+msgid "Вопрос можно задать только по заданию."
+msgstr "Questions can only be asked about a task."
+
+#: .\api\views.py:1302
+msgid "Задать вопрос могут только записанные на курс учащиеся."
+msgstr "Only students enrolled in the course can ask questions."
+
+#: .\api\views.py:1307
+msgid "draft должен быть строкой."
 msgstr ""
+
+#: .\api\views.py:1310
+#, python-format
+msgid "Код в редакторе слишком длинный: не больше %(max)d символов."
+msgstr ""
+
+#: .\api\views.py:1349
+msgid "Напишите вопрос."
+msgstr ""
+
+#: .\api\views.py:1429
+msgid "Укажите course_id и other_user_id."
+msgstr ""
+
+#: .\api\views.py:1454
+msgid "Обсуждение не найдено."
+msgstr "Discussion not found."
+
+#: .\api\views.py:1520
+#, python-format
+msgid "%(field)s: нужно true или false."
+msgstr "%(field)s: must be true or false."
+
+#: .\api\views.py:1523
+msgid "Укажите is_resolved или is_pinned."
+msgstr "Specify is_resolved or is_pinned."
+
+#: .\api\views.py:1525
+msgid "Закреплять обсуждения может только автор курса."
+msgstr "Only the course author can pin discussions."
+
+#: .\api\views.py:1527
+msgid ""
+"Отметить обсуждение решённым может только тот, кто его начал, или автор "
+"курса."
+msgstr "Only whoever started the discussion or the course author can mark it resolved."
+
+#: .\api\views.py:1541
+msgid "Удалять обсуждения может только автор курса."
+msgstr "Only the course author can delete discussions."
+
+#: .\api\views.py:1578
+msgid "Сообщение не найдено."
+msgstr "Message not found."
+
+#: .\api\views.py:1581
+msgid "Удалять сообщения может только автор курса."
+msgstr "Only the course author can delete messages."
+
+#: .\api\views.py:1603
+msgid "Укажите урок: lesson."
+msgstr "Specify the lesson: lesson."
+
+#: .\api\views.py:1605
+msgid "Урок не найден."
+msgstr "Lesson not found."
 
 #: .\backend\templates\public\about.html:4
 #: .\backend\templates\public\about.html:23
-#: .\backend\templates\public\base.html:34
+#: .\backend\templates\public\base.html:35
 msgid "Обо мне"
 msgstr "About me"
 
@@ -307,50 +398,50 @@ msgstr ""
 msgid "Онлайн-курсы с практикой прямо в браузере."
 msgstr "Online courses with hands-on practice right in your browser."
 
-#: .\backend\templates\public\base.html:23
+#: .\backend\templates\public\base.html:24
 msgid "Основная навигация"
 msgstr "Main navigation"
 
-#: .\backend\templates\public\base.html:25
+#: .\backend\templates\public\base.html:26
 #: .\backend\templates\public\landing.html:13
 msgid "Курсы"
 msgstr "Courses"
 
-#: .\backend\templates\public\base.html:30
-#: .\backend\templates\public\base.html:32
+#: .\backend\templates\public\base.html:31
+#: .\backend\templates\public\base.html:33
 #: .\backend\templates\public\landing.html:51
 msgid "Отзывы"
 msgstr "Reviews"
 
-#: .\backend\templates\public\base.html:32
+#: .\backend\templates\public\base.html:33
 msgid "(скоро)"
 msgstr "(coming soon)"
 
-#: .\backend\templates\public\base.html:40
+#: .\backend\templates\public\base.html:41
 msgid "Язык сайта"
 msgstr "Site language"
 
-#: .\backend\templates\public\base.html:51
+#: .\backend\templates\public\base.html:52
 msgid "Мой кабинет"
 msgstr "My account"
 
-#: .\backend\templates\public\base.html:51
+#: .\backend\templates\public\base.html:52
 msgid "Войти"
 msgstr "Log in"
 
-#: .\backend\templates\public\base.html:64
+#: .\backend\templates\public\base.html:65
 msgid "[Юридическое лицо, ИНН, ОГРН]"
 msgstr "[Legal entity, tax and registration numbers]"
 
-#: .\backend\templates\public\base.html:68
+#: .\backend\templates\public\base.html:69
 msgid "Публичная оферта"
 msgstr "Public offer"
 
-#: .\backend\templates\public\base.html:69
+#: .\backend\templates\public\base.html:70
 msgid "Политика обработки персональных данных"
 msgstr "Personal data processing policy"
 
-#: .\backend\templates\public\base.html:70
+#: .\backend\templates\public\base.html:71
 msgid "Контакты"
 msgstr "Contacts"
 
@@ -406,6 +497,10 @@ msgstr "Exercises:"
 #: .\backend\templates\public\includes\block_counts.html:6
 msgid "Пропуски:"
 msgstr "Fill-ins:"
+
+#: .\backend\templates\public\includes\brand_logo.html:5
+msgid "на главную"
+msgstr ""
 
 #: .\backend\templates\public\includes\course_cover.html:6
 #, python-format

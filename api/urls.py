@@ -32,6 +32,11 @@ urlpatterns = [
     path('messages/read/', views.MarkReadView.as_view(), name='messages-read'),
     path('questions/', views.QuestionView.as_view(), name='questions'),
     path('questions/preview/', views.QuestionPreviewView.as_view(), name='questions-preview'),
+    path('blocks/<uuid:block_id>/threads/', views.BlockThreadsView.as_view(), name='block-threads'),
+    path('threads/<int:thread_id>/', views.ThreadDetailView.as_view(), name='thread-detail'),
+    path('threads/<int:thread_id>/comments/', views.ThreadCommentsView.as_view(), name='thread-comments'),
+    path('comments/<int:comment_id>/', views.CommentDetailView.as_view(), name='comment-detail'),
+    path('discussions/counts/', views.DiscussionCountsView.as_view(), name='discussion-counts'),
     path('enrollments/', views.EnrollmentListCreateView.as_view(), name='enrollment-list'),
     path('enrollments/<uuid:course_id>/', views.EnrollmentDeleteView.as_view(), name='enrollment-delete'),
     path('courses/<uuid:course_id>/enrollments/', views.CourseEnrollmentsView.as_view(), name='course-enrollments'),
@@ -84,4 +89,13 @@ PROGRESS:
 - GET    /api/progress/course/{course_id}/           → My progress in a course
 - GET    /api/progress/stats/                        → My stats across enrolled courses
 - GET    /api/progress/student/{id}/course/{id}/     → A student's progress (self or course author)
+
+DISCUSSIONS (public threads per task block; api/discussions.py):
+- GET    /api/blocks/{id}/threads/            → The block's threads I may read
+- POST   /api/blocks/{id}/threads/            → Start a thread
+- POST   /api/threads/{id}/comments/          → Reply
+- PATCH  /api/threads/{id}/                   → Resolve (starter / course author), pin (course author)
+- DELETE /api/threads/{id}/                   → Delete a thread (course author)
+- DELETE /api/comments/{id}/                  → Delete a comment, softly (course author)
+- GET    /api/discussions/counts/?lesson={id} → Threads I may read, per block
 """

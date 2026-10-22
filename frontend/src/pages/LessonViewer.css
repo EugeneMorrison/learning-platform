@@ -105,6 +105,25 @@
     margin-top: var(--space-4);
 }
 
+/* The discussion panel (components/Discussion.css) is on the right:
+   26rem, narrower only where the window is. */
+.lesson-viewer {
+    --discussion-width: min(26rem, calc(100vw - var(--space-7)));
+}
+
+/* Panel open: the chat button moves to the panel's left edge (opening the
+   chat closes the panel, see LessonViewer.jsx). */
+.lesson-viewer--discussion .chat-fab {
+    right: calc(var(--discussion-width) + var(--space-5));
+}
+
+/* Wide windows: the panel is docked; the lesson column centres in the rest. */
+@media (min-width: 64rem) {
+    .lesson-viewer--discussion {
+        padding-right: var(--discussion-width);
+    }
+}
+
 @media (max-width: 40rem) {
     .lesson-header {
         padding: var(--space-5) var(--space-4);
@@ -139,6 +158,13 @@
     }
 
     .next-task-btn__text {
+        display: none;
+    }
+
+    /* The discussion is a bottom sheet over them: the floating buttons go
+       while it is open. */
+    .lesson-viewer--discussion .chat-fab,
+    .lesson-viewer--discussion .next-task-btn {
         display: none;
     }
 }

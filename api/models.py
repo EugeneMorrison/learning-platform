@@ -14,6 +14,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from slugify import slugify
 
+from .block_content import TASK_TYPES
+
 
 # =============================================================================
 # READ-ACCESS RULES (one place; every view that reads courses/lessons/blocks uses these)
@@ -556,6 +558,93 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender.username} → {self.receiver.username}: {self.text[:50]}"
+
+
+# =============================================================================
+# DISCUSSIONS (public threads per task block; api/discussions.py)
+# =============================================================================
+
+class ThreadQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """
+        Threads the user may read, and so reply to (the one rule; every
+        discussion endpoint goes through it):
+        - only on task blocks of courses the user has content access to
+          (own ∪ enrolled, as BlockQuerySet.visible_to);
+        - the course author sees all of them;
+        - anyone else sees all of them once they have solved the block
+          (Progress.is_correct, which stays True), before that only the pinned
+          threads and the ones they started themselves.
+        """
+        if not user.is_authenticated:
+            return self.none()
+        solved = Progress.objects.filter(student=user, block=models.OuterRef('block'), is_correct=True)
+        return self.filter(
+            block__type__in=TASK_TYPES,
+            block__lesson__course__in=Course.objects.with_content_access(user).values('pk'),
+        ).filter(
+            models.Q(block__lesson__course__author=user)
+            | models.Q(is_pinned=True)
+            | models.Q(starter=user)
+            | models.Exists(solved)
+        )
+
+
+class Thread(models.Model):
+    """A discussion about one task block. Its text is its first Comment."""
+    block = models.ForeignKey(Block, on_delete=models.CASCADE, related_name='threads')
+    starter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='started_threads')
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_resolved = models.BooleanField(default=False)
+    resolved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+    )
+    is_pinned = models.BooleanField(default=False, help_text="Pinned by the course author: shown first, and to everyone")
+
+    objects = ThreadQuerySet.as_manager()
+
+    class Meta:
+        db_table = 'threads'
+        # Pinned first, resolved after the open ones, newest first.
+        ordering = ['-is_pinned', 'is_resolved', '-created_at', '-id']
+
+    def __str__(self):
+        return f"Thread #{self.pk} on {self.block} by {self.starter.username}"
+
+
+class Comment(models.Model):
+    """
+    One post in a thread (the first one opens it). Plain text, never rendered
+    as HTML. Deleted by the course author softly: the row stays (the thread
+    keeps its shape, the author can still read it); everyone else gets no text.
+    """
+    thread = models.ForeignKey(Thread, on_delete=models.CASCADE, related_name='comments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='discussion_comments')
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+    )
+
+    class Meta:
+        db_table = 'comments'
+        ordering = ['created_at', 'id']
+        indexes = [
+            # The rate limit: the user's latest comment (api/discussions.py).
+            models.Index(fields=['user', 'created_at'], name='comments_user_created_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} in thread #{self.thread_id}: {self.text[:50]}"
 
 
 # =============================================================================

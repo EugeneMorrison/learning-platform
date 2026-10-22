@@ -133,6 +133,47 @@
     outline-offset: var(--focus-ring-offset);
 }
 
+/* «💬 N»: the block's discussion (DiscussionPanel.jsx). At the right end of
+   the head, after «Задать вопрос» when there is one (that one already pushes
+   both right). */
+.lesson-block__discuss {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+    padding: var(--space-1) var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-pill);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+}
+
+.lesson-block__ask ~ .lesson-block__discuss {
+    margin-left: var(--space-2);
+}
+
+.lesson-block__discuss:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+/* Its discussion is the one open in the panel. */
+.lesson-block__discuss--open {
+    border-color: var(--color-accent);
+    background: var(--color-soft);
+    color: var(--color-accent);
+}
+
+.lesson-block__discuss:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
 /* Quiet text button: "↑ Вернуться к теории". */
 .lesson-block__text-btn {
     display: block;

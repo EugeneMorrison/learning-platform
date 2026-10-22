@@ -1,0 +1,308 @@
+/* Discussion of a task block (DiscussionPanel.jsx): public threads, next to
+   the private chat. Where it sits:
+   - wide windows (64rem+): docked on the right below the app header; the
+     lesson column moves left to make room (LessonViewer.css);
+   - 40–64rem: the same panel over the content, with a shadow;
+   - phones (up to 40rem, the app's phone breakpoint): a bottom sheet; the
+     floating buttons hide while it is open (LessonViewer.css).
+   --discussion-width comes from .lesson-viewer (LessonViewer.css),
+   --discussion-top (the header's bottom edge) from the panel itself. */
+
+.discussion-panel {
+    position: fixed;
+    top: var(--discussion-top, 0px);
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-chat);
+    display: flex;
+    flex-direction: column;
+    width: var(--discussion-width);
+    border-left: var(--border-width) solid var(--color-line);
+    background: var(--color-ground);
+    color: var(--color-ink);
+    box-shadow: var(--shadow-lg);
+}
+
+.discussion-panel:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+}
+
+/* On-screen keyboard open (useKeyboardInset): end above it. */
+.discussion-panel--keyboard {
+    bottom: var(--chat-keyboard);
+}
+
+.discussion-panel__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+    border-bottom: var(--border-width) solid var(--color-line);
+}
+
+.discussion-panel__heading {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.discussion-panel__title {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+}
+
+.discussion-panel__subtitle {
+    margin: var(--space-1) 0 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+}
+
+.discussion-panel__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-4);
+}
+
+.discussion-panel__note {
+    margin: var(--space-4) 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* ---- Forms (new thread, reply) ------------------------------------------- */
+
+.discussion-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.discussion-form__label {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+}
+
+/* 16px text: smaller makes iOS zoom the page when the field is focused. */
+.discussion-form__text {
+    width: 100%;
+    font-size: var(--text-base);
+    resize: vertical;
+}
+
+.discussion-form__error {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: var(--text-sm);
+}
+
+.discussion-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+}
+
+/* ---- Threads ------------------------------------------------------------- */
+
+.discussion-list {
+    margin: var(--space-5) 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.discussion-thread {
+    padding: var(--space-4) 0;
+    border-top: var(--border-width) solid var(--color-line);
+}
+
+.discussion-thread--pinned {
+    margin: 0 calc(-1 * var(--space-4));
+    padding-right: var(--space-4);
+    padding-left: var(--space-4);
+    background: var(--color-soft);
+}
+
+.discussion-thread__chips {
+    display: flex;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-2);
+}
+
+.discussion-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--color-soft);
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+}
+
+.discussion-thread--pinned .discussion-chip {
+    background: var(--color-ground);
+}
+
+.discussion-chip--resolved {
+    background: var(--color-success-soft);
+    color: var(--color-success-on-light);
+}
+
+/* A resolved thread, collapsed: its first post on one line, then who and how many replies. */
+.discussion-thread__summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.discussion-thread__summary-text {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.discussion-thread__summary-more {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.discussion-thread__summary:hover .discussion-thread__summary-more {
+    color: var(--color-accent);
+    text-decoration: underline;
+}
+
+.discussion-comments {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Replies are indented under the first post. */
+.discussion-comment + .discussion-comment {
+    margin-top: var(--space-3);
+    padding-left: var(--space-4);
+    border-left: calc(var(--border-width) * 2) solid var(--color-line);
+}
+
+.discussion-comment__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-1);
+    font-size: var(--text-sm);
+    line-height: var(--leading-tight);
+}
+
+.discussion-comment__author {
+    font-weight: var(--weight-medium);
+    overflow-wrap: anywhere;
+}
+
+.discussion-comment__time {
+    color: var(--color-muted);
+}
+
+/* Plain text as typed: line breaks kept, long words broken. */
+.discussion-comment__text {
+    margin: 0;
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.discussion-comment__deleted {
+    margin: 0;
+    color: var(--color-muted);
+    font-style: italic;
+}
+
+/* The course author still sees what was deleted. */
+.discussion-comment__text--deleted {
+    margin-top: var(--space-1);
+    color: var(--color-muted);
+    text-decoration: line-through;
+}
+
+.discussion-thread__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin-top: var(--space-3);
+}
+
+.discussion-thread .discussion-form {
+    margin-top: var(--space-3);
+}
+
+/* Small text buttons: «Ответить», «Отметить решённым», «Удалить»… */
+.discussion-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    text-decoration: underline;
+    text-underline-offset: var(--space-1);
+    cursor: pointer;
+}
+
+.discussion-link:disabled {
+    color: var(--color-muted);
+    cursor: default;
+}
+
+.discussion-link--danger {
+    color: var(--color-danger);
+}
+
+.discussion-comment .discussion-link {
+    margin-top: var(--space-1);
+}
+
+.discussion-link:focus-visible,
+.discussion-thread__summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+}
+
+/* Wide windows: docked beside the column (which moves left), no shadow. */
+@media (min-width: 64rem) {
+    .discussion-panel {
+        box-shadow: none;
+    }
+}
+
+/* Phones: a bottom sheet, up to 80% of the screen and never under the header. */
+@media (max-width: 40rem) {
+    .discussion-panel {
+        top: auto;
+        left: 0;
+        width: auto;
+        height: min(80dvh, calc(100dvh - var(--discussion-top, 0px)));
+        border-top: var(--border-width) solid var(--color-line);
+        border-left: 0;
+        border-radius: var(--radius-card) var(--radius-card) 0 0;
+    }
+
+    /* Keyboard open: fill what's left of the screen above it. */
+    .discussion-panel--keyboard {
+        height: calc(var(--chat-viewport) - var(--discussion-top, 0px));
+    }
+}

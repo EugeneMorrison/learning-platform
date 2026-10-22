@@ -2,6 +2,7 @@ import { useState } from 'react';
 import hljs from 'highlight.js/lib/core';
 import python from 'highlight.js/lib/languages/python';
 import './blocks.css';
+import { DiscussionBadge } from './DiscussionPanel';
 import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages } from '../lib/contentImages';
@@ -26,7 +27,7 @@ function orderOptions(options, shuffle) {
     return order;
 }
 
-function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk }) {
+function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk, discussion }) {
     // Missing shuffle_options = shuffle. The order is fixed on mount and changes
     // only on «Решить снова», never on a re-render.
     const shuffle = content.shuffle_options !== false;
@@ -106,6 +107,7 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
                         Задать вопрос
                     </button>
                 )}
+                <DiscussionBadge blockId={blockId} discussion={discussion} />
             </div>
 
             {htmlQuestion ? (

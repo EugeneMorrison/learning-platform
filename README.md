@@ -422,6 +422,20 @@ GET    /api/messages/?course={id}              Message history for a course
 POST   /api/messages/                          (Legacy HTTP send — kept for compatibility)
 ```
 
+### Discussions (public threads per task block)
+
+```
+GET    /api/blocks/{id}/threads/               Threads I may read on a task block
+POST   /api/blocks/{id}/threads/               Start a thread {"text"}
+POST   /api/threads/{id}/comments/             Reply {"text"}
+PATCH  /api/threads/{id}/                      {"is_resolved"} (starter / course author), {"is_pinned"} (course author)
+DELETE /api/threads/{id}/                      Delete a thread (course author)
+DELETE /api/comments/{id}/                     Delete a comment, softly (course author)
+GET    /api/discussions/counts/?lesson={id}    Threads I may read, per block («💬 N»)
+```
+
+Course author and enrolled students only. Before solving a task, a student sees only the pinned threads and their own; after solving, all of them (checked on the server, `api/discussions.py`). Plain text up to 2000 characters, one post a minute (the course author is exempt).
+
 ### WebSocket — real-time chat
 
 ```

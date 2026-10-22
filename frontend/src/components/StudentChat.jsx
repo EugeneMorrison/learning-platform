@@ -11,10 +11,11 @@ import './Notifications.css';
  * lesson page and on the student's course page.
  *
  * ref.open(message?): open the window (with `message` already in it, e.g. a
- * question just sent with «Задать вопрос»). While open, the conversation
- * counts as read (lib/notifications.js useActiveChat).
+ * question just sent with «Задать вопрос»); ref.close(). While open, the
+ * conversation counts as read (lib/notifications.js useActiveChat). onOpen:
+ * the window is opening (the lesson page closes its discussion panel).
  */
-function StudentChat({ ref, course, id, emptyHint }) {
+function StudentChat({ ref, course, id, emptyHint, onOpen }) {
     const [showChat, setShowChat] = useState(false);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -53,6 +54,7 @@ function StudentChat({ ref, course, id, emptyHint }) {
     });
 
     function openChat() {
+        onOpen?.();
         setHistoryError(false);
         setSendError('');
         setShowChat(true);
@@ -63,6 +65,9 @@ function StudentChat({ ref, course, id, emptyHint }) {
         open(message) {
             if (message) setMessages(prev => mergeMessages(prev, [message]));
             if (!showChat) openChat();
+        },
+        close() {
+            setShowChat(false);
         },
     }));
 
