@@ -99,6 +99,22 @@
   padding-top: var(--space-3);
 }
 
+/* Level pill (/courses/ only), pinned to the cover's top-left corner: the
+   bottom row has no room for a third item, and titles stay aligned whether a
+   course has a level or not. In the markup it stays after the title (reading
+   order). White on any cover, the fallback block or a photo. */
+.course-card {
+  position: relative;
+}
+
+.course-card__level {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  background: var(--color-ground);
+  box-shadow: var(--shadow-sm);
+}
+
 @media (max-width: 40rem) {
   .catalog {
     padding-top: var(--space-6);

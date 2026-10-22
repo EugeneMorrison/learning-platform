@@ -1,4 +1,4 @@
-{% load i18n %}{# Course card for the catalogs (landing, /courses/): the whole card is one link to the course page. Expects: course with lesson_count and price labels (backend/pricing.py); optional: step (the numbered badge, landing only). Styles: public/css/catalog.css. #}
+{% load i18n %}{# Course card for the catalogs (landing, /courses/): the whole card is one link to the course page. Expects: course with lesson_count and price labels (backend/pricing.py); optional: step (the numbered badge, landing only), show_level (the level pill, /courses/ only; none for a course without a level). Styles: public/css/catalog.css. #}
 <a class="course-card" href="{% url 'course_detail' slug=course.slug %}">
   {% include "public/includes/course_cover.html" with lazy=True %}
 
@@ -13,6 +13,9 @@
 
     <div class="course-card__meta">
       {# Not blocktranslate count: Russian msgids would get English plural rules. #}
+      {% if show_level and course.level %}
+        <span class="pill course-card__level"><span class="visually-hidden">{% translate "Уровень:" %} </span>{{ course.get_level_display }}</span>
+      {% endif %}
       <span class="pill">{% translate "Уроков:" %} {{ course.lesson_count }}</span>
       {% include "public/includes/course_price.html" %}
     </div>

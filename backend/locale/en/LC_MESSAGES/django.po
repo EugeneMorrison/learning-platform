@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 00:55+0300\n"
+"POT-Creation-Date: 2026-10-23 01:14+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -44,15 +44,15 @@ msgid ""
 "%(seconds)d с."
 msgstr "You can post in discussions once a minute. Try again in %(seconds)d s."
 
-#: .\api\models.py:187 .\backend\templates\public\courses.html:37
+#: .\api\models.py:187 .\backend\templates\public\courses.html:39
 msgid "Начальный"
 msgstr "Beginner"
 
-#: .\api\models.py:188 .\backend\templates\public\courses.html:38
+#: .\api\models.py:188 .\backend\templates\public\courses.html:40
 msgid "Средний"
 msgstr "Intermediate"
 
-#: .\api\models.py:189 .\backend\templates\public\courses.html:39
+#: .\api\models.py:189 .\backend\templates\public\courses.html:41
 msgid "Продвинутый"
 msgstr "Advanced"
 
@@ -530,7 +530,7 @@ msgid "Программа курса"
 msgstr "Course syllabus"
 
 #: .\backend\templates\public\course_detail.html:80
-#: .\backend\templates\public\includes\course_card.html:16
+#: .\backend\templates\public\includes\course_card.html:19
 msgid "Уроков:"
 msgstr "Lessons:"
 
@@ -543,7 +543,7 @@ msgid "Программа скоро появится"
 msgstr "The syllabus is coming soon"
 
 #: .\backend\templates\public\courses.html:4
-#: .\backend\templates\public\courses.html:17
+#: .\backend\templates\public\courses.html:19
 msgid "Каталог курсов"
 msgstr "Course catalog"
 
@@ -552,83 +552,83 @@ msgid ""
 "Все курсы: поиск по названию, уровень, бесплатные и платные курсы, скидки."
 msgstr "All courses: search by title, level, free and paid courses, discounts."
 
-#: .\backend\templates\public\courses.html:18
+#: .\backend\templates\public\courses.html:20
 #: .\backend\templates\public\landing.html:15
 msgid "Короткие уроки с практикой прямо в браузере. Выберите курс и начните."
 msgstr ""
 "Short lessons with hands-on practice right in your browser. Pick a course "
 "and start."
 
-#: .\backend\templates\public\courses.html:26
+#: .\backend\templates\public\courses.html:28
 msgid "Фильтры"
 msgstr "Filters"
 
-#: .\backend\templates\public\courses.html:28
 #: .\backend\templates\public\courses.html:30
+#: .\backend\templates\public\courses.html:32
 msgid "Поиск курсов по названию"
 msgstr "Search courses by title"
 
-#: .\backend\templates\public\courses.html:34
+#: .\backend\templates\public\courses.html:36
 msgid "Уровень"
 msgstr "Level"
 
-#: .\backend\templates\public\courses.html:36
+#: .\backend\templates\public\courses.html:38
 msgid "Любой"
 msgstr "Any"
 
-#: .\backend\templates\public\courses.html:44
+#: .\backend\templates\public\courses.html:46
 msgid "Доступ"
 msgstr "Access"
 
-#: .\backend\templates\public\courses.html:46
+#: .\backend\templates\public\courses.html:48
 msgid "Все"
 msgstr "All"
 
-#: .\backend\templates\public\courses.html:47
+#: .\backend\templates\public\courses.html:49
 msgid "Бесплатные"
 msgstr "Free"
 
-#: .\backend\templates\public\courses.html:48
+#: .\backend\templates\public\courses.html:50
 msgid "Платные"
 msgstr "Paid"
 
-#: .\backend\templates\public\courses.html:54
+#: .\backend\templates\public\courses.html:56
 msgid "Только со скидкой"
 msgstr "Discounted only"
 
-#: .\backend\templates\public\courses.html:57
+#: .\backend\templates\public\courses.html:59
 msgid "Сбросить фильтры"
 msgstr "Reset filters"
 
-#: .\backend\templates\public\courses.html:63
+#: .\backend\templates\public\courses.html:65
 msgid "Найдено:"
 msgstr "Found:"
 
-#: .\backend\templates\public\courses.html:66
+#: .\backend\templates\public\courses.html:68
 msgid "Сортировка"
 msgstr "Sort by"
 
-#: .\backend\templates\public\courses.html:68
+#: .\backend\templates\public\courses.html:70
 msgid "Рекомендуемые"
 msgstr "Recommended"
 
-#: .\backend\templates\public\courses.html:69
+#: .\backend\templates\public\courses.html:71
 msgid "По сложности"
 msgstr "By difficulty"
 
-#: .\backend\templates\public\courses.html:70
+#: .\backend\templates\public\courses.html:72
 msgid "Сначала новые"
 msgstr "Newest first"
 
-#: .\backend\templates\public\courses.html:71
+#: .\backend\templates\public\courses.html:73
 msgid "Сначала старые"
 msgstr "Oldest first"
 
-#: .\backend\templates\public\courses.html:92
+#: .\backend\templates\public\courses.html:94
 msgid "Курсы не найдены"
 msgstr "No courses found"
 
-#: .\backend\templates\public\courses.html:96
+#: .\backend\templates\public\courses.html:98
 #: .\backend\templates\public\landing.html:27
 msgid "Курсы скоро появятся. Загляните позже."
 msgstr "Courses are coming soon. Check back later."
@@ -652,6 +652,10 @@ msgstr "Fill-ins:"
 #: .\backend\templates\public\includes\brand_logo.html:5
 msgid "на главную"
 msgstr ""
+
+#: .\backend\templates\public\includes\course_card.html:17
+msgid "Уровень:"
+msgstr "Level:"
 
 #: .\backend\templates\public\includes\course_cover.html:6
 #, python-format

@@ -86,7 +86,7 @@
                     data-created="{{ course.created_key }}"
                     data-rank="{{ forloop.counter0|unlocalize }}"
                     data-id="{{ course.id }}">
-                  {% include "public/includes/course_card.html" %}
+                  {% include "public/includes/course_card.html" with show_level=True %}
                 </li>
               {% endfor %}
             </ul>

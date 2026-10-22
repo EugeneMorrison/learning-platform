@@ -236,6 +236,29 @@ class CoursesCatalogPageTests(PublicPagesTestCase):
                      'Newest first', 'Oldest first', 'No courses found']:
             self.assertContains(en, text)
 
+    def test_level_pill_on_cards_with_a_level(self):
+        self.make_course('Beginner course', level='BEGINNER', sort_order=1)
+        self.make_course('Advanced course', level='ADVANCED', sort_order=2)
+        self.make_course('No level', sort_order=3)
+
+        ru = self.client.get('/courses/').content.decode()
+        en = self.client.get('/en/courses/').content.decode()
+
+        pill = '<span class="pill course-card__level"><span class="visually-hidden">{} </span>{}</span>'
+        self.assertIn(pill.format('Уровень:', 'Начальный'), ru)
+        self.assertIn(pill.format('Уровень:', 'Продвинутый'), ru)
+        self.assertIn(pill.format('Level:', 'Beginner'), en)
+        self.assertIn(pill.format('Level:', 'Advanced'), en)
+        # One pill per card with a level; none for the course without one.
+        cards = re.findall(r'<a class="course-card".*?</a>', ru, re.S)
+        self.assertEqual([card.count('course-card__level') for card in cards], [1, 1, 0])
+
+    def test_no_level_pill_on_the_landing_page(self):
+        self.make_course('Beginner course', level='BEGINNER')
+        for url in ['/', '/en/']:
+            with self.subTest(url=url):
+                self.assertNotContains(self.client.get(url), 'course-card__level')
+
     def test_cards_have_no_step_badges_and_link_to_the_course_page(self):
         course = self.make_course('Linked')
         response = self.client.get('/courses/')
