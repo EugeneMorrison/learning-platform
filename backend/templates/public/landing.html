@@ -2,6 +2,7 @@
 {% load i18n static public_site %}
 
 {% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/catalog.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/landing.css' %}">
 {% endblock %}
 
@@ -17,25 +18,7 @@
       {% if courses %}
         <ol class="catalog__list">
           {% for course in courses %}
-            <li>
-              <a class="course-card" href="{% url 'course_detail' slug=course.slug %}">
-                {% include "public/includes/course_cover.html" with lazy=True %}
-
-                <div class="course-card__body">
-                  <span class="step-badge">{{ forloop.counter|stringformat:"02d" }}</span>
-                  <h3 class="course-card__title">{{ course.title }}</h3>
-                  {% if course.tagline %}
-                    <p class="course-card__tagline">{{ course.tagline }}</p>
-                  {% endif %}
-
-                  <div class="course-card__meta">
-                    {# Not blocktranslate count: Russian msgids would get English plural rules. #}
-                    <span class="pill">{% translate "Уроков:" %} {{ course.lesson_count }}</span>
-                    {% include "public/includes/course_price.html" %}
-                  </div>
-                </div>
-              </a>
-            </li>
+            <li>{% include "public/includes/course_card.html" with step=forloop.counter %}</li>
           {% endfor %}
         </ol>
       {% else %}
