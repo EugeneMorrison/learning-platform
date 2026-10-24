@@ -11,6 +11,8 @@ Model Relationships:
 
 import uuid
 from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from slugify import slugify
@@ -293,6 +295,16 @@ class Course(models.Model):
             slug = f"{base}-{n}"
             n += 1
         return slug
+
+
+@receiver(post_delete, sender=Course)
+def delete_cover_with_course(sender, instance, **kwargs):
+    """A deleted course takes its cover file along (after the commit, and not
+    while another course points to it: Course._delete_cover_file). A signal, not
+    Course.delete(): the admin's bulk delete and cascades (a deleted author)
+    don't call delete() on each course, but do send post_delete."""
+    if instance.cover:
+        Course._delete_cover_file(instance.cover.name)
 
 
 # =============================================================================

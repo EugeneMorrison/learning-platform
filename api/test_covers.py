@@ -228,6 +228,66 @@ class CoverProcessingTests(TestCase):
         self.assertFalse(cleared.cover)
         self.assertFalse(self.storage().exists(replaced.cover.name))
 
+    # --- Deleting a course deletes its cover file ------------------------------
+
+    def test_deleting_a_course_deletes_its_cover(self):
+        course = self.save_cover(image_bytes((800, 600)))
+        name = course.cover.name
+
+        with self.captureOnCommitCallbacks(execute=True):
+            course.delete()
+
+        self.assertFalse(self.storage().exists(name))
+
+    def test_bulk_and_cascade_deletes_too(self):
+        # The admin's «Удалить выбранные» is a queryset delete; deleting an
+        # author cascades to their courses. Neither calls Course.delete().
+        first = self.save_cover(image_bytes((800, 600)), name='first.jpg')
+        second = self.save_cover(image_bytes((800, 600)), name='second.jpg')
+        names = [first.cover.name, second.cover.name]
+        with self.captureOnCommitCallbacks(execute=True):
+            Course.objects.filter(pk__in=[first.pk, second.pk]).delete()
+        for name in names:
+            self.assertFalse(self.storage().exists(name))
+
+        other_author = User.objects.create_user(username='leaving', password='x', role='AUTHOR')
+        course = self.save_cover(image_bytes((800, 600)), course=Course(title='C', author=other_author))
+        name = course.cover.name
+        with self.captureOnCommitCallbacks(execute=True):
+            other_author.delete()
+        self.assertFalse(self.storage().exists(name))
+
+    def test_rolled_back_delete_keeps_the_cover(self):
+        from django.db import transaction
+
+        course = self.save_cover(image_bytes((800, 600)))
+        name = course.cover.name
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            with self.assertRaises(RuntimeError), transaction.atomic():
+                course.delete()
+                raise RuntimeError('the request fails after the delete')
+
+        self.assertEqual(callbacks, [])
+        self.assertTrue(self.storage().exists(name))
+        self.assertTrue(Course.objects.filter(cover=name).exists())
+
+    def test_deleting_a_course_keeps_a_cover_another_course_uses(self):
+        course = self.save_cover(image_bytes((800, 600)))
+        shared = course.cover.name
+        Course.objects.create(title='Copy', author=self.author, cover=shared)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            course.delete()
+
+        self.assertTrue(self.storage().exists(shared))
+
+    def test_deleting_a_course_without_cover(self):
+        course = Course.objects.create(title='No cover', author=self.author)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            course.delete()
+        self.assertEqual(callbacks, [])
+
     def test_admin_help_text(self):
         help_text = Course._meta.get_field('cover').help_text
         self.assertIn('800×600', help_text)
