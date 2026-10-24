@@ -84,9 +84,15 @@
   pointer-events: none;
 }
 
+/* The illustration fades out towards the bottom (only the mask's alpha
+   matters): it stays behind the head and shoulders and is gone (75% down, the
+   lowest fifth of the cut-out) before the cut-out's own fade begins, so the
+   T-shirt fades into the page instead of merging with the violet shapes. */
 .hero__bg img {
   width: 100%;
   height: auto;
+  -webkit-mask-image: linear-gradient(to bottom, var(--color-ink) 40%, transparent 75%);
+  mask-image: linear-gradient(to bottom, var(--color-ink) 40%, transparent 75%);
 }
 
 .hero__author {
@@ -94,23 +100,35 @@
   margin-left: 22%;
 }
 
-/* Dark theme: the illustration was drawn for a white page; dimmed and a touch
-   darker it stays visible without reading as a bright patch. A dedicated dark
+/* Dark theme: the illustration was drawn for a white page; faint and a touch
+   darker it stays a background without reading as a bright patch. A dedicated dark
    image can replace this later: a second <picture class="hero__bg
    hero__bg--dark"> (see hero.html), shown here instead of the light one; the
    :not() keeps the dimming off it. */
 :root[data-theme="dark"] .hero__bg:not(.hero__bg--dark) img {
-  opacity: 0.5;
+  opacity: 0.35;
   filter: brightness(0.8) saturate(1.2);
 }
 
-/* The cut-out ends at the waist: its last few percent fade out (only the
-   mask's alpha matters), so the bottom reads as an edge, not a crop. */
+/* The cut-out ends at the waist: its lowest fifth fades out (only the mask's
+   alpha matters), so the bottom reads as an edge, not a crop. The fade is
+   eased (slow start, slow end): a straight ramp starts with a visible kink,
+   which reads as a line across the T-shirt, most of all on a dark page. */
 .hero__img {
+  --hero-fade: linear-gradient(
+    to bottom,
+    var(--color-ink) 78%,
+    color-mix(in srgb, var(--color-ink) 92%, transparent) 82%,
+    color-mix(in srgb, var(--color-ink) 75%, transparent) 86%,
+    color-mix(in srgb, var(--color-ink) 50%, transparent) 90%,
+    color-mix(in srgb, var(--color-ink) 25%, transparent) 94%,
+    color-mix(in srgb, var(--color-ink) 8%, transparent) 97%,
+    transparent
+  );
   width: 100%;
   height: auto;
-  -webkit-mask-image: linear-gradient(to bottom, var(--color-ink) 88%, transparent);
-  mask-image: linear-gradient(to bottom, var(--color-ink) 88%, transparent);
+  -webkit-mask-image: var(--hero-fade);
+  mask-image: var(--hero-fade);
 }
 
 /* Desktop: text and picture share the header half and half; the picture is
