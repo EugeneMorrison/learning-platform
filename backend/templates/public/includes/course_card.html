@@ -1,22 +1,32 @@
-{% load i18n %}{# Course card for the catalogs (landing, /courses/): the whole card is one link to the course page. Expects: course with lesson_count and price labels (backend/pricing.py); optional: step (the numbered badge, landing only), show_level (the level pill, /courses/ only; none for a course without a level). Styles: public/css/catalog.css. #}
+{% load i18n %}{# Course card for the catalogs (landing, /courses/): the whole card is one link to the course page. Expects: a course from published_courses() in backend/views.py (lesson_count, student_count, students_label, card_summary, price labels). Styles: public/css/catalog.css. #}
 <a class="course-card" href="{% url 'course_detail' slug=course.slug %}">
-  {% include "public/includes/course_cover.html" with lazy=True %}
+  {% include "public/includes/course_cover.html" with lazy=True card=True %}
 
   <div class="course-card__body">
-    {% if step %}
-      <span class="step-badge">{{ step|stringformat:"02d" }}</span>
-    {% endif %}
     <h3 class="course-card__title">{{ course.title }}</h3>
-    {% if course.tagline %}
-      <p class="course-card__tagline">{{ course.tagline }}</p>
+    {% if course.card_summary %}
+      <p class="course-card__summary">{{ course.card_summary }}</p>
+    {% endif %}
+
+    {# Chips over the cover (catalog.css pins them there). In the markup they come #}
+    {# after the title, so screen readers hear the title first.                     #}
+    {% if course.tag or course.level %}
+      <div class="course-card__chips">
+        {% if course.tag %}<span class="course-card__chip course-card__chip--tag">{{ course.tag }}</span>{% endif %}
+        {% if course.level %}<span class="course-card__chip course-card__chip--level"><span class="visually-hidden">{% translate "Уровень:" %} </span>{{ course.get_level_display }}</span>{% endif %}
+      </div>
     {% endif %}
 
     <div class="course-card__meta">
-      {# Not blocktranslate count: Russian msgids would get English plural rules. #}
-      {% if show_level and course.level %}
-        <span class="pill course-card__level"><span class="visually-hidden">{% translate "Уровень:" %} </span>{{ course.get_level_display }}</span>
+      {# Labels, not blocktranslate count: Russian msgids would get English plural rules. #}
+      {% if course.student_count %}
+        <span class="pill course-card__students">
+          <svg class="course-card__icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6" cy="5" r="2.5"/><path d="M1.5 14a4.5 4.5 0 0 1 9 0"/><path d="M10.5 2.75a2.5 2.5 0 0 1 0 4.5M12.5 9.6a4.5 4.5 0 0 1 2 3.9"/></svg>
+          <span class="visually-hidden">{% translate "Учащихся:" %} </span>{{ course.students_label }}
+        </span>
+      {% else %}
+        <span class="pill">{% translate "Уроков:" %} {{ course.lesson_count }}</span>
       {% endif %}
-      <span class="pill">{% translate "Уроков:" %} {{ course.lesson_count }}</span>
       {% include "public/includes/course_price.html" %}
     </div>
   </div>

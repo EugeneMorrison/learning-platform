@@ -1,12 +1,17 @@
 /*
- * Components shared by the landing cards and the course page: cover box,
- * price, numbered step badge and the syllabus path. Uses only tokens.css.
+ * Components shared by the catalog cards and the course page: cover box,
+ * price, numbered step badge (syllabus) and the syllabus path. Uses only tokens.css.
  */
 
-/* Cover: fixed 16:9 box. */
+/* Cover: fixed 16:9 box (course page header); 4:3 on the catalog cards. */
 .course-cover {
   aspect-ratio: 16 / 9;
+  overflow: hidden; /* else a taller image (a portrait photo) stretches the box past its ratio */
   background: var(--color-soft);
+}
+
+.course-cover--card {
+  aspect-ratio: 4 / 3;
 }
 
 .course-cover__img {

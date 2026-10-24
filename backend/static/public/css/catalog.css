@@ -47,8 +47,10 @@
   color: var(--color-muted);
 }
 
-/* Course card: the whole card is one link. */
+/* Course card: the whole card is one link. Cover (4:3, components.css) on
+   top, then title, summary and the bottom row (students or lessons, price). */
 .course-card {
+  position: relative; /* the chips are pinned over the cover */
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -68,25 +70,68 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding: var(--space-5);
 }
 
-/* Step badge (components.css) turns yellow when the card is hovered. */
-.course-card:hover .step-badge {
-  border-color: var(--color-ink);
-  background: var(--color-highlight);
-  color: var(--color-ink);
+/* Title and summary: two lines at most, then "…" (the full text is on the
+   course page). */
+.course-card__title,
+.course-card__summary {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .course-card__title {
-  margin: 0;
   font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
 }
 
-.course-card__tagline {
-  margin: 0;
+.course-card__summary {
   color: var(--color-muted);
+}
+
+/* Chips over the cover: tag top-left, level top-right (alone, each keeps its
+   corner). Solid backgrounds and a shadow keep them readable on any cover.
+   Contrast: ink on highlight 12.5:1, ink on white 18.0:1. A long tag gets
+   "…" before it can run into the level chip. */
+.course-card__chips {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.course-card__chip {
+  min-width: 0;
+  padding: var(--space-1) var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.course-card__chip--tag {
+  background: var(--color-highlight);
+}
+
+.course-card__chip--level {
+  flex-shrink: 0;
+  margin-left: auto;
+  background: var(--color-ground);
 }
 
 .course-card__meta {
@@ -99,20 +144,18 @@
   padding-top: var(--space-3);
 }
 
-/* Level pill (/courses/ only), pinned to the cover's top-left corner: the
-   bottom row has no room for a third item, and titles stay aligned whether a
-   course has a level or not. In the markup it stays after the title (reading
-   order). White on any cover, the fallback block or a photo. */
-.course-card {
-  position: relative;
+/* Students: people icon + number (the label is for screen readers only). */
+.course-card__students {
+  gap: var(--space-1);
 }
 
-.course-card__level {
-  position: absolute;
-  top: var(--space-4);
-  left: var(--space-4);
-  background: var(--color-ground);
-  box-shadow: var(--shadow-sm);
+.course-card__icon {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 
 @media (max-width: 40rem) {

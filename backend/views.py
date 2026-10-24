@@ -9,14 +9,19 @@ The React app is served separately by spa_view / lesson_view in backend/urls.py.
 from datetime import timezone
 
 from django.contrib.staticfiles import finders
-from django.db.models import Count, Q
+from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import translation
 
-from api.models import Course, Review
+from api.models import Course, Enrollment, Review
 
-from .pricing import add_price_labels
+from .pricing import NBSP, add_price_labels
+
+# Card text cut from the description when a course has no tagline: about two
+# lines of a card (CSS clamps it to two lines anyway).
+CARD_SUMMARY_CHARS = 160
 
 # Block types counted on the course page, as (Block.type, annotation name).
 BLOCK_COUNTS = [
@@ -28,17 +33,50 @@ BLOCK_COUNTS = [
 
 
 def published_courses():
-    """Published courses for the catalogs (landing, /courses/), with lesson_count
-    and price labels, in the author's order: sort_order, then title. Explicit
-    order_by: Meta.ordering is ['sort_order', '-created_at']. One query."""
+    """Published courses for the catalogs (landing, /courses/) in the author's
+    order (sort_order, then title; explicit, as Meta.ordering is ['sort_order',
+    '-created_at']), with what the card shows (public/includes/course_card.html):
+    lesson_count, student_count / students_label, card_summary and price labels.
+
+    One query. Students come from a correlated subquery: a second Count over a
+    join would multiply the rows by the lessons (lessons x students)."""
+    students = (
+        Enrollment.objects.filter(course=OuterRef('pk'))
+        .order_by().values('course').annotate(n=Count('*')).values('n')
+    )
     courses = list(
         Course.objects.filter(is_published=True)
-        .annotate(lesson_count=Count('lessons'))
+        .annotate(
+            lesson_count=Count('lessons'),
+            student_count=Coalesce(Subquery(students, output_field=IntegerField()), 0),
+        )
         .order_by('sort_order', 'title')
     )
     for course in courses:
         add_price_labels(course)
+        course.students_label = format_count(course.student_count)
+        course.card_summary = card_summary(course)
     return courses
+
+
+def format_count(n):
+    """A whole number with non-breaking spaces between thousands: "1 234",
+    the same in RU and EN (like the prices, backend/pricing.py)."""
+    return f'{n:,}'.replace(',', NBSP)
+
+
+def card_summary(course):
+    """The card's text: the tagline, else the start of the description (plain
+    text typed by the author) on one line, cut at a word boundary with "…".
+    Empty when both are empty."""
+    if course.tagline.strip():
+        return course.tagline.strip()
+    text = ' '.join(course.description.split())
+    if len(text) <= CARD_SUMMARY_CHARS:
+        return text
+    head = text[:CARD_SUMMARY_CHARS + 1]  # +1: a space right after the limit is a boundary
+    cut = head.rsplit(' ', 1)[0] if ' ' in head else text[:CARD_SUMMARY_CHARS]
+    return cut.rstrip(' .,;:!?—-') + '…'
 
 
 def normalize_title(title):

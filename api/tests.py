@@ -284,6 +284,7 @@ class CourseLevelTests(APITestCase):
 
         response = self.client.get('/admin/api/course/')
         self.assertContains(response, 'column-level')
+        self.assertContains(response, 'column-tag')
         self.assertContains(response, '?level__exact=ADVANCED')  # the list filter
 
         response = self.client.get('/admin/api/course/?level__exact=BEGINNER')
@@ -292,6 +293,7 @@ class CourseLevelTests(APITestCase):
 
         response = self.client.get(f'/admin/api/course/{self.course.id}/change/')
         self.assertContains(response, 'name="level"')
+        self.assertRegex(response.content.decode(), r'<input[^>]* name="tag"[^>]* maxlength="24"')
         self.assertContains(response, '<option value="INTERMEDIATE" selected>')
 
 

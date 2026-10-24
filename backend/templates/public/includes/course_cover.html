@@ -1,10 +1,10 @@
-{% load i18n %}{# Course cover in a fixed 16:9 box, or the cobalt fallback with the course initial. Expects: course; optional: lazy. #}
-<div class="course-cover">
+{% load i18n %}{# Course cover in a fixed box, or the cobalt fallback with the course initial. Expects: course; optional: lazy, card (4:3 for the catalog cards; otherwise 16:9, the course page header). #}
+<div class="course-cover{% if card %} course-cover--card{% endif %}">
   {% if course.cover %}
-    {# width/height reserve the 16:9 space so the layout doesn't shift. #}
+    {# width/height reserve the box's ratio so the layout doesn't shift; object-fit crops the image to it. #}
     <img class="course-cover__img" src="{{ course.cover.url }}"
          alt="{% blocktranslate with title=course.title %}Обложка курса «{{ title }}»{% endblocktranslate %}"
-         width="640" height="360"{% if lazy %} loading="lazy"{% endif %}>
+         width="640" height="{% if card %}480{% else %}360{% endif %}"{% if lazy %} loading="lazy"{% endif %}>
   {% else %}
     <div class="course-cover__fallback" aria-hidden="true">{{ course.title|first|upper }}</div>
   {% endif %}

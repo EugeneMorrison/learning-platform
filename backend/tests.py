@@ -236,29 +236,6 @@ class CoursesCatalogPageTests(PublicPagesTestCase):
                      'Newest first', 'Oldest first', 'No courses found']:
             self.assertContains(en, text)
 
-    def test_level_pill_on_cards_with_a_level(self):
-        self.make_course('Beginner course', level='BEGINNER', sort_order=1)
-        self.make_course('Advanced course', level='ADVANCED', sort_order=2)
-        self.make_course('No level', sort_order=3)
-
-        ru = self.client.get('/courses/').content.decode()
-        en = self.client.get('/en/courses/').content.decode()
-
-        pill = '<span class="pill course-card__level"><span class="visually-hidden">{} </span>{}</span>'
-        self.assertIn(pill.format('Уровень:', 'Начальный'), ru)
-        self.assertIn(pill.format('Уровень:', 'Продвинутый'), ru)
-        self.assertIn(pill.format('Level:', 'Beginner'), en)
-        self.assertIn(pill.format('Level:', 'Advanced'), en)
-        # One pill per card with a level; none for the course without one.
-        cards = re.findall(r'<a class="course-card".*?</a>', ru, re.S)
-        self.assertEqual([card.count('course-card__level') for card in cards], [1, 1, 0])
-
-    def test_no_level_pill_on_the_landing_page(self):
-        self.make_course('Beginner course', level='BEGINNER')
-        for url in ['/', '/en/']:
-            with self.subTest(url=url):
-                self.assertNotContains(self.client.get(url), 'course-card__level')
-
     def test_cards_have_no_step_badges_and_link_to_the_course_page(self):
         course = self.make_course('Linked')
         response = self.client.get('/courses/')
@@ -287,6 +264,154 @@ class CoursesCatalogPageTests(PublicPagesTestCase):
         course = self.make_course('Course')
         response = self.client.get(f'/courses/{course.id}/')
         self.assertTemplateUsed(response, 'index.html')
+
+
+class CourseCardTests(PublicPagesTestCase):
+    """The catalog card (public/includes/course_card.html), the same on the
+    landing page and /courses/: 4:3 cover with the tag and level chips, title,
+    summary, students (or lessons) and price."""
+
+    PAGES = ['/', '/courses/']
+
+    def cards(self, url):
+        html = self.client.get(url).content.decode()
+        return re.findall(r'<a class="course-card".*?</a>', html, re.S)
+
+    def make_students(self, course, n):
+        from api.models import Enrollment
+        for i in range(n):
+            student = User.objects.create_user(username=f'{course.slug}-s{i}', password='x')
+            Enrollment.objects.create(student=student, course=course)
+
+    def test_level_chip_top_right_on_both_pages(self):
+        self.make_course('Beginner course', level='BEGINNER', sort_order=1)
+        self.make_course('No level', sort_order=2)
+
+        chip = ('<span class="course-card__chip course-card__chip--level">'
+                '<span class="visually-hidden">{} </span>{}</span>')
+        for url, label, level in [('/', 'Уровень:', 'Начальный'), ('/courses/', 'Уровень:', 'Начальный'),
+                                  ('/en/', 'Level:', 'Beginner'), ('/en/courses/', 'Level:', 'Beginner')]:
+            cards = self.cards(url)
+            with self.subTest(url=url):
+                self.assertIn(chip.format(label, level), cards[0])
+                self.assertNotIn('course-card__chip', cards[1])  # no level, no tag: no chips at all
+
+    def test_tag_chip_top_left_escaped_and_optional(self):
+        self.make_course('Tagged', tag='<b>Хит</b>', sort_order=1)
+        self.make_course('Untagged', level='ADVANCED', sort_order=2)
+        for url in self.PAGES:
+            cards = self.cards(url)
+            with self.subTest(url=url):
+                self.assertIn('<span class="course-card__chip course-card__chip--tag">&lt;b&gt;Хит&lt;/b&gt;</span>', cards[0])
+                self.assertNotIn('chip--tag', cards[1])
+                self.assertIn('chip--level', cards[1])
+
+    def test_tag_is_at_most_24_characters(self):
+        from django.core.exceptions import ValidationError
+        course = Course(title='T', author=self.author, tag='x' * 25)
+        with self.assertRaises(ValidationError):
+            course.full_clean(exclude=['slug'])
+        course.tag = 'x' * 24
+        course.full_clean(exclude=['slug'])
+
+    def test_students_replace_lessons_when_there_are_any(self):
+        with_students = self.make_course('With students', sort_order=1)
+        without = self.make_course('Without students', sort_order=2)
+        for n in range(3):  # 3 lessons: a Count over the join would give 3 x 2 = 6 students
+            Lesson.objects.create(course=with_students, title=f'L{n}', order_index=n)
+            Lesson.objects.create(course=without, title=f'L{n}', order_index=n)
+        self.make_students(with_students, 2)
+
+        for url, label, lessons in [('/', 'Учащихся:', 'Уроков: 3'), ('/courses/', 'Учащихся:', 'Уроков: 3'),
+                                    ('/en/', 'Students:', 'Lessons: 3')]:
+            cards = self.cards(url)
+            with self.subTest(url=url):
+                self.assertRegex(cards[0], rf'<span class="visually-hidden">{label} </span>2\s*</span>')
+                self.assertIn('class="course-card__icon"', cards[0])
+                self.assertNotIn(lessons, cards[0])
+                self.assertIn(lessons, cards[1])
+                self.assertNotIn('course-card__students', cards[1])
+
+    def test_thousands_get_a_non_breaking_space(self):
+        from backend.views import format_count
+        self.assertEqual(format_count(7), '7')
+        self.assertEqual(format_count(1234), f'1{NBSP}234')
+        self.assertEqual(format_count(1234567), f'1{NBSP}234{NBSP}567')
+
+    def test_query_count_stays_two_with_students(self):
+        # 2 = courses (lessons and students included) + published reviews.
+        for n in range(3):
+            course = self.make_course(f'Course {n}')
+            Lesson.objects.create(course=course, title='Lesson', order_index=1)
+            self.make_students(course, n)
+        for url in self.PAGES:
+            with self.subTest(url=url), self.assertNumQueries(2):
+                self.client.get(url)
+
+    def test_summary_is_the_tagline_else_the_start_of_the_description(self):
+        self.make_course('Tagline wins', tagline='Коротко', description='Длинное описание', sort_order=1)
+        self.make_course('Description', description='Первая строка\n\nвторая   строка <i>курсив</i>', sort_order=2)
+        self.make_course('Nothing', sort_order=3)
+        for url in self.PAGES:
+            cards = self.cards(url)
+            with self.subTest(url=url):
+                self.assertIn('<p class="course-card__summary">Коротко</p>', cards[0])
+                # One line, escaped (authors type plain text).
+                self.assertIn('<p class="course-card__summary">Первая строка вторая строка &lt;i&gt;курсив&lt;/i&gt;</p>',
+                              cards[1])
+                self.assertNotIn('course-card__summary', cards[2])
+
+    def test_long_description_is_cut_at_a_word_boundary(self):
+        from backend.views import CARD_SUMMARY_CHARS, card_summary
+        words = ('слово ' * 60).strip()
+        summary = card_summary(Course(tagline='', description=words))
+        self.assertTrue(summary.endswith('слово…'))
+        self.assertLessEqual(len(summary), CARD_SUMMARY_CHARS + 1)
+        # One word longer than the limit: cut inside it.
+        summary = card_summary(Course(tagline='', description='x' * 500))
+        self.assertEqual(summary, 'x' * CARD_SUMMARY_CHARS + '…')
+        # Short enough: as is, no "…".
+        self.assertEqual(card_summary(Course(tagline='  ', description=' Коротко. ')), 'Коротко.')
+
+    def test_no_step_badges_on_either_page(self):
+        self.make_course('A')
+        self.make_course('B')
+        for url in self.PAGES:
+            with self.subTest(url=url):
+                self.assertNotContains(self.client.get(url), 'step-badge')
+
+    def test_card_cover_is_4_3_and_lazy_course_page_stays_16_9(self):
+        course = self.make_course('Covered', cover='covers/c.jpg')
+        for url in self.PAGES:
+            card = self.cards(url)[0]
+            with self.subTest(url=url):
+                self.assertIn('<div class="course-cover course-cover--card">', card)
+                img = re.search(r'<img[^>]*>', card).group(0)
+                for attr in ['src="/media/covers/c.jpg"', 'width="640" height="480"', 'loading="lazy"']:
+                    self.assertIn(attr, img)
+
+        html = self.client.get(f'/course/{course.slug}/').content.decode()
+        img = re.search(r'<img class="course-cover__img"[^>]*>', html).group(0)
+        self.assertIn('width="640" height="360"', img)
+        self.assertNotIn('loading=', img)
+        self.assertNotIn('course-cover--card', html)
+
+    def test_no_cover_keeps_the_letter_placeholder(self):
+        self.make_course('Ёлка')
+        for url in self.PAGES:
+            card = self.cards(url)[0]
+            with self.subTest(url=url):
+                self.assertIn('<div class="course-cover__fallback" aria-hidden="true">Ё</div>', card)
+                self.assertNotIn('<img', card)
+
+    def test_catalog_data_attributes_unchanged(self):
+        self.make_course('Data', price=Decimal('1990'), old_price=Decimal('2990'), level='ADVANCED', tag='Новый')
+        html = self.client.get('/courses/').content.decode()
+        li = re.search(r'<li (data-title=.*?)>', html, re.S).group(1)
+        self.assertEqual(
+            sorted(re.findall(r'data-([a-z-]+)=', li)),
+            ['created', 'id', 'level', 'old-price', 'price', 'rank', 'title'],
+        )
 
 
 class CourseDetailTests(PublicPagesTestCase):

@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-23 01:14+0300\n"
+"POT-Creation-Date: 2026-10-24 14:56+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -44,15 +44,15 @@ msgid ""
 "%(seconds)d с."
 msgstr "You can post in discussions once a minute. Try again in %(seconds)d s."
 
-#: .\api\models.py:187 .\backend\templates\public\courses.html:39
+#: .\api\models.py:193 .\backend\templates\public\courses.html:39
 msgid "Начальный"
 msgstr "Beginner"
 
-#: .\api\models.py:188 .\backend\templates\public\courses.html:40
+#: .\api\models.py:194 .\backend\templates\public\courses.html:40
 msgid "Средний"
 msgstr "Intermediate"
 
-#: .\api\models.py:189 .\backend\templates\public\courses.html:41
+#: .\api\models.py:195 .\backend\templates\public\courses.html:41
 msgid "Продвинутый"
 msgstr "Advanced"
 
@@ -530,7 +530,7 @@ msgid "Программа курса"
 msgstr "Course syllabus"
 
 #: .\backend\templates\public\course_detail.html:80
-#: .\backend\templates\public\includes\course_card.html:19
+#: .\backend\templates\public\includes\course_card.html:28
 msgid "Уроков:"
 msgstr "Lessons:"
 
@@ -653,9 +653,13 @@ msgstr "Fill-ins:"
 msgid "на главную"
 msgstr ""
 
-#: .\backend\templates\public\includes\course_card.html:17
+#: .\backend\templates\public\includes\course_card.html:16
 msgid "Уровень:"
 msgstr "Level:"
+
+#: .\backend\templates\public\includes\course_card.html:25
+msgid "Учащихся:"
+msgstr "Students:"
 
 #: .\backend\templates\public\includes\course_cover.html:6
 #, python-format

@@ -18,7 +18,7 @@
       {% if courses %}
         <ol class="catalog__list">
           {% for course in courses %}
-            <li>{% include "public/includes/course_card.html" with step=forloop.counter %}</li>
+            <li>{% include "public/includes/course_card.html" %}</li>
           {% endfor %}
         </ol>
         {# The full catalog with search and filters. #}

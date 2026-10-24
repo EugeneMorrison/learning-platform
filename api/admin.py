@@ -28,7 +28,7 @@ class UserAdmin(admin.ModelAdmin):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['title', 'slug', 'level', 'price', 'old_price', 'sort_order', 'is_published', 'created_at']
+    list_display = ['title', 'slug', 'tag', 'level', 'price', 'old_price', 'sort_order', 'is_published', 'created_at']
     list_editable = ['price', 'sort_order']  # tweak pricing/order straight from the list
     list_filter = ['is_published', 'level', 'created_at']
     search_fields = ['title', 'description']

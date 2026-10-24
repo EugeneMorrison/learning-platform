@@ -151,6 +151,12 @@ class Course(models.Model):
         help_text="Short marketing subtitle shown on the course card"
     )
 
+    tag = models.CharField(
+        max_length=24,
+        blank=True,
+        help_text="Optional chip on the card cover, e.g. «Новый» or «Хит»; shown as typed on /en/ too"
+    )
+
     cover = models.ImageField(
         upload_to="covers/",
         blank=True,
