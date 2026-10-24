@@ -113,8 +113,10 @@
     align-items: center;
   }
 
-  /* One line per honor, as in the mockup: the first may run past the text
+  /* The name's and the honors' line breaks are fixed (<br> in the markup), as
+     in the mockup, at any window width or zoom: a line may run past the text
      column, over the edge of the illustration (the text paints above it). */
+  .hero__name,
   .hero__honors {
     white-space: nowrap;
   }

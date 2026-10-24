@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-24 20:37+0300\n"
+"POT-Creation-Date: 2026-10-24 20:59+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -656,7 +656,7 @@ msgid "Старая цена:"
 msgstr "Old price:"
 
 #: .\backend\templates\public\includes\hero.html:11
-msgid "Колесникова Людмила Сергеевна"
+msgid "Колесникова Людмила<br>Сергеевна"
 msgstr ""
 
 #: .\backend\templates\public\includes\hero.html:12

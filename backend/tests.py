@@ -799,7 +799,7 @@ class HeroTests(PublicPagesTestCase):
         '/about/': ['<h1 id="hero-title" class="hero__title">Обо мне</h1>'],
         '/en/about/': ['<h1 id="hero-title" class="hero__title">About me</h1>'],
     }
-    HEADER = ['<p class="hero__name">Колесникова Людмила Сергеевна</p>',
+    HEADER = ['<p class="hero__name">Колесникова Людмила<br>Сергеевна</p>',
               '<p class="hero__role"><em>Преподаватель, методист и автор курсов. '
               'Руководитель с 10-летним стажем.</em></p>',
               '<p class="hero__honors"><strong>Заслуженный наставник кружкового движения НТИ.<br>'
@@ -1109,7 +1109,7 @@ class AboutPageTests(PublicPagesTestCase):
             with self.subTest(url=url):
                 self.assertRegex(html, r'<div class="about__intro">\s*<p>За моими плечами')
                 # Name and titles appear once: in the header, not again above the bio.
-                self.assertEqual(html.count('Колесникова Людмила Сергеевна'), 1)
+                self.assertEqual(html.count('Колесникова Людмила<br>Сергеевна'), 1)
                 self.assertEqual(html.count('Эксперт Школы наставников Сколково.'), 1)
 
     def test_title_meta_and_heading_translated(self):
