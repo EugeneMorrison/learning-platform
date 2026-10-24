@@ -113,6 +113,12 @@
     align-items: center;
   }
 
+  /* One line per honor, as in the mockup: the first may run past the text
+     column, over the edge of the illustration (the text paints above it). */
+  .hero__honors {
+    white-space: nowrap;
+  }
+
   /* 5% kept free on the right: the illustration's violet reaches about 4.4%
      past the box, and stays inside the container. */
   .hero__media {

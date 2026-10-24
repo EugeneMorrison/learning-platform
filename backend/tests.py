@@ -802,7 +802,7 @@ class HeroTests(PublicPagesTestCase):
     HEADER = ['<p class="hero__name">Колесникова Людмила Сергеевна</p>',
               '<p class="hero__role"><em>Преподаватель, методист и автор курсов. '
               'Руководитель с 10-летним стажем.</em></p>',
-              '<p class="hero__honors"><strong>Заслуженный наставник кружкового движения НТИ. '
+              '<p class="hero__honors"><strong>Заслуженный наставник кружкового движения НТИ.<br>'
               'Эксперт Школы наставников Сколково.</strong></p>']
 
     def test_author_texts_in_ru_and_en(self):

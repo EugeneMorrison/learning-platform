@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: learning_embedded_app public pages\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-24 19:58+0300\n"
+"POT-Creation-Date: 2026-10-24 20:37+0300\n"
 "PO-Revision-Date: 2026-10-19 04:45+0300\n"
 "Last-Translator: \n"
 "Language-Team: English\n"
@@ -665,9 +665,11 @@ msgid ""
 msgstr ""
 
 #: .\backend\templates\public\includes\hero.html:13
-msgid ""
-"Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников "
-"Сколково."
+msgid "Заслуженный наставник кружкового движения НТИ."
+msgstr ""
+
+#: .\backend\templates\public\includes\hero.html:13
+msgid "Эксперт Школы наставников Сколково."
 msgstr ""
 
 #: .\backend\templates\public\includes\hero.html:29
