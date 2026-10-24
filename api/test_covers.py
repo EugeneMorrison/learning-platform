@@ -137,6 +137,97 @@ class CoverProcessingTests(TestCase):
         self.assertEqual(self.opened(course).size, (1200, 900))
         self.assertTrue(course.cover.name.endswith('.webp'))
 
+    # --- Old files are deleted when the cover is replaced or removed ------------
+
+    def storage(self):
+        return Course._meta.get_field('cover').storage
+
+    def test_replacing_deletes_the_old_file(self):
+        course = self.save_cover(image_bytes((800, 600)), name='first.jpg')
+        first = course.cover.name
+
+        with self.captureOnCommitCallbacks(execute=True):  # the delete waits for the commit
+            course = self.save_cover(image_bytes((800, 600)), name='second.jpg', course=course)
+
+        self.assertFalse(self.storage().exists(first))
+        self.assertTrue(self.storage().exists(course.cover.name))
+
+    def test_removing_deletes_the_file(self):
+        course = self.save_cover(image_bytes((800, 600)))
+        name = course.cover.name
+
+        with self.captureOnCommitCallbacks(execute=True):
+            course.cover = None
+            course.save()
+
+        course.refresh_from_db()
+        self.assertFalse(course.cover)
+        self.assertFalse(self.storage().exists(name))
+
+    def test_other_saves_keep_the_file(self):
+        course = self.save_cover(image_bytes((800, 600)))
+        name = course.cover.name
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            course.title = 'Renamed'
+            course.save()
+            Course.objects.get(pk=course.pk).save(update_fields=['title'])
+
+        self.assertEqual(callbacks, [])
+        self.assertTrue(self.storage().exists(name))
+
+    def test_rolled_back_save_keeps_the_old_file(self):
+        from django.db import transaction
+
+        course = self.save_cover(image_bytes((800, 600)), name='kept.jpg')
+        kept = course.cover.name
+
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            with self.assertRaises(RuntimeError), transaction.atomic():
+                course.cover = None
+                course.save()
+                raise RuntimeError('the request fails after the save')
+
+        self.assertEqual(callbacks, [])  # the rollback dropped the delete
+        self.assertTrue(self.storage().exists(kept))
+        self.assertEqual(Course.objects.get(pk=course.pk).cover.name, kept)
+
+    def test_file_used_by_another_course_is_kept(self):
+        course = self.save_cover(image_bytes((800, 600)))
+        shared = course.cover.name
+        Course.objects.create(title='Copy', author=self.author, cover=shared)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            course.cover = None
+            course.save()
+
+        self.assertTrue(self.storage().exists(shared))
+
+    def test_admin_replace_and_clear_delete_old_files(self):
+        admin_user = User.objects.create_superuser('boss', 'b@example.com', 'x')
+        request = RequestFactory().get('/admin/')
+        request.user = admin_user
+        course = self.save_cover(image_bytes((800, 600)), name='old.jpg')
+        old = course.cover.name
+
+        def admin_save(data, files=None):
+            instance = Course.objects.get(pk=course.pk)  # as the change page loads it
+            form_class = site._registry[Course].get_form(request, instance, fields=['cover'])
+            form = form_class(data=data, files=files or {}, instance=instance)
+            self.assertTrue(form.is_valid(), form.errors)
+            with self.captureOnCommitCallbacks(execute=True):
+                form.save()
+            return Course.objects.get(pk=course.pk)
+
+        upload = SimpleUploadedFile('new.png', image_bytes((900, 600), fmt='PNG'), content_type='image/png')
+        replaced = admin_save({}, {'cover': upload})
+        self.assertFalse(self.storage().exists(old))
+        self.assertTrue(self.storage().exists(replaced.cover.name))
+
+        cleared = admin_save({'cover-clear': 'on'})  # the admin's «Очистить» checkbox
+        self.assertFalse(cleared.cover)
+        self.assertFalse(self.storage().exists(replaced.cover.name))
+
     def test_admin_help_text(self):
         help_text = Course._meta.get_field('cover').help_text
         self.assertIn('800×600', help_text)

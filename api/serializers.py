@@ -92,7 +92,8 @@ class CourseSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.username', read_only=True)
     lesson_count = serializers.SerializerMethodField()
     # Upload: multipart PATCH; remove: {"cover": null}; read: the file's URL or
-    # null. Course.save() shrinks a new cover (api/covers.py). max_length=None:
+    # null. Course.save() shrinks a new cover (api/covers.py) and deletes the
+    # replaced or removed file. max_length=None:
     # storage trims a long upload name itself, and it becomes <name>.webp anyway.
     cover = serializers.ImageField(required=False, allow_null=True, max_length=None,
                                    error_messages=COVER_ERRORS)
@@ -128,15 +129,6 @@ class CourseSerializer(serializers.ModelSerializer):
         if getattr(getattr(value, 'image', None), 'format', None) not in COVER_FORMATS:
             raise serializers.ValidationError(f'Этот формат не подходит. {COVER_TYPES_TEXT}')
         return value
-
-    def update(self, instance, validated_data):
-        """A replaced or removed cover's file is deleted from storage (after the
-        new state is saved), so the course page doesn't leave orphans behind."""
-        old_cover = instance.cover.name if 'cover' in validated_data else ''
-        course = super().update(instance, validated_data)
-        if old_cover and old_cover != course.cover.name:
-            course.cover.storage.delete(old_cover)
-        return course
 
     def get_lesson_count(self, obj):
         """Count lessons in this course"""

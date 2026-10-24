@@ -348,6 +348,19 @@ class CourseCoverApiTests(APITestCase):
         self.assertRegex(response.data['cover'], r'^http://testserver/media/covers/photo(_\w+)?\.webp$')
         self.assertEqual(self.stored(), ('WEBP', (1200, 900)))
 
+    def test_course_page_upload_goes_through_the_save_hook(self):
+        # The shrinking lives in Course.save() (api/models.py), not in the
+        # serializer: the API upload must reach it with the uploaded file.
+        from api.covers import shrink_cover
+
+        with mock.patch('api.models.shrink_cover', wraps=shrink_cover) as hook:
+            response = self.patch_cover(self.author, self.upload('IMG_2024.JPG'))
+
+        self.assertEqual(response.status_code, 200)
+        hook.assert_called_once()
+        self.assertEqual(hook.call_args.args[0].name, 'IMG_2024.JPG')
+        self.assertEqual(self.stored(), ('WEBP', (1200, 900)))
+
     def test_others_cannot_upload(self):
         for user in [self.other, self.student]:
             with self.subTest(user=user.username):
@@ -394,7 +407,8 @@ class CourseCoverApiTests(APITestCase):
         first = self.course.cover.name
         storage = self.course.cover.storage
 
-        self.patch_cover(self.author, self.upload('second.png', fmt='PNG', content_type='image/png'))
+        with self.captureOnCommitCallbacks(execute=True):  # the delete waits for the commit
+            self.patch_cover(self.author, self.upload('second.png', fmt='PNG', content_type='image/png'))
         self.course.refresh_from_db()
         self.assertRegex(self.course.cover.name, r'^covers/second(_\w+)?\.webp$')
         self.assertFalse(storage.exists(first))
@@ -405,7 +419,8 @@ class CourseCoverApiTests(APITestCase):
         self.course.refresh_from_db()
         name, storage = self.course.cover.name, self.course.cover.storage
 
-        response = self.patch_cover(self.author, None, fmt='json')
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.patch_cover(self.author, None, fmt='json')
 
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.data['cover'])
@@ -418,7 +433,8 @@ class CourseCoverApiTests(APITestCase):
         self.course.refresh_from_db()
         name = self.course.cover.name
 
-        self.client.patch(f'/api/courses/{self.course.id}/', {'title': 'Renamed', 'level': 'ADVANCED'}, format='json')
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.patch(f'/api/courses/{self.course.id}/', {'title': 'Renamed', 'level': 'ADVANCED'}, format='json')
 
         self.course.refresh_from_db()
         self.assertEqual(self.course.cover.name, name)

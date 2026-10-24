@@ -10,7 +10,7 @@ Model Relationships:
 """
 
 import uuid
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from slugify import slugify
@@ -246,14 +246,41 @@ class Course(models.Model):
 
     def save(self, *args, **kwargs):
         """Fill a unique slug from the (transliterated) title when left blank.
+
         Shrink a newly assigned cover (api/covers.py). Not committed = a new file
         that isn't in storage yet (an upload); a cover loaded from the database
-        is committed, so saves that don't change it never re-process it."""
+        is committed, so saves that don't change it never re-process it.
+
+        A replaced or removed cover's old file is deleted (any path: course page,
+        admin, code), so media/covers/ doesn't collect leftovers. The stored name
+        is read from the database right before saving, rather than remembered
+        from loading, so it is never stale."""
         if not self.slug:
             self.slug = self._generate_unique_slug()
+
+        update_fields = kwargs.get('update_fields')
+        old_cover = ''
+        if not self._state.adding and (update_fields is None or 'cover' in update_fields):
+            old_cover = Course.objects.filter(pk=self.pk).values_list('cover', flat=True).first() or ''
+
         if self.cover and not self.cover._committed:
             self.cover = shrink_cover(self.cover.file)  # stored by FileField as usual
         super().save(*args, **kwargs)
+
+        if old_cover and old_cover != self.cover.name:
+            self._delete_cover_file(old_cover)
+
+    @classmethod
+    def _delete_cover_file(cls, name):
+        """Delete a cover file once the save is committed (a rolled-back save
+        keeps it), unless another course still points to the same file."""
+        storage = cls._meta.get_field('cover').storage
+
+        def delete():
+            if not cls.objects.filter(cover=name).exists():
+                storage.delete(name)  # a file that's already gone is fine
+
+        transaction.on_commit(delete)
 
     def _generate_unique_slug(self):
         """Transliterate the title to a slug, falling back to 'course' for
