@@ -1,43 +1,20 @@
 /*
- * "Обо мне" page (/about/), below the author hero (hero.css): the name and titles,
- * then the bio in one reading column (--measure, about 68 characters per
- * line). Uses only the variables from tokens.css.
+ * "Обо мне" page (/about/), below the header (hero.css): the bio in one
+ * reading column (--measure, about 68 characters per line), left-aligned with
+ * the header text. Uses only the variables from tokens.css.
  */
 
-/* No top padding: the hero's bottom padding already separates the two. */
+/* No top padding: the header's bottom padding already separates the two. */
 .about {
   padding: 0 0 var(--space-8);
 }
 
 /* The page text is a step larger than body text; --measure (in ch) is taken
-   at that size, so lines stay about 65-75 characters long. */
+   at that size, so lines stay about 65-75 characters long (about 700px).
+   Centred, as wide as the header above it (.hero__inner). */
 .about__inner {
   max-width: calc(var(--measure) + 2 * var(--space-5));
   font-size: var(--text-lg);
-}
-
-.about__header {
-  margin-bottom: var(--space-7);
-}
-
-/* An h2 (the hero holds the page's h1), at the h1 size it had before. */
-.about__title {
-  margin-bottom: var(--space-5);
-  font-size: var(--text-3xl);
-}
-
-.about__name {
-  margin-bottom: var(--space-3);
-  font-size: var(--text-xl);
-}
-
-.about__role {
-  margin-bottom: var(--space-3);
-  color: var(--color-muted);
-}
-
-.about__honors {
-  margin: 0;
 }
 
 .about__body {
@@ -45,7 +22,7 @@
   overflow-wrap: anywhere;
 }
 
-.about__body section + section {
+.about__body > * + * {
   margin-top: var(--space-7);
 }
 
@@ -67,6 +44,6 @@
   margin-top: var(--space-2);
 }
 
-.about__body section > :last-child {
+.about__body > * > :last-child {
   margin-bottom: 0;
 }

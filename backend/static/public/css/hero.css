@@ -1,11 +1,12 @@
 /*
- * Author hero (public/includes/hero.html): text + the author's picture.
- * Loaded by the pages that include it ("Обо мне"). Uses only the
- * variables from tokens.css.
+ * "Обо мне" header (public/includes/hero.html): the page title, the author's
+ * name and titles, and the author's picture. Loaded by the pages that include
+ * it ("Обо мне"). Uses only the variables from tokens.css.
  */
 
-/* Hero: text + the author's picture. Phones and tablets: one column, the
-   picture under the text. From 56.25rem (900px): two columns, below. */
+/* Phones: one column, the picture (smaller, centred) above the text.
+   From 48rem (768px): text on the left, the picture on the right, below.
+   The header is as wide as the bio below it (about.css), centred. */
 .hero {
   /* Bottom padding: the picture ends inside the section, not on its edge. */
   padding: var(--space-6) 0 var(--space-7);
@@ -13,10 +14,14 @@
   overflow-x: clip;    /* the illustration may bleed past the container edge */
 }
 
+/* --measure (in ch) is taken at the bio's text size, so the width matches
+   .about__inner; the header text itself is body size. */
 .hero__inner {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-6);
+  gap: var(--space-5);
+  max-width: calc(var(--measure) + 2 * var(--space-5));
+  font-size: var(--text-lg);
 }
 
 /* Above the illustration where it reaches into the column gap. */
@@ -24,52 +29,45 @@
   position: relative;
   z-index: 1;
   min-width: 0;
-}
-
-/* Small greeting above the heading. */
-.hero__eyebrow {
-  margin-bottom: var(--space-3);
-  color: var(--color-accent);
-  font-family: var(--font-heading);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  line-height: var(--leading-tight);
+  font-size: var(--text-base);
 }
 
 .hero__title {
   margin-bottom: var(--space-5);
 }
 
-/* The author's paragraphs: regular body text. */
-.hero__about {
-  max-width: calc(var(--container-width) / 2);
-  margin-bottom: var(--space-6);
+.hero__name {
+  margin-bottom: var(--space-3);
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
 }
 
-.hero__about p:last-child {
-  margin-bottom: 0;
+.hero__role {
+  margin-bottom: var(--space-3);
+  color: var(--color-muted);
 }
 
-.hero__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
+.hero__honors {
+  margin: 0;
 }
 
 /* The picture: two layers measured from the mockup, in % of .hero__media.
    Front: the author's cut-out, 70% wide, right of centre; it sets the box
-   height; both layers share its bottom edge.
+   height (about 0.9 of the box width); both layers share its bottom edge.
    Back: the violet illustration, 119% wide, from -9.8% to 109.2%: its
    leftmost violet starts at about -4.4%, inside the column gap, so nothing
    violet sits behind the text; the transparent glow may reach further.
    Its rightmost violet ends at about 104.4%.
-   Phones: the box is narrowed so the whole illustration fits the screen. */
+   Phones: a small box, centred, so the whole illustration fits the screen. */
 .hero__media {
   position: relative;
   z-index: 0;  /* own stacking context: the illustration stays behind */
-  width: 84%;
+  order: -1;
+  width: min(14rem, 70%);
   min-width: 0;
-  margin-left: 8.2%;
+  margin: 0 auto;
 }
 
 .hero__media picture,
@@ -105,31 +103,21 @@
   mask-image: linear-gradient(to bottom, var(--color-ink) 88%, transparent);
 }
 
-/* Desktop: text about 45%, picture about 55%; the text is centred against the
-   picture. */
-@media (min-width: 56.25rem) {
-  .hero {
-    padding-top: var(--space-5);
-  }
-
+/* Desktop: text and picture share the header half and half; the picture is
+   about as tall as the text beside it, and the two are centred against each
+   other. */
+@media (min-width: 48rem) {
   .hero__inner {
-    grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-4);
     align-items: center;
   }
 
-  /* The surname stays on one line in the 45% column: full h1 size from
-     about 1280px, scaled down towards --text-2xl on narrower desktops. */
-  .hero__title {
-    font-size: clamp(var(--text-2xl), 3.4vw, var(--text-3xl));
-  }
-
   /* 5% kept free on the right: the illustration's violet reaches about 4.4%
-     past the box, and stays inside the container instead of the viewport
-     cutting it off on narrower desktops. */
+     past the box, and stays inside the container. */
   .hero__media {
-    align-self: end;
+    order: 0;
     width: auto;
-    margin-left: 0;
-    margin-right: 5%;
+    margin: 0 5% 0 0;
   }
 }

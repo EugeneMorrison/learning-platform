@@ -793,49 +793,43 @@ class HeroTests(PublicPagesTestCase):
         from django.contrib.staticfiles import finders
         self.assertIsNotNone(finders.find('public/img/cat-desk-800.webp'))
 
+    # The header: h1, the name, the role and the honors (the name and titles are
+    # not translated yet, so /en/ shows them in Russian).
     TEXTS = {
-        '/about/': ['<p class="hero__eyebrow">Привет!</p>',
-              '<h1 id="hero-title" class="hero__title">Я Людмила Колесникова</h1>',
-              '<p>Автор образовательного проекта учиЛКа.</p>',
-              '<p>Уже более 10 лет я преподаю, создаю образовательные курсы и руковожу проектами.</p>',
-              '<p>Здесь я делюсь своим опытом и знаниями: от программирования и создания игр '
-              'до управления людьми и командами.</p>',
-              '<p>Люблю объяснять сложное простыми словами и уверена, что ошибки — лучшие учителя, '
-              'а не повод сдаваться!</p>',
-              '<a class="btn btn-primary" href="/">Смотреть курсы</a>'],
-        '/en/about/': ['<p class="hero__eyebrow">Hi!</p>',
-                 '<h1 id="hero-title" class="hero__title">I\'m Lyudmila Kolesnikova</h1>',
-                 '<p>Author of the educational project uchiLKa.</p>',
-                 '<p>For more than 10 years I have been teaching, creating educational courses '
-                 'and leading projects.</p>',
-                 '<p>Here I share my experience and knowledge: from programming and game development '
-                 'to managing people and teams.</p>',
-                 '<p>I love explaining complex things in simple words, and I believe that mistakes '
-                 'are the best teachers, not a reason to give up!</p>',
-                 '<a class="btn btn-primary" href="/en/">Browse courses</a>'],
+        '/about/': ['<h1 id="hero-title" class="hero__title">Обо мне</h1>'],
+        '/en/about/': ['<h1 id="hero-title" class="hero__title">About me</h1>'],
     }
+    HEADER = ['<p class="hero__name">Колесникова Людмила Сергеевна</p>',
+              '<p class="hero__role"><em>Преподаватель, методист и автор курсов. '
+              'Руководитель с 10-летним стажем.</em></p>',
+              '<p class="hero__honors"><strong>Заслуженный наставник кружкового движения НТИ. '
+              'Эксперт Школы наставников Сколково.</strong></p>']
 
     def test_author_texts_in_ru_and_en(self):
         for url, texts in self.TEXTS.items():
             hero = self.hero_html(url)
             with self.subTest(url=url):
-                for text in texts:
+                for text in texts + self.HEADER:
                     self.assertIn(text, hero)
 
-    def test_one_button_and_no_link_to_the_page_itself(self):
+    def test_no_links_in_the_header(self):
         for url in ['/about/', '/en/about/']:
             hero = self.hero_html(url)
             with self.subTest(url=url):
-                self.assertEqual(hero.count('<a '), 1)  # "Смотреть курсы" only
+                self.assertNotIn('<a ', hero)  # no "Смотреть курсы": the nav links to courses
                 for gone in ['hero__more', 'hero-auth-link', 'data-account-href', '/login/']:
                     self.assertNotIn(gone, hero)
 
     def test_old_hero_texts_are_gone(self):
-        hero = self.hero_html('/about/') + self.hero_html('/en/about/')
+        html = self.client.get('/about/').content.decode() + self.client.get('/en/about/').content.decode()
         for old in ['Python: от ужаса до понимания', 'Учитесь Python шаг за шагом',
                     'Короткие уроки и практика', 'Python: from horror to understanding',
-                    'Learn Python step by step', 'hero__lead']:
-            self.assertNotIn(old, hero)
+                    'Learn Python step by step', 'hero__lead',
+                    'hero__eyebrow', 'Привет!', 'Hi!', 'Я Людмила Колесникова', "I'm Lyudmila Kolesnikova",
+                    'Автор образовательного проекта', 'Author of the educational project',
+                    'Смотреть курсы', 'Browse courses', 'hero__actions', 'hero__about',
+                    'Немного обо мне', 'about__header', 'about__title', 'about__name']:
+            self.assertNotIn(old, html)
 
     def test_no_remote_font_hosts(self):
         from django.contrib.staticfiles import finders
@@ -1078,13 +1072,12 @@ class AuthorProfileAdminTests(PublicPagesTestCase):
 
 
 class AboutPageTests(PublicPagesTestCase):
-    """"Обо мне" (/about/, /en/about/): the author hero on top, then the author's
-    bio from the template (no second photo), and the links to it from every page."""
+    """"Обо мне" (/about/, /en/about/): the header (title, name, titles, picture)
+    on top, then the author's bio from the template (no second photo), and the
+    links to it from every page."""
 
     KEY_PHRASES = [
-        '<h2 class="about__name">Колесникова Людмила Сергеевна</h2>',
-        '<em>Преподаватель, методист и автор курсов. Руководитель с 10-летним стажем.</em>',
-        '<strong>Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников Сколково.</strong>',
+        'За моими плечами <strong>11 лет преподавания',
         '<strong>Сегодня именно так я учу своих учеников.</strong>',
         '<strong>Гораздо важнее другое: хватит ли у тебя терпения и желания разобраться в том, '
         'что пока не получается.</strong>',
@@ -1105,18 +1098,24 @@ class AboutPageTests(PublicPagesTestCase):
             with self.subTest(url=url):
                 for phrase in self.KEY_PHRASES:  # no English bio yet: Russian on /en/ too
                     self.assertIn(phrase, html)
-                for heading in ['Немного обо мне', 'Мои ученики и результаты', 'Профессиональный опыт',
+                for heading in ['Мои ученики и результаты', 'Профессиональный опыт',
                                 'Награды и достижения', 'Немного личного', 'Связаться со мной']:
                     self.assertRegex(html, rf'<h2 id="about-[a-z]+">{heading}</h2>')
                 self.assertEqual(html.count('<ul>'), 4)
+
+    def test_bio_starts_without_a_heading(self):
+        for url in ['/about/', '/en/about/']:
+            html = self.get(url)
+            with self.subTest(url=url):
+                self.assertRegex(html, r'<div class="about__intro">\s*<p>За моими плечами')
+                # Name and titles appear once: in the header, not again above the bio.
+                self.assertEqual(html.count('Колесникова Людмила Сергеевна'), 1)
+                self.assertEqual(html.count('Эксперт Школы наставников Сколково.'), 1)
 
     def test_title_meta_and_heading_translated(self):
         ru, en = self.get('/about/'), self.get('/en/about/')
         self.assertIn('<title>Обо мне — УЧЁБУС</title>', ru)
         self.assertIn('<title>About me — UCHEBUS</title>', en)
-        # An h2: the hero above holds the page's only h1.
-        self.assertIn('class="about__title">Обо мне</h2>', ru)
-        self.assertIn('class="about__title">About me</h2>', en)
         for html in [ru, en]:
             self.assertEqual(html.count('<h1'), 1)
             self.assertIn('<h1 id="hero-title"', html)

@@ -9,26 +9,17 @@
   <link rel="stylesheet" href="{% static 'public/css/about.css' %}">
 {% endblock %}
 
-{# The author hero (the page's h1, portrait over the illustration), then the     #}
-{# author's own text (source: design-src/about-author.md), word for word. Each    #}
-{# paragraph is translatable as a whole, markup included; no English yet, so /en/ #}
-{# shows the Russian text.                                                          #}
+{# The header (the page's h1, name and titles, portrait over the illustration),  #}
+{# then the author's own text (source: design-src/about-author.md), word for     #}
+{# word. Each paragraph is translatable as a whole, markup included; no English   #}
+{# yet, so /en/ shows the Russian text.                                            #}
 {% block content %}
   {% include "public/includes/hero.html" %}
 
-  <article class="about" aria-labelledby="about-title">
+  <article class="about">
     <div class="container about__inner">
-
-      <header class="about__header">
-        <h2 id="about-title" class="about__title">{% translate "Обо мне" %}</h2>
-        <h2 class="about__name">{% translate "Колесникова Людмила Сергеевна" %}</h2>
-        <p class="about__role"><em>{% translate "Преподаватель, методист и автор курсов. Руководитель с 10-летним стажем." %}</em></p>
-        <p class="about__honors"><strong>{% translate "Заслуженный наставник кружкового движения НТИ. Эксперт Школы наставников Сколково." %}</strong></p>
-      </header>
-
       <div class="about__body">
-        <section aria-labelledby="about-me">
-          <h2 id="about-me">{% translate "Немного обо мне" %}</h2>
+        <div class="about__intro">
           <p>{% blocktranslate trimmed %}За моими плечами <strong>11 лет преподавания, 10 лет руководства подразделениями в онлайн-школе программирования, 11 000+ проведённых занятий, 20+ авторских курсов и более 100 победителей и призёров олимпиад.</strong>{% endblocktranslate %}</p>
           <p>{% translate "Но когда-то мне самой учёба давалась нелегко." %}</p>
           <p>{% translate "Я пошла в школу в 5 лет, когда моим одноклассникам было уже по 7-8." %}</p>
@@ -38,7 +29,7 @@
           <p>{% translate "Я знаю, каково это — не понимать то, что другим кажется очевидным. И знаю, что это вовсе не означает отсутствие способностей." %}</p>
           <p>{% translate "Неважно, семь пядей у тебя во лбу или нет. И не так уж важно, какие у тебя оценки и любят ли тебя учителя." %}</p>
           <p><strong>{% translate "Гораздо важнее другое: хватит ли у тебя терпения и желания разобраться в том, что пока не получается." %}</strong></p>
-        </section>
+        </div>
 
         <section aria-labelledby="about-students">
           <h2 id="about-students">{% translate "Мои ученики и результаты" %}</h2>
@@ -90,7 +81,6 @@
           <p>{% blocktranslate trimmed %}<strong>Мои курсы:</strong> <a href="https://stepik.org/users/32005180/profile" target="_blank" rel="noopener noreferrer">Профиль на Stepik</a>{% endblocktranslate %}</p>
         </section>
       </div>
-
     </div>
   </article>
 {% endblock %}
