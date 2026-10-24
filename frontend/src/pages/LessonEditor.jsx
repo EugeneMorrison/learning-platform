@@ -588,14 +588,7 @@ function LessonEditor() {
                     <button onClick={() => navigate(previewPath())} style={ghostBtn}>
                         👁 Предпросмотр
                     </button>
-                    {/* The next lesson's editor: next_lesson_id is the lesson
-                        page's own "next" (GET /api/lessons/<id>/); none on the
-                        last lesson. Unsaved changes ask first (useBlocker). */}
-                    {lesson.next_lesson_id && (
-                        <button onClick={() => navigate(`/lesson/${lesson.next_lesson_id}/edit/`)} style={ghostBtn}>
-                            Следующий урок →
-                        </button>
-                    )}
+                    <NextLessonButton nextLessonId={lesson.next_lesson_id} />
                 </div>
             </div>
             <hr style={{ margin: '20px 0' }} />
@@ -633,7 +626,28 @@ function LessonEditor() {
                     ))}
                 </div>
             </div>
+
+            {/* The same «Следующий урок →» again, for an author who has
+                scrolled down through the blocks. */}
+            {lesson.next_lesson_id && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+                    <NextLessonButton nextLessonId={lesson.next_lesson_id} />
+                </div>
+            )}
         </div>
+    );
+}
+
+// «Следующий урок →»: the next lesson's editor. next_lesson_id is the lesson
+// page's own "next" (GET /api/lessons/<id>/); none on the last lesson.
+// Unsaved changes ask first (useBlocker in LessonEditor).
+function NextLessonButton({ nextLessonId }) {
+    const navigate = useNavigate();
+    if (!nextLessonId) return null;
+    return (
+        <button onClick={() => navigate(`/lesson/${nextLessonId}/edit/`)} style={ghostBtn}>
+            Следующий урок →
+        </button>
     );
 }
 
