@@ -914,7 +914,8 @@ class EnrollmentListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         # Student only sees their own enrollments
-        return Enrollment.objects.filter(student=self.request.user)
+        # select_related: course_title / course_cover / student_name per row, one query.
+        return Enrollment.objects.filter(student=self.request.user).select_related('course', 'student')
 
     def create(self, request, *args, **kwargs):
         course = self._published_course(request.data.get('course'))
@@ -986,7 +987,7 @@ class CourseEnrollmentsView(generics.ListAPIView):
         return Enrollment.objects.filter(
             course_id=course_id,
             course__author=self.request.user
-        )
+        ).select_related('course', 'student')
 
 
 class ProgressSubmitView(generics.CreateAPIView):

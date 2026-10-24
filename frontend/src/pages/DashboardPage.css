@@ -6,6 +6,16 @@
     padding: var(--space-5);
 }
 
+/* Cover across the top, out to the card's border (the card keeps its own
+   padding). Not overflow: hidden on the card: that would clip the keyboard
+   focus ring drawn just outside it (.card-link__target::after); the cover
+   rounds its own top corners instead. */
+.dash-card__cover {
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-2);
+    overflow: hidden;
+    border-radius: calc(var(--radius-card) - var(--border-width)) calc(var(--radius-card) - var(--border-width)) 0 0;
+}
+
 .dash-card__title {
     margin: 0;
     font-family: var(--font-heading);

@@ -393,6 +393,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
 
     student_name = serializers.CharField(source='student.username', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
+    course_cover = serializers.SerializerMethodField()
 
     class Meta:
         model = Enrollment
@@ -402,9 +403,18 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             'student_name',  # Extra: student's username
             'course',
             'course_title',  # Extra: course title
+            'course_cover',  # Extra: absolute cover URL, or null (dashboard cards)
             'enrolled_at'
         ]
         read_only_fields = ['id', 'enrolled_at', 'student']
+
+    def get_course_cover(self, obj):
+        """The course's cover as an absolute URL (like CourseSerializer.cover), or None."""
+        cover = obj.course.cover
+        if not cover:
+            return None
+        request = self.context.get('request')
+        return request.build_absolute_uri(cover.url) if request else cover.url
 
 
 # =============================================================================

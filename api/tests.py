@@ -450,6 +450,52 @@ class CourseCoverApiTests(APITestCase):
         self.assertIsNone(self.client.get(f'/api/courses/{self.course.id}/').data['cover'])
 
 
+class DashboardCoverApiTests(APITestCase):
+    """Dashboard cards: the student's «Мои курсы» (/api/enrollments/) gets the
+    course cover as course_cover; the author's (/api/courses/my_courses/) has
+    CourseSerializer.cover. Absolute URLs, or null."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.covered = Course.objects.create(title='Covered', author=cls.author, cover='covers/c.webp')
+        cls.plain = Course.objects.create(title='Plain', author=cls.author)
+        Enrollment.objects.create(student=cls.student, course=cls.covered)
+        Enrollment.objects.create(student=cls.student, course=cls.plain)
+
+    def test_student_enrollments_have_course_cover_and_nothing_else_new(self):
+        self.client.force_authenticate(self.student)
+        rows = {row['course_title']: row for row in self.client.get('/api/enrollments/').data}
+
+        self.assertEqual(rows['Covered']['course_cover'], 'http://testserver/media/covers/c.webp')
+        self.assertIsNone(rows['Plain']['course_cover'])
+        self.assertEqual(set(rows['Covered']), {'id', 'student', 'student_name', 'course', 'course_title',
+                                                'course_cover', 'enrolled_at'})
+
+    def test_author_my_courses_have_the_cover(self):
+        self.client.force_authenticate(self.author)
+        rows = {row['title']: row for row in self.client.get('/api/courses/my_courses/').data}
+        self.assertEqual(rows['Covered']['cover'], 'http://testserver/media/covers/c.webp')
+        self.assertIsNone(rows['Plain']['cover'])
+
+    def test_enrollment_list_query_count_does_not_grow(self):
+        self.client.force_authenticate(self.student)
+        with self.assertNumQueries(1):
+            self.client.get('/api/enrollments/')
+        for n in range(3):
+            course = Course.objects.create(title=f'More {n}', author=self.author, cover=f'covers/{n}.webp')
+            Enrollment.objects.create(student=self.student, course=course)
+        with self.assertNumQueries(1):
+            response = self.client.get('/api/enrollments/')
+        self.assertEqual(len(response.data), 5)
+
+    def test_author_student_list_carries_the_cover_too(self):
+        self.client.force_authenticate(self.author)
+        response = self.client.get(f'/api/courses/{self.covered.id}/enrollments/')
+        self.assertEqual(response.data[0]['course_cover'], 'http://testserver/media/covers/c.webp')
+
+
 class LessonNavigationTests(APITestCase):
     """GET /api/lessons/{id}/ carries course_title and next_lesson_id (the next
     lesson of the same course by order_index; null on the last lesson)."""

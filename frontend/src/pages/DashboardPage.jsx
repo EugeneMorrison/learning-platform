@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 import { COURSE_LEVELS, NO_LEVEL_LABEL } from '../lib/courseLevels';
 import { badgeText, conversationLink, formatMessageTime, useNotifications } from '../lib/notifications';
+import CourseCover from '../components/CourseCover';
 import DiscussionReports from '../components/DiscussionReports';
 import '../components/Notifications.css';
 import './DashboardPage.css';
@@ -98,6 +99,9 @@ function StudentDashboard({ user }) {
                 <div className="card-grid">
                     {enrollments.map(enrollment => (
                         <div key={enrollment.id} className="card card-link dash-card">
+                            <div className="dash-card__cover">
+                                <CourseCover title={enrollment.course_title} cover={enrollment.course_cover} />
+                            </div>
                             <h3 className="dash-card__title">
                                 <Link className="card-link__target" to={`/courses/${enrollment.course}/`}>
                                     {enrollment.course_title}
@@ -267,6 +271,9 @@ function AuthorDashboard() {
                 <div className="card-grid">
                     {courses.map(course => (
                         <div key={course.id} className="card card-link dash-card">
+                            <div className="dash-card__cover">
+                                <CourseCover title={course.title} cover={course.cover} />
+                            </div>
                             <h3 className="dash-card__title">
                                 <Link className="card-link__target" to={`/courses/${course.id}/`}>
                                     {course.title}
