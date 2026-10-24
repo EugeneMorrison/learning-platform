@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { login } from '../api';
 import { goToNext, safeNext, withNext } from '../lib/safeNext';
+import PasswordInput from '../components/PasswordInput';
 import './auth.css';
 
 function LoginPage() {
@@ -45,9 +46,7 @@ function LoginPage() {
                         />
                     </div>
                     <div className="field">
-                        <input
-                            className="input"
-                            type="password"
+                        <PasswordInput
                             placeholder="Пароль"
                             aria-label="Пароль"
                             autoComplete="current-password"

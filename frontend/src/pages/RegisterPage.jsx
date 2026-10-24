@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { register } from '../api';
 import { goToNext, safeNext, withNext } from '../lib/safeNext';
+import PasswordInput from '../components/PasswordInput';
 import './auth.css';
 
 // "не меньше N символа/символов": genitive singular after 1, 21, 31… (not 11).
@@ -98,9 +99,7 @@ function RegisterPage() {
                         />
                     </div>
                     <div className="field">
-                        <input
-                            className="input"
-                            type="password"
+                        <PasswordInput
                             placeholder="Пароль"
                             aria-label="Пароль"
                             autoComplete="new-password"
