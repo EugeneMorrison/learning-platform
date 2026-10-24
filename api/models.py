@@ -16,6 +16,7 @@ from django.utils.translation import gettext_lazy as _
 from slugify import slugify
 
 from .block_content import TASK_TYPES
+from .covers import shrink_cover
 
 
 # =============================================================================
@@ -160,7 +161,9 @@ class Course(models.Model):
     cover = models.ImageField(
         upload_to="covers/",
         blank=True,
-        help_text="Cover image for the course card (stored under MEDIA_ROOT/covers/)"
+        help_text="Cover for the course cards (4:3) and the course page. Recommended "
+                  "800×600; your own artwork only. Larger images are shrunk to 1200 px wide "
+                  "and saved as WebP (stored under MEDIA_ROOT/covers/)"
     )
 
     price = models.DecimalField(
@@ -242,9 +245,14 @@ class Course(models.Model):
         return self.price == 0
 
     def save(self, *args, **kwargs):
-        """Fill a unique slug from the (transliterated) title when left blank."""
+        """Fill a unique slug from the (transliterated) title when left blank.
+        Shrink a newly assigned cover (api/covers.py). Not committed = a new file
+        that isn't in storage yet (an upload); a cover loaded from the database
+        is committed, so saves that don't change it never re-process it."""
         if not self.slug:
             self.slug = self._generate_unique_slug()
+        if self.cover and not self.cover._committed:
+            self.cover = shrink_cover(self.cover.file)  # stored by FileField as usual
         super().save(*args, **kwargs)
 
     def _generate_unique_slug(self):
