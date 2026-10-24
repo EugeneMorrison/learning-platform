@@ -18,7 +18,7 @@
     flex-direction: column;
     width: var(--discussion-width);
     border-left: var(--border-width) solid var(--color-line);
-    background: var(--color-ground);
+    background: var(--color-surface);
     color: var(--color-ink);
     box-shadow: var(--shadow-lg);
 }
@@ -145,7 +145,7 @@
 }
 
 .discussion-thread--pinned .discussion-chip {
-    background: var(--color-ground);
+    background: var(--color-surface);
 }
 
 .discussion-chip--resolved {
@@ -358,7 +358,7 @@
     padding: var(--space-3) var(--space-4);
     border: var(--border-width) solid var(--color-line);
     border-radius: var(--radius-small);
-    background: var(--color-ground);
+    background: var(--color-surface);
 }
 
 .report-item__where {

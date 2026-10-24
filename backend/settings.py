@@ -102,9 +102,6 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # After sessions, before common: picks the language from the URL prefix
-    # (/en/...) for i18n_patterns, otherwise falls back to LANGUAGE_CODE.
-    'django.middleware.locale.LocaleMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -183,8 +180,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-# Russian is the default and lives at / (prefix_default_language=False in
-# backend/urls.py); English lives at /en/.
+# The site is Russian-only: no LocaleMiddleware, so every request is in
+# LANGUAGE_CODE whatever the browser asks for; old /en/ URLs redirect to /
+# (backend/urls.py). The translation tags, locale/ and the English entries
+# below stay, should English return.
 LANGUAGE_CODE = 'ru'
 
 LANGUAGES = [

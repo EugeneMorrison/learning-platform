@@ -5,7 +5,9 @@ import NotificationsBell from './NotificationsBell';
 import LessonProgress from './LessonProgress';
 import { ListIcon } from './LessonsPanel';
 import BrandLogo from './BrandLogo';
+import ThemeToggle from './ThemeToggle';
 import { useLessonBar } from '../lib/lessonBar';
+import { isThemedPath } from '../lib/theme';
 import './AppHeader.css';
 
 // Once every task of the lesson is solved: where the lesson leads, the same
@@ -51,7 +53,7 @@ function readToken() {
 function AppHeader() {
     // Re-render on every navigation so the badge appears right after login and
     // disappears after logout (both end with a navigate()).
-    useLocation();
+    const { pathname } = useLocation();
     const onLessonPage = useMatch('/lesson/:lessonId/');
     const lessonBar = useLessonBar();
 
@@ -133,10 +135,12 @@ function AppHeader() {
                         <a className="app-header__link" href="/#catalog">Курсы</a>
                     </nav>
                 )}
-                {/* Bell (unread messages) and the user. Keyed by the token: a new
+                {/* Theme switch (on pages with a dark theme, lib/theme.js), bell
+                    (unread messages) and the user. Keyed by the token: a new
                     login mounts a fresh badge, which loads the new user. */}
                 {token && (
                     <div className="app-header__end">
+                        {isThemedPath(pathname) && <ThemeToggle />}
                         <NotificationsBell />
                         <UserBadge key={token} />
                     </div>

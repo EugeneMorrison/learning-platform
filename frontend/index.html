@@ -7,6 +7,22 @@
          and the tokens come from /static/public/ (added by the shared-design-tokens
          plugin in vite.config.js). No remote font requests. -->
     <title>%BRAND_NAME%</title>
+    <!-- Dark theme on the pages that have one, before any stylesheet, so they
+         never flash white: the test is lib/theme.js's isThemedPath (keep in
+         step); the choice is "theme" in localStorage, else the OS setting. -->
+    <script>
+      (function () {
+        if (!/^\/(dashboard\/?|courses\/.+|lesson\/.+)$/.test(location.pathname)) return;
+        if (window.self !== window.top) return;
+        var t = null;
+        try { t = localStorage.getItem('theme'); } catch (e) {}
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

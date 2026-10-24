@@ -1,0 +1,99 @@
+/*
+ * Light / dark theme switch, shared by the Django header (base.html) and the
+ * React app bar (frontend/src/components/ThemeToggle.jsx): the same markup in
+ * both. A pill with the sun on the left and the moon on the right; a cobalt
+ * knob sits under the active one (sun: light theme, moon: dark theme). The
+ * button's label says what a click does ("Включить тёмную тему").
+ * Uses only the variables from tokens.css.
+ */
+
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  width: var(--space-8);
+  height: var(--space-6);
+  margin: 0;
+  /* Icons centred over the knob's two positions. */
+  padding: 0 calc(2 * var(--space-1) - var(--border-width));
+  border: var(--border-width) solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-soft);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.theme-toggle[hidden] {
+  display: none;
+}
+
+.theme-toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.theme-toggle:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.theme-toggle__knob {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--space-1) - var(--border-width));
+  width: var(--space-5);
+  height: var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-50%);
+}
+
+/* width/height attributes in the markup too: the icons keep their size even
+   before (or without) this file. */
+.theme-toggle__icon {
+  position: relative; /* above the knob */
+  display: block;
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The icon on the knob: page colour on cobalt (7.6:1 light, 7.9:1 dark). */
+.theme-toggle__sun,
+:root[data-theme="dark"] .theme-toggle__moon {
+  color: var(--color-ground);
+}
+
+:root[data-theme="dark"] .theme-toggle__sun {
+  color: var(--color-muted);
+}
+
+:root[data-theme="dark"] .theme-toggle__knob {
+  transform: translate(var(--space-6), -50%);
+}
+
+/* The knob slides, and the page fades while the theme changes (the scripts add
+   .theme-changing for a moment on a click or an OS switch, never on page load).
+   Nothing moves with reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-toggle__knob {
+    transition: transform 150ms ease;
+  }
+
+  .theme-changing,
+  .theme-changing *,
+  .theme-changing *::before,
+  .theme-changing *::after {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+
+  .theme-changing .theme-toggle__knob {
+    transition: transform 150ms ease, background-color 150ms ease;
+  }
+}

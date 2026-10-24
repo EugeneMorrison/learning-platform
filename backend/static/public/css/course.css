@@ -141,7 +141,7 @@
   padding: var(--space-4) var(--space-5);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-card);
-  background: var(--color-ground);
+  background: var(--color-surface);
 }
 
 .syllabus__title {

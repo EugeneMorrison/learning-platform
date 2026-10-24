@@ -86,11 +86,11 @@ def normalize_title(title):
 
 
 def landing_view(request):
-    """Landing page: Russian at /, English at /en/ (see i18n_patterns in urls.py)."""
+    """Landing page (/)."""
     courses = published_courses()
 
     # Reviews are edited in the Django admin; the section is hidden while there
-    # are none. /en/ shows the English text, falling back to Russian.
+    # are none. Text in the active language (always Russian for now).
     lang = translation.get_language()
     reviews = list(Review.objects.filter(is_published=True).select_related('course'))
     for review in reviews:
@@ -103,7 +103,7 @@ def landing_view(request):
 
 
 def courses_view(request):
-    """Course catalog (/courses/, /en/courses/): every published course as a card,
+    """Course catalog (/courses/): every published course as a card,
     in the author's order. Search, filters and sorting run in the browser
     (public/js/catalog.js) on the data-* attributes set here; without JS the page
     is the full list."""

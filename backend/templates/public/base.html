@@ -3,6 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# Theme before any stylesheet, so a dark page never flashes white: the saved choice #}
+  {# ("theme" in localStorage), else the OS setting. The dark values are tokens.css's   #}
+  {# :root[data-theme="dark"]; the toggle's script is at the end of <body>.             #}
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('theme'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark') {
+        t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.style.colorScheme = t;
+    })();
+  </script>
+  <meta name="color-scheme" content="light dark">
+  {# --color-surface of each theme (the header). Meta tags can't read CSS variables, so #}
+  {# these two repeat tokens.css for the no-JS case; the script keeps them in sync.    #}
+  <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#171A23" media="(prefers-color-scheme: dark)">
   <title>{% block title %}{% brand_name %}{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}{% translate "Онлайн-курсы с практикой прямо в браузере." %}{% endblock %}">
   <link rel="icon" href="{% static 'public/img/favicon.ico' %}" sizes="16x16 32x32 48x48">
@@ -14,6 +33,7 @@
   <link rel="stylesheet" href="{% static 'public/css/base.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/components.css' %}">
   <link rel="stylesheet" href="{% static 'public/css/brand-logo.css' %}">
+  <link rel="stylesheet" href="{% static 'public/css/theme-toggle.css' %}">
   {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -37,15 +57,16 @@
       </nav>
 
       <div class="site-header__actions">
-        {# Django's set_language view: stores the choice and redirects to "next" in the new language. #}
-        <form class="lang-switch" action="{% url 'set_language' %}" method="post" aria-label="{% translate "Язык сайта" %}">
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <button class="lang-switch__btn" type="submit" name="language" value="ru" lang="ru"
-                  aria-pressed="{% if LANGUAGE_CODE == 'ru' %}true{% else %}false{% endif %}">RU</button>
-          <button class="lang-switch__btn" type="submit" name="language" value="en" lang="en"
-                  aria-pressed="{% if LANGUAGE_CODE == 'en' %}true{% else %}false{% endif %}">EN</button>
-        </form>
+        {# Hidden until the script at the end of <body> runs: without JS there is no theme to switch. #}
+        {# Styles: public/css/theme-toggle.css (shared with the React app bar's ThemeToggle.jsx). #}
+        <button class="theme-toggle" id="theme-toggle" type="button" hidden
+                aria-label="{% translate "Включить тёмную тему" %}" title="{% translate "Включить тёмную тему" %}"
+                data-label-dark="{% translate "Включить тёмную тему" %}"
+                data-label-light="{% translate "Включить светлую тему" %}">
+          <span class="theme-toggle__knob" aria-hidden="true"></span>
+          <svg class="theme-toggle__icon theme-toggle__sun" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="theme-toggle__icon theme-toggle__moon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        </button>
         {# React login page (client-side route served by spa_view). The login-aware script #}
         {# at the end of <body> may turn it into "Мой кабинет" → /dashboard/.              #}
         <a class="btn btn-primary" id="header-auth-link" href="/login/"
@@ -90,6 +111,62 @@
       for (var i = 0; i < links.length; i++) {
         links[i].setAttribute('href', links[i].getAttribute('data-account-href'));
         links[i].textContent = links[i].getAttribute('data-account-label');
+      }
+    })();
+  </script>
+  <script>
+    // Theme toggle. The head script already set data-theme; this shows the button,
+    // keeps its label and the theme-color meta in step, saves a click as "theme" in
+    // localStorage and, while nothing is saved, follows the OS setting live. Storage
+    // may be blocked: then the choice lasts for this page only.
+    (function () {
+      var root = document.documentElement;
+      var button = document.getElementById('theme-toggle');
+      var osDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+      var fadeTimer;
+
+      function saved() {
+        try {
+          var t = window.localStorage.getItem('theme');
+          return t === 'light' || t === 'dark' ? t : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function sync() {
+        var dark = root.getAttribute('data-theme') === 'dark';
+        var label = button.getAttribute(dark ? 'data-label-light' : 'data-label-dark');
+        button.setAttribute('aria-label', label);
+        button.setAttribute('title', label);
+        var surface = window.getComputedStyle(root).getPropertyValue('--color-surface').trim();
+        var metas = document.querySelectorAll('meta[name="theme-color"]');
+        for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', surface);
+      }
+
+      function apply(theme) {
+        root.classList.add('theme-changing');
+        root.setAttribute('data-theme', theme);
+        root.style.colorScheme = theme;
+        sync();
+        clearTimeout(fadeTimer);
+        fadeTimer = setTimeout(function () { root.classList.remove('theme-changing'); }, 200);
+      }
+
+      if (!button) return;
+      button.hidden = false;
+      sync();
+
+      button.addEventListener('click', function () {
+        var theme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        try { window.localStorage.setItem('theme', theme); } catch (e) { /* storage blocked */ }
+        apply(theme);
+      });
+
+      if (osDark) {
+        var follow = function (e) { if (!saved()) apply(e.matches ? 'dark' : 'light'); };
+        if (osDark.addEventListener) osDark.addEventListener('change', follow);
+        else if (osDark.addListener) osDark.addListener(follow);
       }
     })();
   </script>

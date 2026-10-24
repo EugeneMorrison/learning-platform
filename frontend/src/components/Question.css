@@ -24,7 +24,7 @@
 .question-modal__backdrop {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--color-ink) 50%, transparent);
+    background: color-mix(in srgb, var(--color-scrim) 50%, transparent);
 }
 
 .question-modal {
@@ -34,7 +34,7 @@
     width: min(100%, var(--reading-width));
     max-height: calc(100dvh - 2 * var(--space-4));
     border-radius: var(--radius-card);
-    background: var(--color-ground);
+    background: var(--color-surface);
     box-shadow: var(--shadow-lg);
 }
 
@@ -238,7 +238,7 @@
     border: var(--border-width) solid var(--color-line);
     border-left: calc(var(--border-width) * 3) solid var(--color-accent);
     border-radius: var(--radius-small);
-    background: var(--color-ground);
+    background: var(--color-surface);
     color: var(--color-ink);
     text-align: left;
 }

@@ -7,7 +7,12 @@ import { BRAND_NAME } from './src/brand.js'
 // at runtime, never bundled, so this plugin adds the tags after Vite has
 // processed index.html (Vite would otherwise try to resolve and copy them).
 // In dev, the proxy below fetches them from Django on port 8000.
-const SHARED_CSS = ['/static/public/css/fonts.css', '/static/public/css/tokens.css', '/static/public/css/brand-logo.css']
+const SHARED_CSS = [
+  '/static/public/css/fonts.css',
+  '/static/public/css/tokens.css',
+  '/static/public/css/brand-logo.css',
+  '/static/public/css/theme-toggle.css', // the app bar's light / dark switch
+]
 const PRELOAD_FONT = '/static/public/fonts/golos-text-cyrillic-400.woff2'
 // Site icons, shared with the Django pages (backend/static/public/img/). The
 // unhashed names stay valid with DEBUG=False: WhiteNoise keeps the originals.

@@ -29,7 +29,7 @@
   border: var(--border-width) solid var(--color-line);
   border-left: calc(var(--border-width) * 4) solid var(--color-highlight);
   border-radius: var(--radius-card);
-  background: var(--color-ground);
+  background: var(--color-surface);
 }
 
 .review-card__text {

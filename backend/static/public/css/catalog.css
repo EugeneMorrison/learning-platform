@@ -137,6 +137,7 @@
 
 .course-card__chip--tag {
   background: var(--color-highlight);
+  color: var(--color-on-highlight);
 }
 
 .course-card__chip--level {

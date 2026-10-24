@@ -15,12 +15,33 @@
     mix-blend-mode: multiply;
 }
 
+/* Dark theme: the cover sits on a light rounded tile and multiplies onto it,
+   as on the public cards (components.css: :root[data-theme="dark"] .course-cover). */
+:root[data-theme="dark"] .course-thumb {
+    position: relative;
+    padding: var(--space-2);
+}
+
+:root[data-theme="dark"] .course-thumb::before {
+    content: "";
+    position: absolute;
+    inset: var(--space-2);
+    border-radius: var(--radius-small);
+    background: var(--color-cover-tile);
+}
+
+:root[data-theme="dark"] .course-thumb__img,
+:root[data-theme="dark"] .course-thumb__fallback {
+    position: relative;
+    border-radius: var(--radius-small);
+}
+
 .course-thumb__fallback {
     display: flex;
     align-items: center;
     justify-content: center;
     height: 100%;
-    background: var(--color-accent);
+    background: var(--color-accent-fill);
     color: var(--color-highlight);
     font-family: var(--font-heading);
     font-size: var(--text-3xl);

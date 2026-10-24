@@ -9,7 +9,6 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import translation
 
 from api.models import Block, Course, Lesson, User
 
@@ -20,12 +19,6 @@ class PublicPagesTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
-
-    def setUp(self):
-        # A request to /en/ leaves English active on the thread, which would make
-        # reverse() in the next test build /en/... URLs. Start each test in Russian.
-        translation.activate('ru')
-        self.addCleanup(translation.deactivate)
 
     def make_course(self, title, **kwargs):
         kwargs.setdefault('is_published', True)
@@ -103,10 +96,8 @@ class LandingCatalogTests(PublicPagesTestCase):
         self.make_course('Course')
 
         ru = self.client.get('/').content.decode()
-        en = self.client.get('/en/').content.decode()
 
         self.assertIn('<a class="btn btn-secondary" href="/courses/">Все курсы →</a>', ru)
-        self.assertIn('<a class="btn btn-secondary" href="/en/courses/">All courses →</a>', en)
         self.assertLess(ru.index('</ol>'), ru.index('href="/courses/">Все курсы'))
 
     def test_empty_state_when_no_published_courses(self):
@@ -118,17 +109,14 @@ class LandingCatalogTests(PublicPagesTestCase):
         self.assertNotContains(response, 'catalog__list')
         self.assertNotContains(response, 'Все курсы →')
 
-    def test_english_catalog_heading(self):
+    def test_russian_whatever_the_browser_asks_for(self):
         self.make_course('Основы', price=0)
 
-        response = self.client.get('/en/')
+        response = self.client.get('/', HTTP_ACCEPT_LANGUAGE='en')
 
-        self.assertContains(response, '<html lang="en">')
-        self.assertContains(response, '<h1 id="catalog-title" class="catalog__title">Courses</h1>')
-        self.assertContains(response, 'Lessons: 0')
-        self.assertContains(response, 'Free')
-        # Database content stays as entered (no model translations yet).
-        self.assertContains(response, 'Основы')
+        self.assertContains(response, '<html lang="ru">')
+        self.assertContains(response, 'Уроков: 0')
+        self.assertNotContains(response, 'Lessons: 0')
 
     def test_catalog_query_count_does_not_grow_with_courses(self):
         def add_course(n):
@@ -158,15 +146,13 @@ class CoursesCatalogPageTests(PublicPagesTestCase):
         return [dict(re.findall(r'data-([a-z-]+)="([^"]*)"', li))
                 for li in re.findall(r'<li (data-title=.*?)>', html, re.S)]
 
-    def test_lists_only_published_courses_under_ru_and_en(self):
+    def test_lists_only_published_courses(self):
         self.make_course('Опубликован')
         self.make_course('Черновик', is_published=False)
-        for url in ['/courses/', '/en/courses/']:
-            response = self.client.get(url)
-            with self.subTest(url=url):
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(self.card_titles(response), ['Опубликован'])
-                self.assertNotContains(response, 'Черновик')
+        response = self.client.get('/courses/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.card_titles(response), ['Опубликован'])
+        self.assertNotContains(response, 'Черновик')
 
     def test_server_order_is_sort_order_then_title(self):
         self.make_course('Б', sort_order=1)
@@ -185,15 +171,13 @@ class CoursesCatalogPageTests(PublicPagesTestCase):
         self.make_course('Free was paid', price=0, old_price=Decimal('500'), sort_order=4)
         self.make_course('Same old price', price=Decimal('100'), old_price=Decimal('100'), sort_order=5)
 
-        # Unlocalized in both languages: "1990.50", never "1990,50" or "1 990,50".
-        for url in ['/courses/', '/en/courses/']:
-            items = self.items(self.client.get(url))
-            with self.subTest(url=url):
-                self.assertEqual(
-                    [(item['price'], item['old-price']) for item in items],
-                    [('0.00', ''), ('1990.50', ''), ('1990.00', '2990.00'),
-                     ('0.00', '500.00'), ('100.00', '100.00')],
-                )
+        # Unlocalized: "1990.50", never "1990,50" or "1 990,50".
+        items = self.items(self.client.get('/courses/'))
+        self.assertEqual(
+            [(item['price'], item['old-price']) for item in items],
+            [('0.00', ''), ('1990.50', ''), ('1990.00', '2990.00'),
+             ('0.00', '500.00'), ('100.00', '100.00')],
+        )
 
     def test_title_level_created_and_id_attributes(self):
         course = self.make_course('  Ёлочные   ИГРУШКИ ', level='INTERMEDIATE')
@@ -220,21 +204,15 @@ class CoursesCatalogPageTests(PublicPagesTestCase):
         self.assertRegex(html, r'<script src="/static/public/js/catalog\.js" defer></script>')
         self.assertIn('aria-live="polite"', html)
 
-    def test_filter_texts_in_ru_and_en(self):
+    def test_filter_texts(self):
         self.make_course('Course')
         ru = self.client.get('/courses/')
-        en = self.client.get('/en/courses/')
 
         for text in ['Каталог курсов', 'placeholder="Поиск курсов по названию"', 'Уровень', 'Любой',
                      'Начальный', 'Средний', 'Продвинутый', 'Доступ', 'Все', 'Бесплатные', 'Платные',
                      'Только со скидкой', 'Сбросить фильтры', 'Найдено:', 'Рекомендуемые',
                      'По сложности', 'Сначала новые', 'Сначала старые', 'Курсы не найдены']:
             self.assertContains(ru, text)
-        for text in ['Course catalog', 'placeholder="Search courses by title"', 'Level', 'Any',
-                     'Beginner', 'Intermediate', 'Advanced', 'Access', 'All', 'Free', 'Paid',
-                     'Discounted only', 'Reset filters', 'Found:', 'Recommended', 'By difficulty',
-                     'Newest first', 'Oldest first', 'No courses found']:
-            self.assertContains(en, text)
 
     def test_cards_have_no_step_badges_and_link_to_the_course_page(self):
         course = self.make_course('Linked')
@@ -289,11 +267,10 @@ class CourseCardTests(PublicPagesTestCase):
 
         chip = ('<span class="course-card__chip course-card__chip--level">'
                 '<span class="visually-hidden">{} </span>{}</span>')
-        for url, label, level in [('/', 'Уровень:', 'Начальный'), ('/courses/', 'Уровень:', 'Начальный'),
-                                  ('/en/', 'Level:', 'Beginner'), ('/en/courses/', 'Level:', 'Beginner')]:
+        for url in self.PAGES:
             cards = self.cards(url)
             with self.subTest(url=url):
-                self.assertIn(chip.format(label, level), cards[0])
+                self.assertIn(chip.format('Уровень:', 'Начальный'), cards[0])
                 self.assertNotIn('course-card__chip', cards[1])  # no level, no tag: no chips at all
 
     def test_tag_chip_top_left_escaped_and_optional(self):
@@ -322,8 +299,8 @@ class CourseCardTests(PublicPagesTestCase):
             Lesson.objects.create(course=without, title=f'L{n}', order_index=n)
         self.make_students(with_students, 2)
 
-        for url, label, lessons in [('/', 'Учащихся:', 'Уроков: 3'), ('/courses/', 'Учащихся:', 'Уроков: 3'),
-                                    ('/en/', 'Students:', 'Lessons: 3')]:
+        label, lessons = 'Учащихся:', 'Уроков: 3'
+        for url in self.PAGES:
             cards = self.cards(url)
             with self.subTest(url=url):
                 self.assertRegex(cards[0], rf'<span class="visually-hidden">{label} </span>2\s*</span>')
@@ -436,6 +413,21 @@ class CoverBackgroundCssTests(PublicPagesTestCase):
         self.assertIn('isolation: isolate;', box)  # blends with the box only
         self.assertIn('mix-blend-mode: multiply;', self.rule(components, '.course-cover__img'))
 
+    def test_dark_theme_puts_every_cover_on_a_light_tile(self):
+        # The tile is inset in the box and the image multiplies onto it, so a
+        # white background blends in; nothing changes in the light theme.
+        components = self.css('components.css')
+        box = self.rule(components, ':root[data-theme="dark"] .course-cover')
+        self.assertIn('padding: var(--space-2);', box)
+        tile = self.rule(components, ':root[data-theme="dark"] .course-cover::before')
+        self.assertIn('inset: var(--space-2);', tile)
+        self.assertIn('background: var(--color-cover-tile);', tile)
+        self.assertNotIn('padding', self.rule(components, '.course-cover'))
+        # Light in both themes.
+        self.assertIn('--color-cover-tile: #F1F3F6;', self.css('tokens.css'))
+        dark = self.css('tokens.css').split(':root[data-theme="dark"]')[1]
+        self.assertIn('--color-cover-tile: #ECEEF3;', dark)
+
     def test_whole_public_card_is_the_cover_grey(self):
         # Cover and body one surface; the card's pills turn white to keep their edge.
         catalog = self.css('catalog.css')
@@ -463,22 +455,20 @@ class CourseDetailTests(PublicPagesTestCase):
     def lesson_titles(self, response):
         return re.findall(r'class="syllabus__title">([^<]*)<', response.content.decode())
 
-    def test_published_course_returns_200_under_ru_and_en(self):
+    def test_published_course_returns_200(self):
         course = self.make_course('Python basics')
 
-        for prefix, lang in [('', 'ru'), ('/en', 'en')]:
-            response = self.client.get(f'{prefix}/course/{course.slug}/')
-            self.assertEqual(response.status_code, 200)
-            self.assertContains(response, f'<html lang="{lang}">')
-            self.assertContains(response, '<title>Python basics — ')
+        response = self.client.get(f'/course/{course.slug}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<html lang="ru">')
+        self.assertContains(response, '<title>Python basics — ')
 
-    def test_unpublished_or_missing_course_returns_404_under_ru_and_en(self):
+    def test_unpublished_or_missing_course_returns_404(self):
         course = self.make_course('Draft', is_published=False)
 
-        for prefix in ['', '/en']:
-            for slug in [course.slug, 'no-such-course']:
-                response = self.client.get(f'{prefix}/course/{slug}/')
-                self.assertEqual(response.status_code, 404, f'{prefix}/course/{slug}/')
+        for slug in [course.slug, 'no-such-course']:
+            response = self.client.get(f'/course/{slug}/')
+            self.assertEqual(response.status_code, 404, f'/course/{slug}/')
 
     def test_lessons_in_order_index_order(self):
         course = self.make_course('Ordered')
@@ -530,13 +520,12 @@ class CourseDetailTests(PublicPagesTestCase):
         Block.objects.create(lesson=lesson, type='TEXT', order_index=3,
                              content={'html': f'<p>{marker}-text</p>'})
 
-        for url in [f'/course/{course.slug}/', f'/en/course/{course.slug}/']:
-            response = self.client.get(url)
-            self.assertNotContains(response, marker)
-            # The context itself holds only titles and integer counts.
-            for row in response.context['lessons']:
-                self.assertEqual(
-                    set(row), {'title', 'text_count', 'quiz_count', 'code_count', 'fill_count'})
+        response = self.client.get(f'/course/{course.slug}/')
+        self.assertNotContains(response, marker)
+        # The context itself holds only titles and integer counts.
+        for row in response.context['lessons']:
+            self.assertEqual(
+                set(row), {'title', 'text_count', 'quiz_count', 'code_count', 'fill_count'})
 
     def test_description_is_escaped(self):
         course = self.make_course(
@@ -559,11 +548,8 @@ class CourseDetailTests(PublicPagesTestCase):
         course = self.make_course('Free', price=0, stepik_id=111)
 
         ru = self.client.get(f'/course/{course.slug}/')
-        en = self.client.get(f'/en/course/{course.slug}/')
 
-        # Same href in both languages: /enroll/ is a React route, not i18n-prefixed.
         self.assertContains(ru, f'href="/enroll/{course.id}/">Начать бесплатно</a>')
-        self.assertContains(en, f'href="/enroll/{course.id}/">Start for free</a>')
         self.assertNotContains(ru, 'stepik.org')
 
     def test_enrol_route_is_served_by_the_react_app(self):
@@ -617,32 +603,24 @@ class CourseDetailTests(PublicPagesTestCase):
         self.assertContains(response, 'Программа скоро появится')
         self.assertNotContains(response, 'class="syllabus"')
 
-    def test_ru_and_en_labels(self):
+    def test_labels(self):
         course = self.make_course('Labels')
         self.make_lesson(course, 'All types', 1, ['TEXT', 'QUIZ', 'CODE', 'FILL'])
 
         ru = self.client.get(f'/course/{course.slug}/')
-        en = self.client.get(f'/en/course/{course.slug}/')
 
         for label in ['Программа курса', 'Уроков: 1', 'Теория: 1', 'Тесты: 1', 'Задачи: 1',
                       'Пропуски: 1', 'Уроки откроются после записи на курс.', 'Все курсы',
                       'Начать бесплатно']:
             self.assertContains(ru, label)
-        for label in ['Course syllabus', 'Lessons: 1', 'Theory: 1', 'Quizzes: 1', 'Exercises: 1',
-                      'Fill-ins: 1', 'Lessons unlock after you enroll in the course.',
-                      'All courses', 'Start for free']:
-            self.assertContains(en, label)
         self.assertContains(ru, 'href="/courses/">← Все курсы<')
-        self.assertContains(en, 'href="/en/courses/">← All courses<')
 
     def test_header_courses_link_goes_to_the_catalog_page(self):
         course = self.make_course('Python basics')
 
         ru = self.client.get(f'/course/{course.slug}/')
-        en = self.client.get(f'/en/course/{course.slug}/')
 
         self.assertContains(ru, 'class="site-nav__link" href="/courses/">Курсы<')
-        self.assertContains(en, 'class="site-nav__link" href="/en/courses/">Courses<')
 
     def test_landing_cards_link_to_course_page(self):
         course = self.make_course('Linked')
@@ -660,7 +638,6 @@ class HeaderAuthLinkTests(PublicPagesTestCase):
     # (link id, url, login label, account label)
     LINKS = [
         ('header-auth-link', '/', 'Войти', 'Мой кабинет'),
-        ('header-auth-link', '/en/', 'Log in', 'My account'),
         ('header-auth-link', '/about/', 'Войти', 'Мой кабинет'),
     ]
 
@@ -727,7 +704,7 @@ class HeroTests(PublicPagesTestCase):
     picture (the violet illustration behind the author's cut-out), WebP with PNG
     fallbacks, loaded eagerly, alt translated."""
 
-    CASES = [('/about/', 'ru', 'Людмила Колесникова'), ('/en/about/', 'en', 'Lyudmila Kolesnikova')]
+    CASES = [('/about/', 'ru', 'Людмила Колесникова')]
 
     def hero_html(self, url):
         html = self.client.get(url).content.decode()
@@ -793,11 +770,9 @@ class HeroTests(PublicPagesTestCase):
         from django.contrib.staticfiles import finders
         self.assertIsNotNone(finders.find('public/img/cat-desk-800.webp'))
 
-    # The header: h1, the name, the role and the honors (the name and titles are
-    # not translated yet, so /en/ shows them in Russian).
+    # The header: h1, the name, the role and the honors.
     TEXTS = {
         '/about/': ['<h1 id="hero-title" class="hero__title">Обо мне</h1>'],
-        '/en/about/': ['<h1 id="hero-title" class="hero__title">About me</h1>'],
     }
     HEADER = ['<p class="hero__name">Колесникова Людмила<br>Сергеевна</p>',
               '<p class="hero__role"><em>Преподаватель, методист и автор курсов. '
@@ -805,7 +780,7 @@ class HeroTests(PublicPagesTestCase):
               '<p class="hero__honors"><strong>Заслуженный наставник кружкового движения НТИ.<br>'
               'Эксперт Школы наставников Сколково.</strong></p>']
 
-    def test_author_texts_in_ru_and_en(self):
+    def test_author_texts(self):
         for url, texts in self.TEXTS.items():
             hero = self.hero_html(url)
             with self.subTest(url=url):
@@ -813,7 +788,7 @@ class HeroTests(PublicPagesTestCase):
                     self.assertIn(text, hero)
 
     def test_no_links_in_the_header(self):
-        for url in ['/about/', '/en/about/']:
+        for url in ['/about/']:
             hero = self.hero_html(url)
             with self.subTest(url=url):
                 self.assertNotIn('<a ', hero)  # no "Смотреть курсы": the nav links to courses
@@ -821,7 +796,7 @@ class HeroTests(PublicPagesTestCase):
                     self.assertNotIn(gone, hero)
 
     def test_old_hero_texts_are_gone(self):
-        html = self.client.get('/about/').content.decode() + self.client.get('/en/about/').content.decode()
+        html = self.client.get('/about/').content.decode()
         for old in ['Python: от ужаса до понимания', 'Учитесь Python шаг за шагом',
                     'Короткие уроки и практика', 'Python: from horror to understanding',
                     'Learn Python step by step', 'hero__lead',
@@ -834,7 +809,7 @@ class HeroTests(PublicPagesTestCase):
     def test_no_remote_font_hosts(self):
         from django.contrib.staticfiles import finders
 
-        for url in ['/', '/en/', '/about/']:
+        for url in ['/', '/about/']:
             html = self.client.get(url).content.decode()
             for host in ['fonts.googleapis.com', 'fonts.gstatic.com']:
                 self.assertNotIn(host, html, url)
@@ -969,7 +944,7 @@ class FaviconTests(PublicPagesTestCase):
 
     def test_public_pages_link_the_icons(self):
         course = self.make_course('Course')
-        for url in ['/', '/en/', '/about/', f'/course/{course.slug}/']:
+        for url in ['/', '/about/', f'/course/{course.slug}/']:
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
                 self.assertIn('<link rel="icon" href="/static/public/img/favicon.ico" sizes="16x16 32x32 48x48">', html)
@@ -979,8 +954,7 @@ class FaviconTests(PublicPagesTestCase):
 
 
 class ReviewsSectionTests(PublicPagesTestCase):
-    """"Отзывы" come from the admin (Review): hidden while empty, and /en/ falls
-    back to the Russian text."""
+    """"Отзывы" come from the admin (Review): hidden while empty."""
 
     def make_review(self, **kwargs):
         from api.models import Review
@@ -992,7 +966,7 @@ class ReviewsSectionTests(PublicPagesTestCase):
         self.make_review(student_name='Черновик', is_published=False)  # unpublished only
         course = self.make_course('Course')
 
-        for url in ['/', '/en/', f'/course/{course.slug}/']:
+        for url in ['/', f'/course/{course.slug}/']:
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
                 self.assertNotIn('id="reviews"', html)
@@ -1021,16 +995,13 @@ class ReviewsSectionTests(PublicPagesTestCase):
         course_html = self.client.get(f'/course/{course.slug}/').content.decode()
         self.assertIn('href="/#reviews">Отзывы<', course_html)
 
-    def test_english_falls_back_to_russian(self):
-        self.make_review(student_name='Без перевода', text_ru='Только по-русски', text_en='')
+    def test_russian_text_even_when_an_english_one_exists(self):
         self.make_review(student_name='С переводом', text_ru='По-русски', text_en='In English')
 
-        html = self.client.get('/en/').content.decode()
+        html = self.client.get('/', HTTP_ACCEPT_LANGUAGE='en').content.decode()
 
-        self.assertIn('Только по-русски', html)        # text_en empty → Russian
-        self.assertIn('In English', html)
-        self.assertNotIn('<p>По-русски</p>', html)
-        self.assertIn('href="/en/#reviews">Reviews<', html)
+        self.assertIn('<p>По-русски</p>', html)
+        self.assertNotIn('In English', html)
 
     def test_review_text_is_escaped_and_keeps_paragraphs(self):
         self.make_review(text_ru='<b>bold</b>')
@@ -1072,7 +1043,7 @@ class AuthorProfileAdminTests(PublicPagesTestCase):
 
 
 class AboutPageTests(PublicPagesTestCase):
-    """"Обо мне" (/about/, /en/about/): the header (title, name, titles, picture)
+    """"Обо мне" (/about/): the header (title, name, titles, picture)
     on top, then the author's bio from the template (no second photo), and the
     links to it from every page."""
 
@@ -1092,11 +1063,11 @@ class AboutPageTests(PublicPagesTestCase):
         self.assertEqual(response.status_code, 200, url)
         return response.content.decode()
 
-    def test_ru_and_en_pages_render_the_bio(self):
-        for url in ['/about/', '/en/about/']:
+    def test_page_renders_the_bio(self):
+        for url in ['/about/']:
             html = self.get(url)
             with self.subTest(url=url):
-                for phrase in self.KEY_PHRASES:  # no English bio yet: Russian on /en/ too
+                for phrase in self.KEY_PHRASES:
                     self.assertIn(phrase, html)
                 for heading in ['Мои ученики и результаты', 'Профессиональный опыт',
                                 'Награды и достижения', 'Немного личного', 'Связаться со мной']:
@@ -1104,7 +1075,7 @@ class AboutPageTests(PublicPagesTestCase):
                 self.assertEqual(html.count('<ul>'), 4)
 
     def test_bio_starts_without_a_heading(self):
-        for url in ['/about/', '/en/about/']:
+        for url in ['/about/']:
             html = self.get(url)
             with self.subTest(url=url):
                 self.assertRegex(html, r'<div class="about__intro">\s*<p>За моими плечами')
@@ -1112,15 +1083,12 @@ class AboutPageTests(PublicPagesTestCase):
                 self.assertEqual(html.count('Колесникова Людмила<br>Сергеевна'), 1)
                 self.assertEqual(html.count('Эксперт Школы наставников Сколково.'), 1)
 
-    def test_title_meta_and_heading_translated(self):
-        ru, en = self.get('/about/'), self.get('/en/about/')
+    def test_title_meta_and_heading(self):
+        ru = self.get('/about/')
         self.assertIn('<title>Обо мне — УЧЁБУС</title>', ru)
-        self.assertIn('<title>About me — UCHEBUS</title>', en)
-        for html in [ru, en]:
-            self.assertEqual(html.count('<h1'), 1)
-            self.assertIn('<h1 id="hero-title"', html)
+        self.assertEqual(ru.count('<h1'), 1)
+        self.assertIn('<h1 id="hero-title"', ru)
         self.assertIn('<meta name="description" content="Людмила Колесникова — преподаватель', ru)
-        self.assertIn('<meta name="description" content="Lyudmila Kolesnikova — teacher', en)
 
     def test_external_links_open_in_a_new_tab(self):
         html = self.get('/about/')
@@ -1134,7 +1102,7 @@ class AboutPageTests(PublicPagesTestCase):
 
     def test_hero_first_then_the_bio_without_a_second_photo(self):
         make_author_profile()  # an uploaded photo is no longer shown anywhere
-        for url in ['/about/', '/en/about/']:
+        for url in ['/about/']:
             html = self.get(url)
             main = html[html.index('<main>'):html.index('</main>')]
             with self.subTest(url=url):
@@ -1149,8 +1117,7 @@ class AboutPageTests(PublicPagesTestCase):
     def test_nav_link_on_every_public_page(self):
         course = self.make_course('Course')
         for url, href, label in [('/', '/about/', 'Обо мне'),
-                                 (f'/course/{course.slug}/', '/about/', 'Обо мне'),
-                                 ('/en/', '/en/about/', 'About me')]:
+                                 (f'/course/{course.slug}/', '/about/', 'Обо мне')]:
             html = self.get(url)
             with self.subTest(url=url):
                 self.assertIn(f'<a class="site-nav__link" href="{href}">{label}</a>', html)
@@ -1159,7 +1126,7 @@ class AboutPageTests(PublicPagesTestCase):
 
     def test_landing_no_longer_has_the_author_section(self):
         make_author_profile(stepik_url='https://stepik.org/users/1')
-        for url in ['/', '/en/']:
+        for url in ['/']:
             html = self.get(url)
             with self.subTest(url=url):
                 self.assertNotIn('id="author"', html)
@@ -1171,16 +1138,13 @@ class AboutPageTests(PublicPagesTestCase):
 
 class HeaderNavTests(PublicPagesTestCase):
     """The header nav (base.html): exactly Курсы · Отзывы · Обо мне, on every
-    public page, in RU and EN. "Отзывы" is a link only while published reviews
+    public page. "Отзывы" is a link only while published reviews
     exist; before that it is plain text, never a link that leads nowhere."""
 
     CASES = [
         ('/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
         ('/about/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
         ('/courses/', ['Курсы', 'Отзывы', 'Обо мне'], '/'),
-        ('/en/', ['Courses', 'Reviews', 'About me'], '/en/'),
-        ('/en/about/', ['Courses', 'Reviews', 'About me'], '/en/'),
-        ('/en/courses/', ['Courses', 'Reviews', 'About me'], '/en/'),
     ]
 
     def nav(self, url):
@@ -1225,7 +1189,6 @@ class HeaderNavTests(PublicPagesTestCase):
                 self.assertNotIn('#reviews', nav)
                 self.assertIn('site-nav__link--soon', nav)
         self.assertIn('<span class="visually-hidden"> (скоро)</span>', self.nav('/'))
-        self.assertIn('<span class="visually-hidden"> (coming soon)</span>', self.nav('/en/'))
 
         Review.objects.create(student_name='Анна', text_ru='Отличный курс!', is_published=True)
         for url, labels, landing in self.CASES:
@@ -1237,23 +1200,19 @@ class HeaderNavTests(PublicPagesTestCase):
 
     def test_courses_is_marked_current_only_on_courses(self):
         self.assertIn('href="/courses/" aria-current="page">Курсы</a>', self.nav('/courses/'))
-        self.assertIn('href="/en/courses/" aria-current="page">Courses</a>', self.nav('/en/courses/'))
-        for url in ['/', '/about/', '/en/']:
+        for url in ['/', '/about/']:
             self.assertNotIn('href="/courses/" aria-current', self.nav(url))
-            self.assertNotIn('href="/en/courses/" aria-current', self.nav(url))
 
     def test_about_is_marked_current_only_on_about(self):
         self.assertIn('href="/about/" aria-current="page"', self.nav('/about/'))
-        self.assertIn('href="/en/about/" aria-current="page"', self.nav('/en/about/'))
-        for url in ['/', '/en/']:
-            self.assertNotIn('aria-current', self.nav(url))
+        self.assertNotIn('aria-current', self.nav('/'))
 
 
 class LandingCatTests(PublicPagesTestCase):
     """The decorative cat above the footer: landing page only."""
 
-    def test_on_the_landing_page_in_ru_and_en(self):
-        for url in ['/', '/en/']:
+    def test_on_the_landing_page(self):
+        for url in ['/']:
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
                 block = re.search(r'<div class="landing-cat">.*?</div>', html, re.S).group(0)
@@ -1269,7 +1228,7 @@ class LandingCatTests(PublicPagesTestCase):
 
     def test_not_on_other_pages(self):
         course = self.make_course('Course')
-        for url in ['/about/', '/en/about/', f'/course/{course.slug}/']:
+        for url in ['/about/', f'/course/{course.slug}/']:
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
                 self.assertNotIn('landing-cat', html)
@@ -1278,12 +1237,10 @@ class LandingCatTests(PublicPagesTestCase):
 
 class LandingHomeTests(PublicPagesTestCase):
     """The home page opens with the course catalog: no author hero, a short
-    heading (the page's h1) and one subtitle line, in RU and EN."""
+    heading (the page's h1) and one subtitle line."""
 
     HEADINGS = {
         '/': ('Курсы', 'Короткие уроки с практикой прямо в браузере. Выберите курс и начните.'),
-        '/en/': ('Courses', 'Short lessons with hands-on practice right in your browser. '
-                            'Pick a course and start.'),
     }
 
     def test_catalog_heading_and_subtitle(self):
@@ -1304,12 +1261,13 @@ class LandingHomeTests(PublicPagesTestCase):
                              'hero-auth-link', 'Привет!', 'Hi!', 'Подробнее обо мне', 'More about me']:
                     self.assertNotIn(gone, html)
 
-    def test_header_is_unchanged(self):
+    def test_header_parts(self):
         html = self.client.get('/').content.decode()
         header = html[html.index('<header class="site-header">'):html.index('</header>')]
-        for part in ['class="site-logo brand-logo"', 'class="site-nav"', 'class="lang-switch"',
+        for part in ['class="site-logo brand-logo"', 'class="site-nav"', 'id="theme-toggle"',
                      'id="header-auth-link"', 'data-account-label="Мой кабинет"']:
             self.assertIn(part, header)
+        self.assertNotIn('lang-switch', html)
 
 
 class CourseLoginGateTests(PublicPagesTestCase):
@@ -1325,7 +1283,7 @@ class CourseLoginGateTests(PublicPagesTestCase):
 
     def test_gate_in_head_of_course_pages(self):
         course = self.make_course('Gated')
-        for url in [f'/course/{course.slug}/', f'/en/course/{course.slug}/']:
+        for url in [f'/course/{course.slug}/']:
             script = self.gate_script(self.client.get(url).content.decode())
             with self.subTest(url=url):
                 # Same key as frontend/src/api.js; storage access guarded.
@@ -1336,7 +1294,7 @@ class CourseLoginGateTests(PublicPagesTestCase):
                 self.assertIn('window.location.pathname + window.location.search', script)
 
     def test_no_gate_on_other_public_pages(self):
-        for url in ['/', '/en/', '/about/']:
+        for url in ['/', '/about/']:
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
                 self.assertNotIn('access_token', html[:html.index('</head>')])
@@ -1370,7 +1328,7 @@ class AuthPageNextTests(TestCase):
 
     def test_same_site_next_is_kept(self):
         for page in ['/login/', '/register/']:
-            for next_url in ['/course/python-basics/', '/en/course/python-basics/',
+            for next_url in ['/course/python-basics/',
                              '/enroll/3fa85f64-5717-4562-b3fc-2c963f66afa6/',
                              'http://testserver/course/python-basics/']:
                 with self.subTest(page=page, next=next_url):
@@ -1395,20 +1353,18 @@ class AuthPageNextTests(TestCase):
 
 
 class BrandTests(PublicPagesTestCase):
-    """The site name comes from settings.BRAND_NAMES only: УЧЁБУС on Russian
-    pages, UCHEBUS on English ones, in the logo, footer, <title> and admin."""
+    """The site name comes from settings.BRAND_NAMES only (the Russian entry: the
+    site is Russian-only), in the logo, footer, <title> and admin."""
 
     OLD_NAMES = ['Game Python', 'от ужаса до понимания', 'from horror to understanding']
 
     def pages(self):
         course = self.make_course('Python basics')
         # (url, name, logo link)
-        return [('/', 'УЧЁБУС', '/'), ('/about/', 'УЧЁБУС', '/'), (f'/course/{course.slug}/', 'УЧЁБУС', '/'),
-                ('/en/', 'UCHEBUS', '/en/'), ('/en/about/', 'UCHEBUS', '/en/'),
-                (f'/en/course/{course.slug}/', 'UCHEBUS', '/en/')]
+        return [('/', 'УЧЁБУС', '/'), ('/about/', 'УЧЁБУС', '/'), (f'/course/{course.slug}/', 'УЧЁБУС', '/')]
 
     def test_logo_footer_and_title(self):
-        titles = {'/': '<title>УЧЁБУС</title>', '/en/': '<title>UCHEBUS</title>'}
+        titles = {'/': '<title>УЧЁБУС</title>'}
         for url, name, home in self.pages():
             html = self.client.get(url).content.decode()
             with self.subTest(url=url):
@@ -1431,7 +1387,6 @@ class BrandTests(PublicPagesTestCase):
     def test_course_title_has_the_name(self):
         course = self.make_course('Python basics')
         self.assertContains(self.client.get(f'/course/{course.slug}/'), '<title>Python basics — УЧЁБУС</title>')
-        self.assertContains(self.client.get(f'/en/course/{course.slug}/'), '<title>Python basics — UCHEBUS</title>')
 
     def test_admin_header_and_title(self):
         User.objects.create_superuser('boss', 'b@example.com', 'x')
@@ -1446,11 +1401,9 @@ class BrandTests(PublicPagesTestCase):
 
         with override_settings(BRAND_NAMES={'ru': 'НОВОЕ', 'en': 'NEW'}):
             ru = self.client.get('/').content.decode()
-            en = self.client.get('/en/').content.decode()
         self.assertIn('<a class="site-logo" href="/">НОВОЕ</a>', ru)
         self.assertIn('<title>НОВОЕ</title>', ru)
-        self.assertIn('<a class="site-logo" href="/en/">NEW</a>', en)
-        self.assertNotIn('УЧЁБУС', ru + en)
+        self.assertNotIn('УЧЁБУС', ru)
 
     def test_react_constant_matches_the_russian_name(self):
         from django.conf import settings
@@ -1467,3 +1420,161 @@ class BrandTests(PublicPagesTestCase):
         logo = re.search(r'\.site-logo \{(.*?)\}', css, re.S).group(1)
         self.assertIn('letter-spacing: var(--tracking-logo);', logo)
         self.assertIn('white-space: nowrap;', logo)
+
+
+class EnglishRemovedTests(PublicPagesTestCase):
+    """The site is Russian-only: every old /en/<path> answers 301 to /<path> with
+    the query string kept, and no page links to /en/ any more."""
+
+    def test_old_english_urls_redirect_permanently(self):
+        course = self.make_course('Python basics')
+        for old, new in [('/en/', '/'), ('/en', '/'), ('/en/courses/', '/courses/'),
+                         ('/en/about/', '/about/'),
+                         (f'/en/course/{course.slug}/', f'/course/{course.slug}/'),
+                         ('/en/courses/?q=python&level=beginner', '/courses/?q=python&level=beginner'),
+                         ('/en/?utm_source=x', '/?utm_source=x')]:
+            with self.subTest(url=old):
+                response = self.client.get(old)
+                self.assertEqual(response.status_code, 301)
+                self.assertEqual(response['Location'], new)
+
+    def test_redirect_never_leaves_the_site(self):
+        # /en//evil.example/ must not become //evil.example/ (another host).
+        for old in ['/en//evil.example/', '/en/\\evil.example/', '/en///evil.example/']:
+            with self.subTest(url=old):
+                response = self.client.get(old)
+                self.assertEqual(response.status_code, 301)
+                self.assertEqual(response['Location'], '/evil.example/')
+
+    def test_similar_paths_are_not_redirected(self):
+        from django.urls import resolve
+        from backend.urls import spa_view
+
+        self.assertIs(resolve('/enroll/3fa85f64-5717-4562-b3fc-2c963f66afa6/').func, spa_view)
+        self.assertIs(resolve('/english/').func, spa_view)
+
+    def test_language_switch_view_is_gone(self):
+        from django.urls import NoReverseMatch
+
+        with self.assertRaises(NoReverseMatch):
+            reverse('set_language')
+
+    def test_no_english_links_on_public_pages(self):
+        course = self.make_course('Course')
+        for url in ['/', '/courses/', '/about/', f'/course/{course.slug}/']:
+            html = self.client.get(url).content.decode()
+            with self.subTest(url=url):
+                self.assertNotRegex(html, r'href="/en[/"]')
+                self.assertNotIn('hreflang', html)
+                self.assertNotIn('lang="en"', html)
+                self.assertNotIn('i18n/setlang', html)
+                self.assertIn('<html lang="ru">', html)
+
+
+class ThemeTests(PublicPagesTestCase):
+    """Light / dark theme on the public pages: tokens.css's dark values, the
+    head script that sets data-theme before any stylesheet, and the header
+    toggle that saves the choice in localStorage ("theme")."""
+
+    @staticmethod
+    def static(path):
+        from django.contrib.staticfiles import finders
+        return open(finders.find(path), encoding='utf-8').read()
+
+    def page(self, url='/'):
+        return self.client.get(url).content.decode()
+
+    def test_toggle_button_in_the_header_of_every_page(self):
+        course = self.make_course('Course')
+        for url in ['/', '/courses/', '/about/', f'/course/{course.slug}/']:
+            html = self.page(url)
+            header = html[html.index('<header class="site-header">'):html.index('</header>')]
+            with self.subTest(url=url):
+                button = re.search(r'<button class="theme-toggle"[^>]*>', header).group(0)
+                for attr in ['id="theme-toggle"', 'type="button"', 'hidden',  # shown by the script
+                             'aria-label="Включить тёмную тему"',
+                             'data-label-dark="Включить тёмную тему"',
+                             'data-label-light="Включить светлую тему"']:
+                    self.assertIn(attr, button)
+                self.assertIn('class="theme-toggle__icon theme-toggle__sun"', header)
+                self.assertIn('class="theme-toggle__icon theme-toggle__moon"', header)
+                self.assertIn('title="Включить тёмную тему"', button)  # hover hint
+
+    def test_head_script_sets_the_theme_before_any_stylesheet(self):
+        html = self.page()
+        head = html[:html.index('</head>')]
+        script = re.search(r'<script>(.*?)</script>', head, re.S).group(1)
+        self.assertIn("localStorage.getItem('theme')", script)
+        self.assertIn('catch (e)', script)  # storage may be blocked
+        self.assertIn('prefers-color-scheme: dark', script)
+        self.assertIn("setAttribute('data-theme', t)", script)
+        self.assertLess(head.index("getItem('theme')"), head.index('rel="stylesheet"'))
+
+    def test_color_scheme_and_theme_color_meta(self):
+        html = self.page()
+        head = html[:html.index('</head>')]
+        self.assertIn('<meta name="color-scheme" content="light dark">', head)
+        self.assertEqual(head.count('<meta name="theme-color"'), 2)
+        self.assertIn('media="(prefers-color-scheme: dark)"', head)
+
+    def test_toggle_script_saves_guarded_and_follows_the_os(self):
+        html = self.page()
+        scripts = [s for s in re.findall(r'<script>(.*?)</script>', html, re.S) if 'theme-toggle' in s]
+        self.assertEqual(len(scripts), 1)
+        script = scripts[0]
+        self.assertIn("window.localStorage.setItem('theme', theme)", script)
+        self.assertEqual(script.count('localStorage.'), script.count('try'))  # every access guarded
+        self.assertIn("addEventListener('change'", script)
+        self.assertIn('if (!saved())', script)  # the OS only rules until the visitor chooses
+        self.assertIn('theme-changing', script)  # the fade, on change only
+        self.assertLess(html.index('id="theme-toggle"'), html.index(script))
+
+    def test_dark_values_redefine_existing_tokens_only(self):
+        css = self.static('public/css/tokens.css')
+        light = re.search(r':root \{(.*?)\n\}', css, re.S).group(1)
+        dark = re.search(r':root\[data-theme="dark"\] \{(.*?)\n\}', css, re.S).group(1)
+        light_names = set(re.findall(r'(--[a-z0-9-]+):', light))
+        dark_names = set(re.findall(r'(--[a-z0-9-]+):', dark))
+        self.assertTrue(dark_names)
+        self.assertLessEqual(dark_names, light_names)
+        for name in ['--color-ink', '--color-ground', '--color-soft', '--color-line', '--color-muted',
+                     '--color-accent', '--color-highlight', '--color-cover', '--color-surface']:
+            self.assertIn(name, dark_names)
+        # Light values unchanged.
+        for value in ['--color-ink: #14161F;', '--color-ground: #FFFFFF;', '--color-accent: #2340D6;',
+                      '--color-highlight: #FFD23F;', '--color-cover: #F1F3F6;']:
+            self.assertIn(value, light)
+        # Never a media query here: the React app loads this file and must stay
+        # light until it sets data-theme itself.
+        self.assertNotIn('prefers-color-scheme', css)
+
+    def test_no_raw_colours_outside_tokens(self):
+        from pathlib import Path
+        from django.contrib.staticfiles import finders
+
+        css_dir = Path(finders.find('public/css/tokens.css')).parent
+        for path in sorted(css_dir.glob('*.css')):
+            if path.name == 'tokens.css':
+                continue
+            css = re.sub(r'/\*.*?\*/', '', path.read_text(encoding='utf-8'), flags=re.S)
+            with self.subTest(file=path.name):
+                self.assertNotRegex(css, r'#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|:\s*(white|black)\b')
+
+    def test_toggle_is_a_switch_that_follows_the_theme(self):
+        css = self.static('public/css/theme-toggle.css')
+        # The knob moves to the moon in the dark theme; the active icon is on it.
+        self.assertIn(':root[data-theme="dark"] .theme-toggle__knob', css)
+        self.assertIn(':root[data-theme="dark"] .theme-toggle__moon', css)
+        self.assertIn(':root[data-theme="dark"] .theme-toggle__sun', css)
+        self.assertIn('.theme-toggle:focus-visible', css)
+        # Movement and the fade only without reduced motion.
+        motion = css[css.index('@media (prefers-reduced-motion: no-preference)'):]
+        self.assertIn('.theme-changing', motion)
+        self.assertIn('transition: transform', motion)
+        self.assertNotIn('transition', css[:css.index('@media (prefers-reduced-motion')])
+        # Linked by every public page; the icons keep a size even without the CSS.
+        html = self.page()
+        self.assertIn('href="/static/public/css/theme-toggle.css"', html)
+        self.assertIn('class="theme-toggle__knob"', html)
+        self.assertEqual(len(re.findall(r'<svg class="theme-toggle__icon [^"]+" width="16" height="16"', html)), 2)
+        self.assertNotIn('theme-toggle', self.static('public/css/base.css'))

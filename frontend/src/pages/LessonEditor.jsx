@@ -542,10 +542,10 @@ function LessonEditor() {
         delete: id => latest.current.handleDelete(latest.current.blocks.find(b => b.id === id)),
     }), []);
 
-    if (loading) return <p style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Загрузка...</p>;
-    if (error) return <p style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>{error}</p>;
+    if (loading) return <p style={{ padding: 40, textAlign: 'center', color: 'var(--color-muted)' }}>Загрузка...</p>;
+    if (error) return <p style={{ padding: 40, textAlign: 'center', color: 'var(--color-danger)' }}>{error}</p>;
     if (user?.role !== 'AUTHOR') {
-        return <p style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Только автор курса может редактировать урок.</p>;
+        return <p style={{ padding: 40, textAlign: 'center', color: 'var(--color-danger)' }}>Только автор курса может редактировать урок.</p>;
     }
 
     // New, unsaved blocks: above their anchor block, or at the end.
@@ -573,7 +573,7 @@ function LessonEditor() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <div>
                     {/* Position in the course, as on the course page (not order_index). */}
-                    <div style={{ fontSize: 13, color: '#64748b' }}>Редактор урока {lesson.lesson_position}</div>
+                    <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Редактор урока {lesson.lesson_position}</div>
                     <EditableTitle
                         as="h2"
                         value={lesson.title}
@@ -595,7 +595,7 @@ function LessonEditor() {
             <p className="visually-hidden" role="status">{copyStatus}</p>
 
             {blocks.length === 0 && newDrafts.length === 0 && (
-                <p style={{ color: '#64748b' }}>В этом уроке пока нет блоков. Добавьте первый блок ниже.</p>
+                <p style={{ color: 'var(--color-muted)' }}>В этом уроке пока нет блоков. Добавьте первый блок ниже.</p>
             )}
 
             {/* Every block open for editing. Above each: «+ Вставить блок» and
@@ -616,8 +616,8 @@ function LessonEditor() {
             {newAtEnd.map(draft => renderCard(draft))}
 
             {/* Add block buttons */}
-            <div style={{ marginTop: 24, padding: 16, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
-                <div style={{ fontWeight: 600, marginBottom: 10, color: '#334155' }}>Добавить блок:</div>
+            <div style={{ marginTop: 24, padding: 16, border: '1px dashed var(--color-line)', borderRadius: 8, background: 'var(--color-soft)' }}>
+                <div style={{ fontWeight: 600, marginBottom: 10, color: 'var(--color-ink)' }}>Добавить блок:</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
                         <button key={type} onClick={() => startAdd(type)} style={addBtn}>
@@ -666,8 +666,8 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
         );
     }
     return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, padding: 12, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
-            <span style={{ fontWeight: 600, color: '#334155' }}>Вставить здесь:</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, padding: 12, border: '1px dashed var(--color-line)', borderRadius: 8, background: 'var(--color-soft)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--color-ink)' }}>Вставить здесь:</span>
             {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
                 <button key={type} onClick={() => onPick(type)} style={addBtn}>
                     {TYPE_LABELS[type]}
@@ -692,7 +692,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
             id={isNew ? `edit-new-${key}` : `edit-block-${id}`}
             style={{
                 ...blockCard,
-                borderLeft: `4px solid ${dirty ? '#d97706' : '#0C4B33'}`,
+                borderLeft: `4px solid ${dirty ? 'var(--color-warning)' : 'var(--color-success-on-light)'}`,
                 scrollMarginTop: 'calc(var(--space-8) + var(--space-4))',
                 ...(flash ? copiedCard : null),
             }}
@@ -701,7 +701,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
                     <span style={badge}>{isNew ? 'Новый блок: ' : ''}{TYPE_LABELS[type]}</span>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155', fontWeight: 600 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--color-ink)', fontWeight: 600 }}>
                         Тип блока
                         <select value={type} onChange={e => actions.changeType(key, e.target.value)} style={{ ...input, width: 'auto' }}>
                             {TYPE_CHOICES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -738,7 +738,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
 
             {type === 'FILL' && <FillFields content={content} setContent={setContent} />}
 
-            {error && <p style={{ color: '#dc2626', marginTop: 8 }}>{error}</p>}
+            {error && <p style={{ color: 'var(--color-danger)', marginTop: 8 }}>{error}</p>}
 
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 16 }}>
                 <button
@@ -757,7 +757,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
                         style={{ ...ghostBtn, ...(!dirty || saving ? disabledBtn : null) }}
                     >Отменить изменения</button>
                 )}
-                <span style={{ fontSize: 13, color: dirty ? '#b45309' : '#64748b' }} aria-live="polite">
+                <span style={{ fontSize: 13, color: dirty ? 'var(--color-warning)' : 'var(--color-muted)' }} aria-live="polite">
                     {dirty ? 'Есть изменения' : isNew ? 'Новый блок — не сохранён' : 'Сохранено'}
                 </span>
             </div>
@@ -816,7 +816,7 @@ function QuizFields({ uid, content, setContent }) {
                 >+ Вариант</button>
                 <BulkOptions setContent={setContent} />
                 {/* Missing in older quizzes = on. */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 14, color: '#334155' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 14, color: 'var(--color-ink)' }}>
                     <input
                         type="checkbox"
                         checked={content.shuffle_options !== false}
@@ -895,8 +895,8 @@ function BulkOptions({ setContent }) {
     }
 
     return (
-        <div style={{ marginTop: 12, padding: 12, border: '1px dashed #cbd5e1', borderRadius: 8, background: '#f8fafc' }}>
-            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
+        <div style={{ marginTop: 12, padding: 12, border: '1px dashed var(--color-line)', borderRadius: 8, background: 'var(--color-soft)' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>
                 Каждый вариант — с новой строки. Пустые строки пропускаются.
                 Начните строку с <b>*&nbsp;</b> (звёздочка и пробел), чтобы сразу отметить правильный ответ.
             </div>
@@ -918,7 +918,7 @@ function BulkOptions({ setContent }) {
                 <button type="button" onClick={() => { setOpen(false); setText(''); }} style={{ ...iconBtn }}>
                     Свернуть
                 </button>
-                {note && <span style={{ fontSize: 12, color: '#16a34a' }}>{note}</span>}
+                {note && <span style={{ fontSize: 12, color: 'var(--color-success-on-light)' }}>{note}</span>}
             </div>
         </div>
     );
@@ -977,7 +977,7 @@ function CodeFields({ content, setContent }) {
                             placeholder="Ожидаемый вывод (stdout)"
                         />
                         <label
-                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: '#475569', whiteSpace: 'nowrap', paddingTop: 12 }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap', paddingTop: 12 }}
                             title="Видимые тесты ученик видит целиком; скрытые — только «пройден / не пройден»"
                         >
                             <input
@@ -1043,21 +1043,21 @@ function FillFields({ content, setContent }) {
             {/* Live preview of how the blanks will look + which answers are accepted */}
             {hasBlanks && (
                 <Field label="Предпросмотр">
-                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 2.2, fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14, color: '#334155' }}>
+                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 2.2, fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14, color: 'var(--color-ink)' }}>
                         {segments.map((seg, idx) => (
                             seg.type === 'text'
                                 ? <span key={idx}>{seg.value}</span>
                                 : <span key={idx} style={previewBlank} title="Принимаемые ответы">{seg.answers.join(' / ') || '⌀'}</span>
                         ))}
                     </div>
-                    <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 8 }}>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>
                         В пропусках показаны принимаемые ответы — студент увидит пустые поля.
                     </div>
                 </Field>
             )}
 
             <Field label="">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--color-ink)' }}>
                     <input
                         type="checkbox"
                         checked={!!content.case_sensitive}
@@ -1104,8 +1104,8 @@ const CodeField = memo(function CodeField({ field, value, setContent }) {
 function Field({ label, hint, children }) {
     return (
         <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, color: '#334155', fontSize: 14 }}>{label}</label>
-            {hint && <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>{hint}</div>}
+            <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, color: 'var(--color-ink)', fontSize: 14 }}>{label}</label>
+            {hint && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>{hint}</div>}
             {children}
         </div>
     );
@@ -1120,11 +1120,11 @@ function Field({ label, hint, children }) {
 const PY_EXTENSIONS = [python(), pycharmDarcula];
 
 const blockCard = {
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--color-line)',
     borderRadius: 8,
     padding: 16,
     marginTop: 12,
-    background: 'white',
+    background: 'var(--color-surface)',
 };
 
 // A fresh copy, for a moment (tokens: backend/static/public/css/tokens.css).
@@ -1136,8 +1136,8 @@ const copiedCard = {
 const badge = {
     display: 'inline-block',
     padding: '3px 10px',
-    background: '#ecfdf5',
-    color: '#0C4B33',
+    background: 'var(--color-success-soft)',
+    color: 'var(--color-success-on-light)',
     borderRadius: 999,
     fontWeight: 600,
     fontSize: 13,
@@ -1146,36 +1146,36 @@ const badge = {
 const input = {
     width: '100%',
     padding: '8px 10px',
-    border: '1px solid #cbd5e1',
+    border: '1px solid var(--color-line)',
     borderRadius: 6,
     fontSize: 14,
     boxSizing: 'border-box',
 };
 
 const cmWrap = {
-    border: '1px solid #cbd5e1',
+    border: '1px solid var(--color-line)',
     borderRadius: 6,
     overflow: 'hidden',
 };
 
 const saveBtn = {
-    padding: '9px 22px', background: '#0C4B33', color: 'white',
+    padding: '9px 22px', background: 'var(--color-success-on-light)', color: 'var(--color-ground)',
     border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
 };
 
 const ghostBtn = {
-    padding: '9px 18px', background: 'white', color: '#334155',
-    border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+    padding: '9px 18px', background: 'var(--color-surface)', color: 'var(--color-ink)',
+    border: '1px solid var(--color-line)', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
 };
 
 const addBtn = {
-    padding: '10px 18px', background: 'white', color: '#0C4B33',
-    border: '1px solid #0C4B33', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+    padding: '10px 18px', background: 'var(--color-surface)', color: 'var(--color-success-on-light)',
+    border: '1px solid var(--color-success-on-light)', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
 };
 
 // «+ Вставить блок»: quiet, so a long block list stays easy to scan.
 const insertBtn = {
-    padding: '2px 10px', background: 'none', color: '#94a3b8',
+    padding: '2px 10px', background: 'none', color: 'var(--color-muted)',
     border: 'none', cursor: 'pointer', fontSize: 12,
 };
 
@@ -1183,20 +1183,20 @@ const insertBtn = {
 const disabledBtn = { opacity: 0.45, cursor: 'not-allowed' };
 
 const iconBtn = {
-    padding: '6px 10px', background: 'white', color: '#475569',
-    border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+    padding: '6px 10px', background: 'var(--color-surface)', color: 'var(--color-muted)',
+    border: '1px solid var(--color-line)', borderRadius: 6, cursor: 'pointer', fontSize: 13,
 };
 
 const deleteBtn = {
-    padding: '6px 12px', background: 'white', color: '#dc2626',
-    border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500,
+    padding: '6px 12px', background: 'var(--color-surface)', color: 'var(--color-danger)',
+    border: '1px solid var(--color-danger)', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500,
 };
 
 const previewBlank = {
     display: 'inline-block', verticalAlign: 'middle',
     fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14,
-    background: '#dcfce7', border: '2px solid #16a34a', borderRadius: 999,
-    padding: '2px 12px', color: '#15803d', fontWeight: 600,
+    background: 'var(--color-success-soft)', border: '2px solid var(--color-success-on-light)', borderRadius: 999,
+    padding: '2px 12px', color: 'var(--color-success-on-light)', fontWeight: 600,
 };
 
 // The router reuses the component when only :lessonId changes («Следующий

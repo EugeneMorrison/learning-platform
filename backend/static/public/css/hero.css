@@ -94,6 +94,16 @@
   margin-left: 22%;
 }
 
+/* Dark theme: the illustration was drawn for a white page; dimmed and a touch
+   darker it stays visible without reading as a bright patch. A dedicated dark
+   image can replace this later: a second <picture class="hero__bg
+   hero__bg--dark"> (see hero.html), shown here instead of the light one; the
+   :not() keeps the dimming off it. */
+:root[data-theme="dark"] .hero__bg:not(.hero__bg--dark) img {
+  opacity: 0.5;
+  filter: brightness(0.8) saturate(1.2);
+}
+
 /* The cut-out ends at the waist: its last few percent fade out (only the
    mask's alpha matters), so the bottom reads as an edge, not a crop. */
 .hero__img {

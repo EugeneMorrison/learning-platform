@@ -26,7 +26,7 @@
 .lessons-panel__backdrop {
     position: absolute;
     inset: 0;
-    background: color-mix(in srgb, var(--color-ink) 50%, transparent);
+    background: color-mix(in srgb, var(--color-scrim) 50%, transparent);
     animation: lessons-panel-fade 0.2s ease;
 }
 
@@ -42,7 +42,7 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     border-right: var(--border-width) solid var(--color-line);
-    background: var(--color-ground);
+    background: var(--color-surface);
     box-shadow: var(--shadow-lg);
     animation: lessons-panel-slide 0.2s ease;
 }

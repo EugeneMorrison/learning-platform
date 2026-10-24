@@ -37,7 +37,7 @@ function StudentProgressPage() {
     }
 
     function renderAnswerBody(answer, blockType) {
-        if (!answer) return <em style={{ color: '#94a3b8' }}>пусто</em>;
+        if (!answer) return <em style={{ color: 'var(--color-muted)' }}>пусто</em>;
         if (blockType === 'CODE') {
             const code = typeof answer.code === 'string'
                 ? answer.code
@@ -71,14 +71,14 @@ function StudentProgressPage() {
             return (
                 <div style={{
                     padding: '10px 14px',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    background: 'var(--color-soft)',
+                    border: '1px solid var(--color-line)',
                     borderRadius: '6px',
                     fontSize: '13px',
                     fontFamily: "'JetBrains Mono', Consolas, monospace",
                 }}>
                     {blanks.length === 0
-                        ? <em style={{ color: '#94a3b8' }}>пусто</em>
+                        ? <em style={{ color: 'var(--color-muted)' }}>пусто</em>
                         : blanks.map((b, i) => (
                             <div key={i}>Пропуск {i + 1}: <strong>{b || '—'}</strong></div>
                         ))}
@@ -90,8 +90,8 @@ function StudentProgressPage() {
             return (
                 <div style={{
                     padding: '10px 14px',
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
+                    background: 'var(--color-soft)',
+                    border: '1px solid var(--color-line)',
                     borderRadius: '6px',
                     fontSize: '13px',
                 }}>
@@ -139,12 +139,12 @@ function StudentProgressPage() {
                 ← Назад
             </button>
             <h2>Прогресс студента: {data.student_username}</h2>
-            <p style={{ color: '#64748b' }}>Курс: {data.course_title}</p>
+            <p style={{ color: 'var(--color-muted)' }}>Курс: {data.course_title}</p>
 
             {/* Summary */}
             <div style={{
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                background: 'var(--color-soft)',
+                border: '1px solid var(--color-line)',
                 borderRadius: '8px',
                 padding: '16px',
                 marginTop: '16px',
@@ -152,22 +152,22 @@ function StudentProgressPage() {
                 gap: '32px',
             }}>
                 <div>
-                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#0C4B33' }}>
+                    <div style={{ fontSize: '28px', fontWeight: 'bold', color: 'var(--color-success-on-light)' }}>
                         {taskPercentage}%
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '14px' }}>Выполнено</div>
+                    <div style={{ color: 'var(--color-muted)', fontSize: '14px' }}>Выполнено</div>
                 </div>
                 <div>
                     <div style={{ fontSize: '28px', fontWeight: 'bold' }}>
                         {completedTasks}/{totalTasks}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '14px' }}>Заданий</div>
+                    <div style={{ color: 'var(--color-muted)', fontSize: '14px' }}>Заданий</div>
                 </div>
                 <div>
                     <div style={{ fontSize: '28px', fontWeight: 'bold' }}>
                         {data.correct_answers}/{data.total_quizzes}
                     </div>
-                    <div style={{ color: '#64748b', fontSize: '14px' }}>Тестов верно</div>
+                    <div style={{ color: 'var(--color-muted)', fontSize: '14px' }}>Тестов верно</div>
                 </div>
             </div>
 
@@ -196,7 +196,7 @@ function StudentProgressPage() {
 
                     return (
                         <div key={idx} style={{
-                            border: '1px solid #e2e8f0',
+                            border: '1px solid var(--color-line)',
                             borderRadius: '8px',
                             padding: '16px',
                             marginTop: '12px',
@@ -205,7 +205,7 @@ function StudentProgressPage() {
                                 Урок {lesson.lesson_order}: {lesson.lesson_title}
                             </h4>
                             {lessonTasks.length === 0 && (
-                                <p style={{ margin: 0, color: '#94a3b8', fontSize: '14px' }}>
+                                <p style={{ margin: 0, color: 'var(--color-muted)', fontSize: '14px' }}>
                                     В этом уроке нет заданий — только теория.
                                 </p>
                             )}
@@ -216,7 +216,7 @@ function StudentProgressPage() {
                                 return (
                                     <div key={bidx} style={{
                                         padding: '8px 0',
-                                        borderTop: bidx > 0 ? '1px solid #f1f5f9' : 'none',
+                                        borderTop: bidx > 0 ? '1px solid var(--color-line)' : 'none',
                                     }}>
                                         <div style={{
                                             display: 'flex',
@@ -226,7 +226,7 @@ function StudentProgressPage() {
                                             <span style={{ fontSize: '20px' }}>
                                                 {block.completed ? '✅' : '○'}
                                             </span>
-                                            <span style={{ color: '#64748b', fontSize: '14px' }}>
+                                            <span style={{ color: 'var(--color-muted)', fontSize: '14px' }}>
                                                 Задание {bidx + 1} ({typeLabels[bidx]})
                                             </span>
                                             {/* QUIZ and CODE both report is_correct, so show the
@@ -234,7 +234,7 @@ function StudentProgressPage() {
                                             {block.completed && block.is_correct != null && (
                                                 <span style={{
                                                     fontSize: '13px',
-                                                    color: block.is_correct ? '#16a34a' : '#dc2626',
+                                                    color: block.is_correct ? 'var(--color-success-on-light)' : 'var(--color-danger)',
                                                 }}>
                                                     {block.is_correct ? '✓ Верно' : '✗ Неверно'}
                                                 </span>
@@ -244,12 +244,12 @@ function StudentProgressPage() {
                                                     onClick={() => toggleBlock(block.block_id)}
                                                     style={{
                                                         background: 'none',
-                                                        border: '1px solid #e2e8f0',
+                                                        border: '1px solid var(--color-line)',
                                                         borderRadius: '999px',
                                                         padding: '2px 10px',
                                                         cursor: 'pointer',
                                                         fontSize: '12px',
-                                                        color: '#475569',
+                                                        color: 'var(--color-muted)',
                                                         fontWeight: 500,
                                                     }}
                                                     title="Показать историю попыток"
@@ -258,7 +258,7 @@ function StudentProgressPage() {
                                                 </button>
                                             )}
                                             {block.completed_at && (
-                                                <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
+                                                <span style={{ fontSize: '12px', color: 'var(--color-muted)', marginLeft: 'auto' }}>
                                                     {new Date(block.completed_at).toLocaleDateString('ru-RU')}
                                                 </span>
                                             )}
@@ -269,8 +269,8 @@ function StudentProgressPage() {
                                                 marginTop: '8px',
                                                 marginLeft: '32px',
                                                 padding: '8px 12px',
-                                                background: '#f8fafc',
-                                                border: '1px solid #e2e8f0',
+                                                background: 'var(--color-soft)',
+                                                border: '1px solid var(--color-line)',
                                                 borderRadius: '6px',
                                             }}>
                                                 {history.map((attempt, idx) => {
@@ -278,7 +278,7 @@ function StudentProgressPage() {
                                                     return (
                                                         <div key={attempt.id} style={{
                                                             padding: '6px 0',
-                                                            borderTop: idx > 0 ? '1px solid #e2e8f0' : 'none',
+                                                            borderTop: idx > 0 ? '1px solid var(--color-line)' : 'none',
                                                         }}>
                                                             <div
                                                                 onClick={() => toggleAttempt(attempt.id)}
@@ -290,20 +290,20 @@ function StudentProgressPage() {
                                                                     userSelect: 'none',
                                                                 }}
                                                             >
-                                                                <span style={{ fontSize: '12px', color: '#64748b', width: '12px' }}>
+                                                                <span style={{ fontSize: '12px', color: 'var(--color-muted)', width: '12px' }}>
                                                                     {isAttemptOpen ? '▼' : '▶'}
                                                                 </span>
                                                                 <span style={{
                                                                     fontSize: '14px',
-                                                                    color: attempt.is_correct ? '#16a34a' : (attempt.is_correct === false ? '#dc2626' : '#64748b'),
+                                                                    color: attempt.is_correct ? 'var(--color-success-on-light)' : (attempt.is_correct === false ? 'var(--color-danger)' : 'var(--color-muted)'),
                                                                     width: '16px',
                                                                 }}>
                                                                     {attempt.is_correct ? '✓' : (attempt.is_correct === false ? '✗' : '·')}
                                                                 </span>
-                                                                <span style={{ fontSize: '13px', color: '#475569' }}>
+                                                                <span style={{ fontSize: '13px', color: 'var(--color-muted)' }}>
                                                                     Попытка {idx + 1}
                                                                 </span>
-                                                                <span style={{ fontSize: '12px', color: '#94a3b8', marginLeft: 'auto' }}>
+                                                                <span style={{ fontSize: '12px', color: 'var(--color-muted)', marginLeft: 'auto' }}>
                                                                     {formatDateTime(attempt.created_at)}
                                                                 </span>
                                                             </div>

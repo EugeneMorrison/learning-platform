@@ -53,7 +53,7 @@
     flex-direction: column;
     overflow: hidden;
     border: var(--border-width) solid var(--color-line);
-    background: var(--color-ground);
+    background: var(--color-surface);
     color: var(--color-ink);
 }
 
@@ -162,7 +162,7 @@
     border: var(--border-width) solid var(--color-line);
     border-radius: var(--radius-small);
     border-bottom-left-radius: var(--space-1);
-    background: var(--color-ground);
+    background: var(--color-surface);
     color: var(--color-ink);
 }
 

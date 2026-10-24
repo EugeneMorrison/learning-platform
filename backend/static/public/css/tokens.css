@@ -16,6 +16,13 @@
   --color-highlight: #FFD23F;  /* marker highlights, badges */
   --color-cover: #F1F3F6;      /* behind course covers: white and transparent parts of an
                                   image take it on (mix-blend-mode: multiply); 1.11:1 on white */
+  --color-surface: #FFFFFF;    /* header, cards, inputs: the page colour in light, a step
+                                  lighter than the page in dark */
+  --color-on-highlight: #14161F; /* text on --color-highlight (tag chip): dark in both themes */
+  --color-accent-fill: #2340D6;  /* solid cobalt behind yellow text (cover placeholder) */
+  --color-scrim: #14161F;        /* behind dialogs and side panels, mixed to 50% */
+  --color-cover-tile: #F1F3F6;   /* dark theme only: the light rounded tile a cover sits on,
+                                    light in both themes (the image multiplies onto it) */
 
   /* Code card (dark editor). Contrast on --color-ink: text 14.8:1, highlight
      12.5:1, accent-on-dark 7.5:1, code-muted 7.6:1, success 10.4:1.
@@ -25,6 +32,7 @@
   --color-accent-on-dark: #8EA2FF;  /* cobalt tint for function names */
   --color-code-muted: #A0A8C0;      /* strings, comments, output label */
   --color-success: #4ADE80;         /* "tests passed" */
+  --color-code-bg: #14161F;         /* the code card itself (run output): dark in both themes */
 
   /* Status colours on light surfaces (app: answers, errors, notices). Contrast:
      text on white / on its own tint. --color-highlight (yellow) is for
@@ -101,4 +109,45 @@
   --card-min-width: 18rem;       /* app: smallest card in a responsive grid */
   --measure: 68ch;               /* comfortable line length for long text */
   --border-width: 1px;
+}
+
+/*
+ * Dark theme: the same tokens, new values. Only on an explicit
+ * data-theme="dark" on <html>, set by the public pages' head script (from the
+ * saved choice or the OS setting); never by a media query here, so the React
+ * app, which loads this file too, stays light until it sets the attribute.
+ * Contrast (WCAG): ink on ground 15.7:1, on surface 14.5:1, on soft/cover
+ * 13.7:1; muted 8.1 / 7.4 / 7.0:1; accent 7.9 / 7.3 / 6.9:1, and ground text on
+ * an accent button 7.9:1; on-highlight on highlight 9.2:1; highlight on
+ * accent-fill 3.8:1 (the cover placeholder's large letter only); status
+ * colours on ground 8.3:1 or more, on their own tint 6.7:1 or more.
+ * The other code-card tokens are dark in both themes and keep their values
+ * (code text on --color-code-bg: 14.5:1 dark).
+ */
+:root[data-theme="dark"] {
+  --color-ink: #E8EAF2;          /* off-white text */
+  --color-ground: #0F1117;       /* near-black page, not pure #000 */
+  --color-soft: #1C1F2A;         /* tinted sections, footer, filters */
+  --color-line: #2E3344;
+  --color-muted: #A3A9BC;
+  --color-accent: #8EA2FF;       /* cobalt, lightened for dark backgrounds */
+  --color-highlight: #D9B54A;    /* muted yellow: backgrounds and borders only */
+  --color-cover: #1C1F2A;        /* the card around the cover tile */
+  --color-surface: #171A23;
+  --color-on-highlight: #14161F;
+  --color-accent-fill: #2340D6;
+  --color-cover-tile: #ECEEF3;   /* light: a white cover background multiplies to it */
+  --color-code-bg: #171A23;      /* a step off the page, the code bar above it */
+  --color-scrim: #000000;        /* the off-white ink would wash the page out */
+
+  --color-danger: #FF8A80;
+  --color-danger-soft: #3A1D1D;
+  --color-success-on-light: #5CD18E;
+  --color-success-soft: #13291D;
+  --color-warning: #F5B35C;
+  --color-warning-soft: #33260F;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
 }

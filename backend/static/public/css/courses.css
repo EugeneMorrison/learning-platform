@@ -54,7 +54,7 @@
   padding: var(--space-3);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-small);
-  background: var(--color-ground);
+  background: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -97,7 +97,7 @@
   padding: var(--space-1) var(--space-3);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-pill);
-  background: var(--color-ground);
+  background: var(--color-surface);
   color: var(--color-ink);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -107,7 +107,7 @@
   border-color: var(--color-accent);
 }
 
-/* Selected: the same dark pill as the RU / EN switch. */
+/* Selected: an inverted pill (ink background). */
 .chip input:checked + span {
   border-color: var(--color-ink);
   background: var(--color-ink);

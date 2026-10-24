@@ -34,6 +34,12 @@
     background: var(--color-cover); /* the cards' grey + multiply, so the preview matches them */
 }
 
+/* Dark theme: the preview on the light tile the cards put covers on
+   (CourseCover.css), so multiply doesn't turn it black. */
+:root[data-theme="dark"] .cover-editor__preview {
+    background: var(--color-cover-tile);
+}
+
 .cover-editor__preview img {
     width: 100%;
     height: 100%;
@@ -54,7 +60,7 @@
     border-radius: var(--radius-pill);
     background: var(--color-highlight);
     box-shadow: var(--shadow-sm);
-    color: var(--color-ink);
+    color: var(--color-on-highlight);
     font-size: var(--text-sm);
     font-weight: var(--weight-semibold);
     line-height: var(--leading-tight);

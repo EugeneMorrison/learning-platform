@@ -141,13 +141,13 @@ a {
   padding: var(--space-6);
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-card);
-  background: var(--color-ground);
+  background: var(--color-surface);
 }
 
 /* Header */
 .site-header {
   border-bottom: var(--border-width) solid var(--color-line);
-  background: var(--color-ground);
+  background: var(--color-surface);
 }
 
 .site-header__inner {
@@ -212,33 +212,6 @@ a {
   gap: var(--space-3);
 }
 
-/* RU / EN switch */
-.lang-switch {
-  display: inline-flex;
-  margin: 0;
-  padding: var(--space-1);
-  border: var(--border-width) solid var(--color-line);
-  border-radius: var(--radius-pill);
-}
-
-.lang-switch__btn {
-  padding: var(--space-1) var(--space-3);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-muted);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-}
-
-.lang-switch__btn[aria-pressed="true"] {
-  background: var(--color-ink);
-  color: var(--color-ground);
-  cursor: default;
-}
-
 /* Footer */
 .site-footer {
   margin-top: var(--space-9);
@@ -298,7 +271,7 @@ a {
     flex-basis: 100%;
   }
 
-  /* Logo, RU/EN switch and "Мой кабинет" share the first line down to 360px:
+  /* Logo, theme toggle and "Мой кабинет" share the first line down to 360px:
      the logo keeps its size, the gaps and the controls get tighter. */
   .site-header__inner {
     justify-content: space-between;
@@ -307,10 +280,6 @@ a {
 
   .site-header__actions {
     gap: var(--space-2);
-  }
-
-  .lang-switch__btn {
-    padding: var(--space-1) var(--space-2);
   }
 
   .site-header__actions .btn {

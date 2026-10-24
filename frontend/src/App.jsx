@@ -3,6 +3,7 @@ import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-rou
 import AppHeader from './components/AppHeader';
 import NotificationsProvider from './components/NotificationsProvider';
 import { LessonBarContext, SetLessonBarContext } from './lib/lessonBar';
+import { useRouteTheme } from './lib/theme';
 import LessonViewer from './pages/LessonViewer';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -26,8 +27,10 @@ function LessonBarProvider({ children }) {
 }
 
 // The header on every page, the page below it. Unread messages (the bell,
-// chat badges) are loaded once here for the whole app.
+// chat badges) are loaded once here for the whole app; the light / dark theme
+// follows the route (lib/theme.js).
 function Layout() {
+    useRouteTheme();
     return (
         <LessonBarProvider>
             <NotificationsProvider>

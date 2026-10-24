@@ -14,6 +14,11 @@
     </div>
 
     <div class="hero__media">
+      {# Dark theme: hero.css dims this illustration. A dedicated dark image would be a  #}
+      {# second <picture class="hero__bg hero__bg--dark"> right after this one, with     #}
+      {# loading="lazy" on its <img> (a hidden lazy image is never downloaded) and CSS   #}
+      {# showing one or the other by :root[data-theme]. Not <source media=              #}
+      {# "(prefers-color-scheme: dark)">: that follows the OS, not the site's toggle.   #}
       <picture class="hero__bg">
         <source type="image/webp"
                 srcset="{% static 'public/img/hero-bg-768.webp' %} 768w, {% static 'public/img/hero-bg-1536.webp' %} 1536w"

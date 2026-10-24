@@ -99,10 +99,10 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
 
     const btn = (active) => ({
         padding: '4px 10px',
-        border: '1px solid #cbd5e1',
+        border: '1px solid var(--color-line)',
         borderRadius: '6px',
-        background: active ? '#0C4B33' : 'white',
-        color: active ? 'white' : '#334155',
+        background: active ? 'var(--color-success-on-light)' : 'var(--color-ground)',
+        color: active ? 'var(--color-ground)' : 'var(--color-ink)',
         cursor: 'pointer',
         fontSize: '13px',
         fontWeight: 600,

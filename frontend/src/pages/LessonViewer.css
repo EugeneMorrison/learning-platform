@@ -22,7 +22,7 @@
     padding: var(--space-6);
     border: var(--border-width) solid var(--color-line);
     border-radius: var(--radius-card);
-    background: var(--color-ground);
+    background: var(--color-surface);
 }
 
 /* Lesson headings are Golos bold (decided), including the lesson title. */

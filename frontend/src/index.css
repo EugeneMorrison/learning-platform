@@ -17,3 +17,9 @@ body {
     color: var(--color-ink);
     line-height: var(--leading-normal);
 }
+
+/* Dark theme (lib/theme.js): the page is the darkest layer and cards, blocks
+   and menus (--color-surface) sit a step lighter, as in the light theme. */
+:root[data-theme="dark"] body {
+    background: var(--color-ground);
+}

@@ -2,12 +2,12 @@
 Main URL Configuration for Learning Platform
 
 Includes:
-- Landing page: / (Russian) and /en/ (English), rendered by Django
-- Course catalog: /courses/ and /en/courses/ (Django; the author's course page
-  /courses/<uuid>/ is a React route and still goes to the SPA catch-all)
-- Course page: /course/<slug>/ and /en/course/<slug>/ (Django)
-- About me ("Обо мне"): /about/ and /en/about/ (Django)
-- Language switch: /i18n/setlang/ (Django's set_language view)
+- Landing page: / (Django; the site is Russian-only)
+- Course catalog: /courses/ (Django; the author's course page /courses/<uuid>/
+  is a React route and still goes to the SPA catch-all)
+- Course page: /course/<slug>/ (Django)
+- About me ("Обо мне"): /about/ (Django)
+- Old English URLs: /en/<path> → 301 to /<path>, query string kept
 - Admin panel: /admin/
 - API endpoints: /api/
 - Auth endpoints: /api/auth/
@@ -15,7 +15,6 @@ Includes:
 - Login / register: /login/, /register/ (React app; ?next= validated first)
 """
 
-from django.conf.urls.i18n import i18n_patterns
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.shortcuts import redirect, render
@@ -35,6 +34,17 @@ def lesson_view(request, lesson_id):
     @xframe_options_exempt allows this page to be embedded in an <iframe>.
     """
     return render(request, 'index.html')
+
+
+def english_redirect_view(request, rest=''):
+    """The English version is gone: /en/<path>?<query> → 301 /<path>?<query>.
+    Leading slashes are dropped: /en//evil.com must not become //evil.com,
+    which a browser reads as another host."""
+    target = '/' + (rest or '').lstrip('/\\')
+    query = request.META.get('QUERY_STRING')
+    if query:
+        target += '?' + query
+    return redirect(target, permanent=True)
 
 
 def spa_view(request):
@@ -66,21 +76,20 @@ urlpatterns = [
     # Daphne regardless of DEBUG; must come before the SPA catch-all below.
     # TEMPORARY: Django serving media is a stopgap until Caddy serves /media/.
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
-    path('i18n/', include('django.conf.urls.i18n')),  # set_language for the RU/EN switch
+    re_path(r'^en(?:/(?P<rest>.*))?$', english_redirect_view),  # before the SPA catch-all
     path('favicon.ico', favicon_view, name='favicon'),  # before the SPA catch-all
     path('login/', auth_page_view, name='spa-login'),        # React pages, ?next= checked
     path('register/', auth_page_view, name='spa-register'),
 ]
 
-# Django-rendered public pages. Russian has no prefix (/), English gets /en/.
+# Django-rendered public pages (Russian only).
 # Must come before the SPA catch-all, which would otherwise answer at /.
-urlpatterns += i18n_patterns(
+urlpatterns += [
     path('', landing_view, name='landing'),
     path('courses/', courses_view, name='courses'),
     path('course/<slug:slug>/', course_detail_view, name='course_detail'),
     path('about/', about_view, name='about'),
-    prefix_default_language=False,
-)
+]
 
 urlpatterns += [
     # Catch-all for client-side React Router routes (/login/, /register/, /dashboard/, /courses/...)
