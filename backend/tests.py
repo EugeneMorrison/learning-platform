@@ -436,6 +436,15 @@ class CoverBackgroundCssTests(PublicPagesTestCase):
         self.assertIn('isolation: isolate;', box)  # blends with the box only
         self.assertIn('mix-blend-mode: multiply;', self.rule(components, '.course-cover__img'))
 
+    def test_whole_public_card_is_the_cover_grey(self):
+        # Cover and body one surface; the card's pills turn white to keep their edge.
+        catalog = self.css('catalog.css')
+        card = self.rule(catalog, '.course-card')
+        self.assertIn('background: var(--color-cover);', card)
+        self.assertIn('box-shadow: var(--shadow-sm);', card)
+        self.assertIn('box-shadow: var(--shadow-md);', self.rule(catalog, '.course-card:hover'))
+        self.assertIn('background: var(--color-ground);', self.rule(catalog, '.course-card .pill'))
+
     def test_cards_and_course_page_use_the_shared_cover_box(self):
         course = self.make_course('Covered', cover='covers/c.webp')
         for url in ['/', '/courses/', f'/course/{course.slug}/']:

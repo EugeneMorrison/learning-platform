@@ -48,7 +48,11 @@
 }
 
 /* Course card: the whole card is one link. Cover (4:3, components.css) on
-   top, then title, summary and the bottom row (students or lessons, price). */
+   top, then title, summary and the bottom row (students or lessons, price).
+   The whole card is --color-cover, like the cover box: cover and body are one
+   surface (white image backgrounds multiply to exactly this grey). The border
+   and a light shadow set it off the white page. Text on the grey: ink 16.2:1,
+   muted 7.1:1. */
 .course-card {
   position: relative; /* the chips are pinned over the cover */
   display: flex;
@@ -57,13 +61,20 @@
   overflow: hidden;
   border: var(--border-width) solid var(--color-line);
   border-radius: var(--radius-card);
-  background: var(--color-ground);
+  background: var(--color-cover);
+  box-shadow: var(--shadow-sm);
   color: var(--color-ink);
   text-decoration: none;
 }
 
 .course-card:hover {
   border-color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* The usual soft pill would all but vanish on the grey (1.02:1): white here. */
+.course-card .pill {
+  background: var(--color-ground);
 }
 
 .course-card__body {
