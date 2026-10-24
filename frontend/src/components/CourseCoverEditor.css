@@ -28,15 +28,17 @@
     max-width: 100%;
     aspect-ratio: 4 / 3;
     overflow: hidden;
+    isolation: isolate;
     border: var(--border-width) solid var(--color-line);
     border-radius: var(--radius-small);
-    background: var(--color-soft);
+    background: var(--color-cover); /* the cards' grey + multiply, so the preview matches them */
 }
 
 .cover-editor__preview img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    mix-blend-mode: multiply;
 }
 
 .cover-editor__empty {

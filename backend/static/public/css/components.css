@@ -7,17 +7,21 @@
 .course-cover {
   aspect-ratio: 16 / 9;
   overflow: hidden; /* else a taller image (a portrait photo) stretches the box past its ratio */
-  background: var(--color-soft);
+  isolation: isolate; /* the image blends with this box only, never with what's behind the card */
+  background: var(--color-cover);
 }
 
 .course-cover--card {
   aspect-ratio: 4 / 3;
 }
 
+/* multiply: a white image background turns cover-grey, transparent parts show
+   it anyway, and photos barely change (a multiply by ~95% white). */
 .course-cover__img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  mix-blend-mode: multiply;
 }
 
 /* No cover: branded cobalt block with the course initial. */

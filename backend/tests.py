@@ -414,6 +414,36 @@ class CourseCardTests(PublicPagesTestCase):
         )
 
 
+class CoverBackgroundCssTests(PublicPagesTestCase):
+    """Covers sit on --color-cover and multiply with it (white image backgrounds
+    turn grey, transparent parts show it): cards and the course page header
+    share .course-cover (components.css)."""
+
+    @staticmethod
+    def css(name):
+        from django.contrib.staticfiles import finders
+        return open(finders.find(f'public/css/{name}'), encoding='utf-8').read()
+
+    @staticmethod
+    def rule(css, selector):
+        return re.search(r'(?m)^' + re.escape(selector) + r' \{(.*?)\}', css, re.S).group(1)
+
+    def test_token_and_cover_rules(self):
+        self.assertRegex(self.css('tokens.css'), r'--color-cover: #F1F3F6;')
+        components = self.css('components.css')
+        box = self.rule(components, '.course-cover')
+        self.assertIn('background: var(--color-cover);', box)
+        self.assertIn('isolation: isolate;', box)  # blends with the box only
+        self.assertIn('mix-blend-mode: multiply;', self.rule(components, '.course-cover__img'))
+
+    def test_cards_and_course_page_use_the_shared_cover_box(self):
+        course = self.make_course('Covered', cover='covers/c.webp')
+        for url in ['/', '/courses/', f'/course/{course.slug}/']:
+            with self.subTest(url=url):
+                self.assertRegex(self.client.get(url).content.decode(),
+                                 r'<div class="course-cover[^"]*">\s*\n?\s*(\{#.*?#\}\s*)?<img class="course-cover__img"')
+
+
 class CourseDetailTests(PublicPagesTestCase):
     def make_lesson(self, course, title, order_index, block_types=()):
         lesson = Lesson.objects.create(course=course, title=title, order_index=order_index)

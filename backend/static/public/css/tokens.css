@@ -14,6 +14,8 @@
   --color-muted: #4B5165;      /* secondary text */
   --color-accent: #2340D6;     /* links, primary buttons */
   --color-highlight: #FFD23F;  /* marker highlights, badges */
+  --color-cover: #F1F3F6;      /* behind course covers: white and transparent parts of an
+                                  image take it on (mix-blend-mode: multiply); 1.11:1 on white */
 
   /* Code card (dark editor). Contrast on --color-ink: text 14.8:1, highlight
      12.5:1, accent-on-dark 7.5:1, code-muted 7.6:1, success 10.4:1.
