@@ -795,7 +795,7 @@
     cursor: pointer;
 }
 
-/* «▼ Показать ещё N тестов»: a bar joined to the table's bottom edge. */
+/* «▼ Показать ещё тесты»: a bar joined to the table's bottom edge. */
 .tests-more {
     display: flex;
     align-items: center;

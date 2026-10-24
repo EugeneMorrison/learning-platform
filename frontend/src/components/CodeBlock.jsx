@@ -9,17 +9,9 @@ import { DiscussionBadge } from './DiscussionPanel';
 
 const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 
-// Tests shown before «Показать ещё»; the rest wait behind the arrow.
+// Tests shown before «Показать ещё тесты»; the rest wait behind the arrow.
+// Students only receive visible tests, so hidden ones never count here.
 const SHOWN_TESTS = 2;
-
-// "1 тест", "2 теста", "5 тестов" (11–14 → "тестов").
-function testsWord(n) {
-    const last = n % 10;
-    const lastTwo = n % 100;
-    if (last === 1 && lastTwo !== 11) return 'тест';
-    if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return 'теста';
-    return 'тестов';
-}
 
 function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk, discussion }) {
     const wasSolved = savedProgress?.is_correct === true;
@@ -37,7 +29,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
     const [userCode, setUserCode] = useState(savedCode || content.starter_code);
     const [testsOpen, setTestsOpen] = useState(true);
     const [allTestsShown, setAllTestsShown] = useState(false);
-    const moreTestCount = Math.max((content.tests?.length || 0) - SHOWN_TESTS, 0);
+    const hasMoreTests = (content.tests?.length || 0) > SHOWN_TESTS;
     const shownTests = allTestsShown ? content.tests : content.tests?.slice(0, SHOWN_TESTS);
     const [testInput, setTestInput] = useState(firstTestInput || '');
     const [selectedTestIndex, setSelectedTestIndex] = useState(hasTests ? 0 : null);
@@ -220,7 +212,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
                                 </tbody>
                             </table>
                         </div>
-                        {moreTestCount > 0 && (
+                        {hasMoreTests && (
                             <button
                                 type="button"
                                 className="tests-more"
@@ -228,11 +220,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
                                 aria-expanded={allTestsShown}
                             >
                                 <span aria-hidden="true">{allTestsShown ? '▲' : '▼'}</span>
-                                <span>
-                                    {allTestsShown
-                                        ? 'Свернуть'
-                                        : `Показать ещё ${moreTestCount} ${testsWord(moreTestCount)}`}
-                                </span>
+                                <span>{allTestsShown ? 'Свернуть' : 'Показать ещё тесты'}</span>
                             </button>
                         )}
                         </>
