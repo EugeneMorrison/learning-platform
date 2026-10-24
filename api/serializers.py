@@ -65,6 +65,19 @@ TITLE_ERRORS = {
     'max_length': 'Название не длиннее 255 символов.',
 }
 
+# Cover uploads from the course page (owner only: updates go through
+# IsOwnerOrReadOnly). nginx allows 11 MB request bodies (nginx/uchebus.conf),
+# so a 10 MB file plus the multipart overhead still reaches this check.
+MAX_COVER_BYTES = 10 * 1024 * 1024
+COVER_FORMATS = {'JPEG', 'PNG', 'WEBP', 'GIF'}  # as Pillow detects them, not the file name
+COVER_TYPES_TEXT = 'Подойдут JPEG, PNG, WebP или GIF.'
+COVER_ERRORS = {
+    'invalid': 'Отправьте файл изображения.',
+    'invalid_image': f'Это не изображение или файл повреждён. {COVER_TYPES_TEXT}',
+    'empty': 'Файл пустой.',
+    'no_name': 'Отправьте файл изображения.',
+}
+
 
 class CourseSerializer(serializers.ModelSerializer):
     """
@@ -78,6 +91,11 @@ class CourseSerializer(serializers.ModelSerializer):
     # Computed fields
     author_name = serializers.CharField(source='author.username', read_only=True)
     lesson_count = serializers.SerializerMethodField()
+    # Upload: multipart PATCH; remove: {"cover": null}; read: the file's URL or
+    # null. Course.save() shrinks a new cover (api/covers.py). max_length=None:
+    # storage trims a long upload name itself, and it becomes <name>.webp anyway.
+    cover = serializers.ImageField(required=False, allow_null=True, max_length=None,
+                                   error_messages=COVER_ERRORS)
 
     class Meta:
         model = Course
@@ -89,6 +107,7 @@ class CourseSerializer(serializers.ModelSerializer):
             'author_name',  # Extra: author's username
             'is_published',
             'level',  # BEGINNER / INTERMEDIATE / ADVANCED, or null (not specified)
+            'cover',  # URL, or null
             'lesson_count',  # Extra: number of lessons
             'created_at',
             'updated_at'
@@ -99,6 +118,25 @@ class CourseSerializer(serializers.ModelSerializer):
     def validate_level(self, value):
         """«Не указан» is stored as NULL, whether the client sends null or ''."""
         return value or None
+
+    def validate_cover(self, value):
+        """Image types only (Pillow has opened it by now: value.image) and 10 MB at most."""
+        if value is None:
+            return None
+        if value.size > MAX_COVER_BYTES:
+            raise serializers.ValidationError('Файл больше 10 МБ. Уменьшите изображение.')
+        if getattr(getattr(value, 'image', None), 'format', None) not in COVER_FORMATS:
+            raise serializers.ValidationError(f'Этот формат не подходит. {COVER_TYPES_TEXT}')
+        return value
+
+    def update(self, instance, validated_data):
+        """A replaced or removed cover's file is deleted from storage (after the
+        new state is saved), so the course page doesn't leave orphans behind."""
+        old_cover = instance.cover.name if 'cover' in validated_data else ''
+        course = super().update(instance, validated_data)
+        if old_cover and old_cover != course.cover.name:
+            course.cover.storage.delete(old_cover)
+        return course
 
     def get_lesson_count(self, obj):
         """Count lessons in this course"""

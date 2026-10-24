@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import ChatPanel from '../components/ChatPanel';
+import CourseCoverEditor from '../components/CourseCoverEditor';
 import EditableTitle from '../components/EditableTitle';
 import StudentChat from '../components/StudentChat';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
@@ -356,6 +357,13 @@ function CoursePage() {
                                 {levelStatus === 'error' && 'Не удалось сохранить уровень. Попробуйте ещё раз.'}
                             </span>
                         </div>
+                    )}
+                    {isOwner && (
+                        <CourseCoverEditor
+                            courseId={courseId}
+                            cover={course.cover}
+                            onSaved={cover => setCourse(prev => ({ ...prev, cover }))}
+                        />
                     )}
                     {course.description && <p className="page__lead">{course.description}</p>}
                 </div>

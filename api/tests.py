@@ -297,6 +297,143 @@ class CourseLevelTests(APITestCase):
         self.assertContains(response, '<option value="INTERMEDIATE" selected>')
 
 
+class CourseCoverApiTests(APITestCase):
+    """Cover upload / replace / remove from the course page: multipart PATCH by
+    the owner, image types only, 10 MB at most, shrunk like admin uploads."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
+        cls.other = User.objects.create_user(username='other', password='x', role='AUTHOR')
+        cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
+        cls.course = Course.objects.create(title='Python', author=cls.author, is_published=True)
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        from django.test import override_settings
+
+        media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media, ignore_errors=True)
+        settings = override_settings(MEDIA_ROOT=media)
+        settings.enable()
+        self.addCleanup(settings.disable)
+
+    @staticmethod
+    def upload(name='photo.jpg', size=(2400, 1800), fmt='JPEG', content_type='image/jpeg'):
+        import io
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        out = io.BytesIO()
+        Image.new('RGB', size, (40, 120, 200)).save(out, fmt)
+        return SimpleUploadedFile(name, out.getvalue(), content_type=content_type)
+
+    def patch_cover(self, user, cover, fmt='multipart'):
+        self.client.force_authenticate(user)
+        return self.client.patch(f'/api/courses/{self.course.id}/', {'cover': cover}, format=fmt)
+
+    def stored(self):
+        from PIL import Image
+
+        self.course.refresh_from_db()
+        with self.course.cover.open('rb') as f:
+            img = Image.open(f)
+            return img.format, img.size
+
+    def test_owner_uploads_a_cover_and_it_is_shrunk(self):
+        response = self.patch_cover(self.author, self.upload())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(response.data['cover'], r'^http://testserver/media/covers/photo(_\w+)?\.webp$')
+        self.assertEqual(self.stored(), ('WEBP', (1200, 900)))
+
+    def test_others_cannot_upload(self):
+        for user in [self.other, self.student]:
+            with self.subTest(user=user.username):
+                self.assertEqual(self.patch_cover(user, self.upload()).status_code, 403)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.patch(f'/api/courses/{self.course.id}/', {'cover': self.upload()},
+                                           format='multipart').status_code, 401)
+        self.course.refresh_from_db()
+        self.assertFalse(self.course.cover)
+
+    def test_non_images_and_other_formats_are_rejected_in_russian(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        cases = [
+            SimpleUploadedFile('notes.jpg', b'not an image at all', content_type='image/jpeg'),
+            SimpleUploadedFile('logo.svg', b'<svg xmlns="http://www.w3.org/2000/svg"/>', content_type='image/svg+xml'),
+            self.upload('scan.bmp', size=(50, 50), fmt='BMP', content_type='image/bmp'),
+            self.upload('scan.tif', size=(50, 50), fmt='TIFF', content_type='image/tiff'),
+        ]
+        for upload in cases:
+            with self.subTest(name=upload.name):
+                response = self.patch_cover(self.author, upload)
+                self.assertEqual(response.status_code, 400)
+                self.assertRegex(str(response.data['cover'][0]), '[А-Яа-я]')
+        self.course.refresh_from_db()
+        self.assertFalse(self.course.cover)
+
+    def test_accepted_formats(self):
+        for fmt, name in [('PNG', 'a.png'), ('WEBP', 'a.webp'), ('GIF', 'a.gif'), ('JPEG', 'a.jpeg')]:
+            with self.subTest(fmt=fmt):
+                response = self.patch_cover(self.author, self.upload(name, size=(300, 200), fmt=fmt))
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(self.stored(), ('WEBP', (300, 200)))
+
+    def test_over_10_mb_is_rejected(self):
+        with mock.patch('api.serializers.MAX_COVER_BYTES', 1000):  # instead of a real 10 MB file
+            response = self.patch_cover(self.author, self.upload())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('10 МБ', str(response.data['cover'][0]))
+
+    def test_replace_deletes_the_old_file(self):
+        self.patch_cover(self.author, self.upload('first.jpg'))
+        self.course.refresh_from_db()
+        first = self.course.cover.name
+        storage = self.course.cover.storage
+
+        self.patch_cover(self.author, self.upload('second.png', fmt='PNG', content_type='image/png'))
+        self.course.refresh_from_db()
+        self.assertRegex(self.course.cover.name, r'^covers/second(_\w+)?\.webp$')
+        self.assertFalse(storage.exists(first))
+        self.assertTrue(storage.exists(self.course.cover.name))
+
+    def test_remove_with_null_deletes_the_file(self):
+        self.patch_cover(self.author, self.upload())
+        self.course.refresh_from_db()
+        name, storage = self.course.cover.name, self.course.cover.storage
+
+        response = self.patch_cover(self.author, None, fmt='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data['cover'])
+        self.course.refresh_from_db()
+        self.assertFalse(self.course.cover)
+        self.assertFalse(storage.exists(name))
+
+    def test_other_edits_keep_the_cover(self):
+        self.patch_cover(self.author, self.upload())
+        self.course.refresh_from_db()
+        name = self.course.cover.name
+
+        self.client.patch(f'/api/courses/{self.course.id}/', {'title': 'Renamed', 'level': 'ADVANCED'}, format='json')
+
+        self.course.refresh_from_db()
+        self.assertEqual(self.course.cover.name, name)
+        self.assertTrue(self.course.cover.storage.exists(name))
+
+    def test_readers_see_the_cover_url(self):
+        self.patch_cover(self.author, self.upload())
+        self.client.force_authenticate(None)
+        response = self.client.get(f'/api/courses/{self.course.id}/')
+        self.assertRegex(response.data['cover'], r'/media/covers/photo(_\w+)?\.webp$')
+        self.course.cover = ''
+        self.course.save()
+        self.assertIsNone(self.client.get(f'/api/courses/{self.course.id}/').data['cover'])
+
+
 class LessonNavigationTests(APITestCase):
     """GET /api/lessons/{id}/ carries course_title and next_lesson_id (the next
     lesson of the same course by order_index; null on the last lesson)."""
