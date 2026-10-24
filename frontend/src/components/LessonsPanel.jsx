@@ -29,6 +29,7 @@ const FOCUSABLE = 'a[href], button:not([disabled])';
  * solved_count null and sees no counts. Modal dialog: focus moves in, Tab
  * stays inside, Esc / backdrop / close button / choosing a lesson close it,
  * and the page behind doesn't scroll. The caller returns focus on close.
+ * The current lesson is scrolled into view once the list loads.
  */
 function LessonsPanel({ courseId, courseTitle, currentLessonId, onClose }) {
     const [lessons, setLessons] = useState(null);
@@ -36,6 +37,7 @@ function LessonsPanel({ courseId, courseTitle, currentLessonId, onClose }) {
     const [attempt, setAttempt] = useState(0);
     const panelRef = useRef(null);
     const closeRef = useRef(null);
+    const currentRef = useRef(null);
 
     // Fetched on every open (and on "Повторить"); starts as "loading".
     useEffect(() => {
@@ -61,6 +63,19 @@ function LessonsPanel({ courseId, courseTitle, currentLessonId, onClose }) {
         document.documentElement.classList.add('lessons-panel-open');
         return () => document.documentElement.classList.remove('lessons-panel-open');
     }, []);
+
+    // Once loaded, bring the current lesson into view: centred in the panel
+    // if it's below (or above) the visible part, left alone if already seen.
+    // The panel's own scrollTop, so the locked page behind never moves.
+    useEffect(() => {
+        const panel = panelRef.current;
+        const link = currentRef.current;
+        if (!panel || !link) return;
+        const panelBox = panel.getBoundingClientRect();
+        const linkBox = link.getBoundingClientRect();
+        if (linkBox.top >= panelBox.top && linkBox.bottom <= panelBox.bottom) return;
+        panel.scrollTop += linkBox.top - panelBox.top - (panelBox.height - linkBox.height) / 2;
+    }, [lessons]);
 
     function handleKeyDown(e) {
         if (e.key === 'Escape') {
@@ -146,6 +161,7 @@ function LessonsPanel({ courseId, courseTitle, currentLessonId, onClose }) {
                             return (
                                 <li key={lesson.id}>
                                     <Link
+                                        ref={current ? currentRef : undefined}
                                         to={`/lesson/${lesson.id}/`}
                                         className={current
                                             ? 'lessons-panel__link lessons-panel__link--current'
