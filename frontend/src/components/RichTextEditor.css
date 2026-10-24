@@ -1,11 +1,19 @@
+/* clip, not hidden: still rounds the corners, but isn't a scroll box, so the
+   sticky toolbar below works (hidden stays as the fallback for old browsers). */
 .rte {
     border: 1px solid var(--color-line);
     border-radius: 8px;
     overflow: hidden;
+    overflow: clip;
     background: var(--color-surface);
 }
 
+/* Stays in view under the app header while a long text scrolls past, and
+   leaves with its editor. --app-header-height: set by AppHeader. */
 .rte-toolbar {
+    position: sticky;
+    top: var(--app-header-height, 0px);
+    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     gap: 6px;

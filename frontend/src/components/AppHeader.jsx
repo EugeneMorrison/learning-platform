@@ -66,13 +66,30 @@ function AppHeader() {
         lessonsWereOpen.current = lessonsOpen;
     }, [lessonsOpen]);
 
+    // --app-header-height on <html>: where sticky things below the header stop
+    // (the editor's formatting toolbar). Follows the bar's real height.
+    const headerRef = useRef(null);
+    useEffect(() => {
+        const header = headerRef.current;
+        if (!header) return;
+        const root = document.documentElement;
+        const observer = new ResizeObserver(() => {
+            root.style.setProperty('--app-header-height', `${header.offsetHeight}px`);
+        });
+        observer.observe(header);
+        return () => {
+            observer.disconnect();
+            root.style.removeProperty('--app-header-height');
+        };
+    }, []);
+
     const isInIframe = window.self !== window.top;
     if (isInIframe) return null;
 
     const token = readToken();
 
     return (
-        <header className="app-header">
+        <header ref={headerRef} className="app-header">
             <div className={onLessonPage ? 'app-header__inner app-header__inner--lesson' : 'app-header__inner'}>
                 {/* Without the badge the bar is low: the cat grows in place. */}
                 <BrandLogo className="app-header__brand" compact={!token} />
