@@ -308,8 +308,16 @@ function LessonViewer() {
     // CODE: /run-tests/ returns the test results and is_correct, not the saved
     // record, so read the record back. Only this block's record is taken (the
     // others may have changed since), and only from the latest read-back.
+    // The verdict is already known, so the task counts as solved right away:
+    // waiting for the read-back left "К следующей задаче" (and the header's
+    // count) pointing at the task just solved until it arrived.
     async function handleCodeSubmitted(blockId, data) {
         if (!data.recorded) return;
+        setProgress(prev => {
+            const old = prev.find(p => p.block === blockId);
+            return [...prev.filter(p => p.block !== blockId),
+                { ...old, block: blockId, lesson: lesson.id, is_correct: data.is_correct === true }];
+        });
         const seq = (codeRefetchSeq.current[blockId] || 0) + 1;
         codeRefetchSeq.current[blockId] = seq;
         try {
