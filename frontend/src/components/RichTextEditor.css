@@ -33,6 +33,11 @@
     color: var(--color-muted);
 }
 
+.rte-toolbar__hint {
+    font-size: 13px;
+    color: var(--color-muted);
+}
+
 .rte-sep {
     width: 1px;
     align-self: stretch;
@@ -120,8 +125,49 @@
     margin: 4px 0;
 }
 
+/* Resizable images (Tiptap's resize view): container > wrapper > img + four
+   corner handles. The wrapper never gets wider than the text, and the height
+   follows the width (the view also sets a height while dragging), so a picture
+   is never squashed. */
+.rte-content .ProseMirror [data-resize-container] {
+    margin: 4px 0;
+}
+
+.rte-content .ProseMirror [data-resize-wrapper] {
+    max-width: 100%;
+}
+
+.rte-content .ProseMirror [data-resize-wrapper] img {
+    display: block;
+    margin: 0;
+    height: auto !important;
+}
+
+.rte-content .ProseMirror [data-resize-handle] {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--color-ground);
+    border-radius: 3px;
+    background: var(--color-success-on-light);
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 1;
+}
+
+.rte-content .ProseMirror [data-resize-handle='top-left'] { margin: -4px 0 0 -4px; cursor: nwse-resize; }
+.rte-content .ProseMirror [data-resize-handle='top-right'] { margin: -4px -4px 0 0; cursor: nesw-resize; }
+.rte-content .ProseMirror [data-resize-handle='bottom-left'] { margin: 0 0 -4px -4px; cursor: nesw-resize; }
+.rte-content .ProseMirror [data-resize-handle='bottom-right'] { margin: 0 -4px -4px 0; cursor: nwse-resize; }
+
+.rte-content .ProseMirror [data-resize-container]:hover [data-resize-handle],
+.rte-content .ProseMirror [data-resize-container].ProseMirror-selectednode [data-resize-handle],
+.rte-content .ProseMirror [data-resize-container][data-resize-state='true'] [data-resize-handle] {
+    opacity: 1;
+}
+
 /* Selected image highlight (ProseMirror node selection) */
-.rte-content .ProseMirror img.ProseMirror-selectednode {
+.rte-content .ProseMirror img.ProseMirror-selectednode,
+.rte-content .ProseMirror [data-resize-container].ProseMirror-selectednode img {
     outline: 2px solid var(--color-success-on-light);
 }
 

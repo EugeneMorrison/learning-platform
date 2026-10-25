@@ -16,6 +16,10 @@ import './RichTextEditor.css';
  * Images (incl. formulas pasted as pictures) are uploaded to Django via
  * POST /api/upload-image/ and inserted as <img src="<absolute url>">. Authors
  * can add them three ways: the toolbar button, Ctrl+V paste, and drag-and-drop.
+ * A selected image can be resized: drag a corner handle (the proportions are
+ * kept), or use the image row of the toolbar (smaller / larger / original
+ * size). The size is saved as width/height attributes on the <img>; the lesson
+ * view keeps height auto and max-width 100%, so it never outgrows the column.
  *
  * Tables: the toolbar button inserts a 3×3 table with a header row; while the
  * cursor is in a table, a second toolbar row adds and removes rows and columns.
@@ -27,6 +31,30 @@ import './RichTextEditor.css';
  * headings in saved content are never rewritten.
  */
 const DEFAULT_HEADING_LEVELS = [2, 3];
+
+// Smallest width an image can be shrunk to, px (handles and buttons).
+const MIN_IMAGE_WIDTH = 40;
+
+// Tiptap's resizable image view keeps the size it was dragged to even when the
+// node changes under it (undo, redo, the size buttons): re-apply the node's size.
+const ResizableImage = Image.extend({
+    addNodeView() {
+        const create = this.parent?.();
+        if (!create) return null;
+        return props => {
+            const view = create(props);
+            const update = view.update.bind(view);
+            view.update = (node, ...rest) => {
+                if (!update(node, ...rest)) return false;
+                const { width, height } = node.attrs;
+                view.element.style.width = width ? `${width}px` : '';
+                view.element.style.height = height ? `${height}px` : '';
+                return true;
+            };
+            return view;
+        };
+    },
+});
 const HEADING_TITLES = { 1: 'Главный заголовок', 2: 'Заголовок', 3: 'Подзаголовок' };
 
 function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_HEADING_LEVELS }) {
@@ -35,7 +63,17 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
     const editor = useEditor({
         extensions: [
             StarterKit,
-            Image.configure({ inline: false, allowBase64: false }),
+            ResizableImage.configure({
+                inline: false,
+                allowBase64: false,
+                resize: {
+                    enabled: true,
+                    directions: ['top-left', 'top-right', 'bottom-left', 'bottom-right'],
+                    minWidth: MIN_IMAGE_WIDTH,
+                    minHeight: 20,
+                    alwaysPreserveAspectRatio: true,
+                },
+            }),
             TableKit.configure({ table: { resizable: false } }),
         ],
         content: value || '',
@@ -79,11 +117,33 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
     }, [value, editor]);
 
     // The toolbar re-renders on edits only; this re-renders it when the cursor
-    // moves into or out of a table, so the table row shows up on a click.
-    const inTable = useEditorState({
+    // moves into or out of a table or an image is selected, so their toolbar
+    // rows show up on a click.
+    const { inTable, imageSelected } = useEditorState({
         editor,
-        selector: ({ editor }) => !!editor?.isActive('table'),
+        selector: ({ editor }) => ({
+            inTable: !!editor?.isActive('table'),
+            imageSelected: !!editor?.isActive('image'),
+        }),
     });
+
+    // The selected image's size buttons: scale its shown width by `factor`
+    // (between MIN_IMAGE_WIDTH and the editor's text width), or null = the
+    // picture's own size again.
+    function resizeSelectedImage(factor) {
+        if (factor === null) {
+            editor.chain().focus().updateAttributes('image', { width: null, height: null }).run();
+            return;
+        }
+        const img = editor.view.nodeDOM(editor.state.selection.from)?.querySelector?.('img');
+        if (!img || !img.offsetWidth || !img.offsetHeight) return;
+        const page = editor.view.dom;
+        const style = getComputedStyle(page);
+        const maxWidth = page.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        const width = Math.round(Math.min(maxWidth, Math.max(MIN_IMAGE_WIDTH, img.offsetWidth * factor)));
+        const height = Math.round(width * img.offsetHeight / img.offsetWidth);
+        editor.chain().focus().updateAttributes('image', { width, height }).run();
+    }
 
     function firstImageFile(fileList) {
         if (!fileList || !fileList.length) return null;
@@ -188,6 +248,18 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
                         <span className="rte-sep" />
                         <button type="button" title="Удалить таблицу" style={btn(false)}
                             onClick={() => editor.chain().focus().deleteTable().run()}>Удалить таблицу</button>
+                    </div>
+                )}
+                {imageSelected && (
+                    <div className="rte-toolbar rte-toolbar--image">
+                        <span className="rte-toolbar__label">Картинка:</span>
+                        <button type="button" title="Уменьшить картинку" style={btn(false)}
+                            onClick={() => resizeSelectedImage(0.8)}>− Меньше</button>
+                        <button type="button" title="Увеличить картинку" style={btn(false)}
+                            onClick={() => resizeSelectedImage(1.25)}>+ Больше</button>
+                        <button type="button" title="Вернуть исходный размер картинки" style={btn(false)}
+                            onClick={() => resizeSelectedImage(null)}>Исходный размер</button>
+                        <span className="rte-toolbar__hint">или потяните за уголок картинки</span>
                     </div>
                 )}
             </div>
