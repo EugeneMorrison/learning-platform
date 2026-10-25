@@ -34,12 +34,13 @@ const PLACES = [
     { place: 'inline', label: 'В строке текста' },
     { place: 'left', label: 'Отдельной строкой, слева' },
     { place: 'center', label: 'Отдельной строкой, по центру' },
+    { place: 'right', label: 'Отдельной строкой, справа' },
 ];
 
 /**
  * The lesson editor's formula dialog: LaTeX with a live preview, quick-insert
  * buttons, and where the formula goes: PLACES (inside the line, or on a line
- * of its own, at the left or centred). Enter saves, Shift+Enter starts a new
+ * of its own: at the left, centred or at the right). Enter saves, Shift+Enter starts a new
  * line in the field.
  *
  * initial: { latex, place, editing }. onSubmit(latex, place); onDelete
@@ -167,7 +168,7 @@ function FormulaDialog({ initial, onSubmit, onDelete, onClose }) {
                     </fieldset>
 
                     <div id="formula-dialog-preview" aria-live="polite"
-                        className={`formula-dialog__preview${place === 'left' ? ' formula-dialog__preview--left' : ''}`}>
+                        className={`formula-dialog__preview formula-dialog__preview--${place}`}>
                         {!trimmed && <span className="formula-dialog__placeholder">Здесь появится формула</span>}
                         {preview && <div dangerouslySetInnerHTML={{ __html: preview }} />}
                         {error && <p className="formula-dialog__error" role="alert">Ошибка в формуле: {error}</p>}

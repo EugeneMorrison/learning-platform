@@ -100,9 +100,8 @@
 }
 
 .formula-dialog__where {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-5);
+    display: grid;
+    gap: var(--space-2);
     margin: var(--space-3) 0;
     padding: 0;
     border: 0;
@@ -132,17 +131,37 @@
     max-width: 100%;
 }
 
-.formula-dialog__preview--left {
+.formula-dialog__preview--left,
+.formula-dialog__preview--right {
     justify-content: flex-start;
 }
 
-.formula-dialog__preview--left > div {
+.formula-dialog__preview--left > div,
+.formula-dialog__preview--right > div {
     width: 100%;
 }
 
 .formula-dialog__preview--left .katex-display,
 .formula-dialog__preview--left .katex-display > .katex {
     text-align: left;
+}
+
+.formula-dialog__preview--right .katex-display,
+.formula-dialog__preview--right .katex-display > .katex {
+    text-align: right;
+}
+
+/* Right-aligned, KaTeX overshoots the edge: its hidden screen-reader copy
+   (1px, absolutely placed) lands past it, and a superscript or root draws 2px
+   beyond where its layout ends (.vlist-t2's margin-right: -2px). Either would
+   make the box scroll. */
+.formula-dialog__preview--right .katex-display > .katex {
+    position: relative;
+    padding-right: 2px;
+}
+
+.formula-dialog__preview--right .katex-mathml {
+    left: 0;
 }
 
 .formula-dialog__preview .katex-display {

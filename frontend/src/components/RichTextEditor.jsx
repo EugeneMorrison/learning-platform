@@ -32,11 +32,11 @@ import './RichTextEditor.css';
  *
  * Formulas (LaTeX, drawn by KaTeX): «∑ Формула» opens FormulaDialog, with a
  * live preview; selected text becomes the formula. A formula sits inside the
- * line or on a line of its own, centred or at the left. Clicking a formula
- * opens it again to change, move or delete it. Saved as an empty
+ * line or on a line of its own: centred, at the left or at the right. Clicking
+ * a formula opens it again to change, move or delete it. Saved as an empty
  * <span data-type="inline-math"> or <div data-type="block-math"> with the
- * formula in data-latex (and data-align="left" for one at the left); the
- * lesson view draws it (lib/contentMath.js).
+ * formula in data-latex (and data-align="left" / "right" when not centred);
+ * the lesson view draws it (lib/contentMath.js).
  *
  * Tables: the toolbar button inserts a 3×3 table with a header row; while the
  * cursor is in a table, a second toolbar row adds and removes rows and columns.
@@ -73,16 +73,18 @@ const ResizableImage = Image.extend({
     },
 });
 
-// A formula on a line of its own, centred (no attribute, as before) or at the
-// left: data-align="left". Tiptap's view doesn't copy attributes to the editor
+// A formula on a line of its own, centred (no attribute, as before), or at the
+// left or right: data-align="left" / "right". Tiptap's view doesn't copy attributes to the editor
 // DOM, so the view sets it; a changed attribute redraws the view.
+const SIDE_ALIGNS = ['left', 'right'];
+
 const AlignedBlockMath = BlockMath.extend({
     addAttributes() {
         return {
             ...this.parent?.(),
             align: {
                 default: null,
-                parseHTML: el => (el.getAttribute('data-align') === 'left' ? 'left' : null),
+                parseHTML: el => (SIDE_ALIGNS.includes(el.getAttribute('data-align')) ? el.getAttribute('data-align') : null),
                 renderHTML: attrs => (attrs.align ? { 'data-align': attrs.align } : {}),
             },
         };
@@ -101,7 +103,7 @@ const AlignedBlockMath = BlockMath.extend({
 // Where a formula is (FormulaDialog's place) → its node type and attributes.
 function formulaNode(latex, place) {
     if (place === 'inline') return { type: 'inlineMath', attrs: { latex } };
-    return { type: 'blockMath', attrs: { latex, align: place === 'left' ? 'left' : null } };
+    return { type: 'blockMath', attrs: { latex, align: SIDE_ALIGNS.includes(place) ? place : null } };
 }
 
 const HEADING_TITLES = { 1: 'Главный заголовок', 2: 'Заголовок', 3: 'Подзаголовок' };
@@ -134,7 +136,7 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
     // cursor; selected text, if any, becomes the new formula and is replaced.
     function openFormula({ node, pos }) {
         if (node) {
-            const place = node.type.name === 'inlineMath' ? 'inline' : node.attrs.align === 'left' ? 'left' : 'center';
+            const place = node.type.name === 'inlineMath' ? 'inline' : node.attrs.align || 'center';
             setFormula({ latex: node.attrs.latex, place, editing: true, pos });
             return;
         }

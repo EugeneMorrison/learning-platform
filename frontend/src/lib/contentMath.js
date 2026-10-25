@@ -6,8 +6,9 @@ import 'katex/dist/katex.min.css';
  * mathematics extension) are stored empty, the formula in data-latex:
  *   <span data-type="inline-math" data-latex="…"></span>  — inside a line
  *   <div data-type="block-math" data-latex="…"></div>      — on a line of its own
- * A formula on a line of its own is centred, or at the left with
- * data-align="left" (kept on the element; see blocks.css). renderMath fills them with KaTeX's HTML for display. A broken formula shows
+ * A formula on a line of its own is centred, or at the left or right with
+ * data-align="left" / "right" (kept on the element; see blocks.css).
+ * renderMath fills them with KaTeX's HTML for display. A broken formula shows
  * KaTeX's error in red instead of breaking the block. Display only: the
  * stored HTML is not changed.
  */

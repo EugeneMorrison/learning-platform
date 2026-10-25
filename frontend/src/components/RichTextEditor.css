@@ -241,10 +241,28 @@
     margin: 0;
 }
 
-/* At the left instead (data-align="left"). */
+/* At the left or right instead (data-align). */
 .rte-content .ProseMirror [data-type="block-math"][data-align="left"] .katex-display,
 .rte-content .ProseMirror [data-type="block-math"][data-align="left"] .katex-display > .katex {
     text-align: left;
+}
+
+.rte-content .ProseMirror [data-type="block-math"][data-align="right"] .katex-display,
+.rte-content .ProseMirror [data-type="block-math"][data-align="right"] .katex-display > .katex {
+    text-align: right;
+}
+
+/* Right-aligned, KaTeX overshoots the edge: its hidden screen-reader copy
+   (1px, absolutely placed) lands past it, and a superscript or root draws 2px
+   beyond where its layout ends (.vlist-t2's margin-right: -2px). Either would
+   make the box scroll. */
+.rte-content .ProseMirror [data-type="block-math"][data-align="right"] .katex-display > .katex {
+    position: relative;
+    padding-right: 2px;
+}
+
+.rte-content .ProseMirror [data-type="block-math"][data-align="right"] .katex-mathml {
+    left: 0;
 }
 
 .rte-content .ProseMirror .inline-math-error,
