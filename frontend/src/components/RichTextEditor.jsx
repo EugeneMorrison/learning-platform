@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
+import { TableKit } from '@tiptap/extension-table';
 import api from '../api';
 import './RichTextEditor.css';
 
@@ -15,6 +16,11 @@ import './RichTextEditor.css';
  * Images (incl. formulas pasted as pictures) are uploaded to Django via
  * POST /api/upload-image/ and inserted as <img src="<absolute url>">. Authors
  * can add them three ways: the toolbar button, Ctrl+V paste, and drag-and-drop.
+ *
+ * Tables: the toolbar button inserts a 3×3 table with a header row; while the
+ * cursor is in a table, a second toolbar row adds and removes rows and columns.
+ * Tab moves to the next cell (and adds a row at the end). Columns take the
+ * width of their content (no drag-resizing, so no fixed widths are saved).
  *
  * headingLevels: which heading buttons the toolbar shows (H1 only in the TEXT
  * block form). The schema keeps all six levels in every editor, so existing
@@ -30,6 +36,7 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
         extensions: [
             StarterKit,
             Image.configure({ inline: false, allowBase64: false }),
+            TableKit.configure({ table: { resizable: false } }),
         ],
         content: value || '',
         // Avoid SSR hydration warnings; harmless on the client.
@@ -70,6 +77,13 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
             editor.commands.setContent(incoming, { emitUpdate: false });
         }
     }, [value, editor]);
+
+    // The toolbar re-renders on edits only; this re-renders it when the cursor
+    // moves into or out of a table, so the table row shows up on a click.
+    const inTable = useEditorState({
+        editor,
+        selector: ({ editor }) => !!editor?.isActive('table'),
+    });
 
     function firstImageFile(fileList) {
         if (!fileList || !fileList.length) return null;
@@ -120,37 +134,62 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
 
     return (
         <div className="rte">
-            <div className="rte-toolbar">
-                <button type="button" title="Отменить (Ctrl+Z)" disabled={!canUndo} style={stepBtn(canUndo)}
-                    onClick={() => editor.chain().focus().undo().run()}>↶</button>
-                <button type="button" title="Повторить (Ctrl+Y / Ctrl+Shift+Z)" disabled={!canRedo} style={stepBtn(canRedo)}
-                    onClick={() => editor.chain().focus().redo().run()}>↷</button>
-                <span className="rte-sep" />
-                <button type="button" title="Жирный" style={btn(editor.isActive('bold'))}
-                    onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></button>
-                <button type="button" title="Курсив" style={btn(editor.isActive('italic'))}
-                    onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></button>
-                <span className="rte-sep" />
-                {headingLevels.map(level => (
-                    <button key={level} type="button" title={HEADING_TITLES[level] || `Заголовок ${level}`}
-                        style={btn(editor.isActive('heading', { level }))}
-                        onClick={() => editor.chain().focus().toggleHeading({ level }).run()}>H{level}</button>
-                ))}
-                <span className="rte-sep" />
-                <button type="button" title="Маркированный список" style={btn(editor.isActive('bulletList'))}
-                    onClick={() => editor.chain().focus().toggleBulletList().run()}>• Список</button>
-                <button type="button" title="Нумерованный список" style={btn(editor.isActive('orderedList'))}
-                    onClick={() => editor.chain().focus().toggleOrderedList().run()}>1. Список</button>
-                <span className="rte-sep" />
-                <button type="button" title="Код (строка)" style={btn(editor.isActive('code'))}
-                    onClick={() => editor.chain().focus().toggleCode().run()}>{'< >'}</button>
-                <button type="button" title="Блок кода" style={btn(editor.isActive('codeBlock'))}
-                    onClick={() => editor.chain().focus().toggleCodeBlock().run()}>Код-блок</button>
-                <button type="button" title="Цитата" style={btn(editor.isActive('blockquote'))}
-                    onClick={() => editor.chain().focus().toggleBlockquote().run()}>❝</button>
-                <span className="rte-sep" />
-                <button type="button" title="Вставить изображение (или просто вставьте/перетащите картинку)"
-                    style={btn(false)} onClick={() => fileInputRef.current?.click()}>🖼 Картинка</button>
+            <div className="rte-toolbars">
+                <div className="rte-toolbar">
+                    <button type="button" title="Отменить (Ctrl+Z)" disabled={!canUndo} style={stepBtn(canUndo)}
+                        onClick={() => editor.chain().focus().undo().run()}>↶</button>
+                    <button type="button" title="Повторить (Ctrl+Y / Ctrl+Shift+Z)" disabled={!canRedo} style={stepBtn(canRedo)}
+                        onClick={() => editor.chain().focus().redo().run()}>↷</button>
+                    <span className="rte-sep" />
+                    <button type="button" title="Жирный" style={btn(editor.isActive('bold'))}
+                        onClick={() => editor.chain().focus().toggleBold().run()}><b>B</b></button>
+                    <button type="button" title="Курсив" style={btn(editor.isActive('italic'))}
+                        onClick={() => editor.chain().focus().toggleItalic().run()}><i>I</i></button>
+                    <span className="rte-sep" />
+                    {headingLevels.map(level => (
+                        <button key={level} type="button" title={HEADING_TITLES[level] || `Заголовок ${level}`}
+                            style={btn(editor.isActive('heading', { level }))}
+                            onClick={() => editor.chain().focus().toggleHeading({ level }).run()}>H{level}</button>
+                    ))}
+                    <span className="rte-sep" />
+                    <button type="button" title="Маркированный список" style={btn(editor.isActive('bulletList'))}
+                        onClick={() => editor.chain().focus().toggleBulletList().run()}>• Список</button>
+                    <button type="button" title="Нумерованный список" style={btn(editor.isActive('orderedList'))}
+                        onClick={() => editor.chain().focus().toggleOrderedList().run()}>1. Список</button>
+                    <span className="rte-sep" />
+                    <button type="button" title="Код (строка)" style={btn(editor.isActive('code'))}
+                        onClick={() => editor.chain().focus().toggleCode().run()}>{'< >'}</button>
+                    <button type="button" title="Блок кода" style={btn(editor.isActive('codeBlock'))}
+                        onClick={() => editor.chain().focus().toggleCodeBlock().run()}>Код-блок</button>
+                    <button type="button" title="Цитата" style={btn(editor.isActive('blockquote'))}
+                        onClick={() => editor.chain().focus().toggleBlockquote().run()}>❝</button>
+                    <span className="rte-sep" />
+                    <button type="button" title="Вставить изображение (или просто вставьте/перетащите картинку)"
+                        style={btn(false)} onClick={() => fileInputRef.current?.click()}>🖼 Картинка</button>
+                    <button type="button" title="Вставить таблицу" style={btn(inTable)}
+                        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>▦ Таблица</button>
+                </div>
+                {inTable && (
+                    <div className="rte-toolbar rte-toolbar--table">
+                        <span className="rte-toolbar__label">Таблица:</span>
+                        <button type="button" title="Добавить строку ниже" style={btn(false)}
+                            onClick={() => editor.chain().focus().addRowAfter().run()}>+ Строка</button>
+                        <button type="button" title="Добавить столбец справа" style={btn(false)}
+                            onClick={() => editor.chain().focus().addColumnAfter().run()}>+ Столбец</button>
+                        <button type="button" title="Удалить строку" style={btn(false)}
+                            onClick={() => editor.chain().focus().deleteRow().run()}>− Строка</button>
+                        <button type="button" title="Удалить столбец" style={btn(false)}
+                            onClick={() => editor.chain().focus().deleteColumn().run()}>− Столбец</button>
+                        <span className="rte-sep" />
+                        <button type="button" title="Первая строка — заголовок таблицы" style={btn(false)}
+                            onClick={() => editor.chain().focus().toggleHeaderRow().run()}>Строка заголовка</button>
+                        <button type="button" title="Объединить выделенные ячейки или разделить объединённую" style={btn(false)}
+                            onClick={() => editor.chain().focus().mergeOrSplit().run()}>Объединить / разделить</button>
+                        <span className="rte-sep" />
+                        <button type="button" title="Удалить таблицу" style={btn(false)}
+                            onClick={() => editor.chain().focus().deleteTable().run()}>Удалить таблицу</button>
+                    </div>
+                )}
             </div>
             <input
                 ref={fileInputRef}

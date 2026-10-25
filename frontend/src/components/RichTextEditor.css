@@ -9,11 +9,15 @@
 }
 
 /* Stays in view under the app header while a long text scrolls past, and
-   leaves with its editor. --app-header-height: set by AppHeader. */
-.rte-toolbar {
+   leaves with its editor. --app-header-height: set by AppHeader. Holds the
+   main row and, while the cursor is in a table, the table row. */
+.rte-toolbars {
     position: sticky;
     top: var(--app-header-height, 0px);
     z-index: 1;
+}
+
+.rte-toolbar {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -21,6 +25,12 @@
     padding: 8px;
     border-bottom: 1px solid var(--color-line);
     background: var(--color-soft);
+}
+
+.rte-toolbar__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-muted);
 }
 
 .rte-sep {
@@ -113,6 +123,49 @@
 /* Selected image highlight (ProseMirror node selection) */
 .rte-content .ProseMirror img.ProseMirror-selectednode {
     outline: 2px solid var(--color-success-on-light);
+}
+
+/* Tables. The wrapper (Tiptap's table view) scrolls sideways when a table is
+   wider than the editor. */
+.rte-content .ProseMirror .tableWrapper {
+    overflow-x: auto;
+    margin: 0 0 10px 0;
+}
+
+.rte-content .ProseMirror table {
+    border-collapse: collapse;
+    table-layout: auto;
+    margin: 0;
+}
+
+.rte-content .ProseMirror th,
+.rte-content .ProseMirror td {
+    position: relative;
+    min-width: 3em;
+    padding: 6px 10px;
+    border: 1px solid var(--color-line);
+    vertical-align: top;
+    text-align: left;
+}
+
+.rte-content .ProseMirror th {
+    background: var(--color-soft);
+    font-weight: 600;
+}
+
+.rte-content .ProseMirror th > :last-child,
+.rte-content .ProseMirror td > :last-child {
+    margin-bottom: 0;
+}
+
+/* Cells selected by dragging across them (for merging). */
+.rte-content .ProseMirror .selectedCell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--color-success-on-light);
+    opacity: 0.15;
+    pointer-events: none;
 }
 
 /* Placeholder for empty editor */

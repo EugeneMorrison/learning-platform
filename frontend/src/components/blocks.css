@@ -321,6 +321,45 @@
     border-radius: var(--radius-small);
 }
 
+/* Author tables. Each sits in a block-level .content-figure box
+   (wrapTables, lib/contentImages.js) that scrolls sideways when the table is
+   wider than the column. Columns take the width of their content. */
+.content-figure--table {
+    display: block;
+    margin: var(--space-3) 0;
+}
+
+.text-content table {
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
+.text-content th,
+.text-content td {
+    padding: var(--space-2) var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    vertical-align: top;
+    text-align: left;
+    overflow-wrap: normal; /* a narrow column shouldn't split words mid-letter */
+}
+
+.text-content th {
+    background: var(--color-soft);
+    font-weight: var(--weight-bold);
+}
+
+.text-content th > :last-child,
+.text-content td > :last-child {
+    margin-bottom: 0;
+}
+
+/* An empty cell keeps a line's height, so a blank row doesn't shrink to a strip. */
+.text-content th > p:empty::before,
+.text-content td > p:empty::before {
+    content: '\00a0';
+}
+
 /* Inline code: .startswith() */
 .text-content code,
 .quiz-option code {

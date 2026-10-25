@@ -5,14 +5,14 @@ import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
 import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
-import { wrapImages } from '../lib/contentImages';
+import { wrapImages, wrapTables } from '../lib/contentImages';
 
 hljs.registerLanguage('python', python);
 
 // Questions authored with the rich-text editor are HTML (wrapped in block tags);
 // older quizzes store plain text with an optional "\n\n + code" convention.
 function isHtmlQuestion(q) {
-    return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|strong|em|code|div|br)\b/i.test(q || '');
+    return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|table|strong|em|code|div|br)\b/i.test(q || '');
 }
 
 // The options in display order, each with its index in content.options (the
@@ -113,7 +113,7 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
             {htmlQuestion ? (
                 <div
                     className="text-content lesson-block__prompt"
-                    dangerouslySetInnerHTML={{ __html: wrapImages(highlightPreBlocks(content.question)) }}
+                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(highlightPreBlocks(content.question))) }}
                 />
             ) : (
                 <>

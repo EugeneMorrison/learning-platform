@@ -10,6 +10,19 @@ export function wrapImages(html) {
 }
 
 /**
+ * Wrap every <table> in author HTML in a .content-figure box too (block-level:
+ * content-figure--table), so a table wider than the column scrolls sideways
+ * instead of stretching the page, with the same fade at the right edge. Open
+ * and close tags are replaced separately, so a table inside a cell still nests.
+ * Display only: the stored HTML is not changed.
+ */
+export function wrapTables(html) {
+    return (html || '')
+        .replace(/<table\b/gi, '<div class="content-figure content-figure--table"><table')
+        .replace(/<\/table>/gi, '</table></div>');
+}
+
+/**
  * Mark .content-figure boxes under `root` that have more picture to the right
  * (class content-figure--more → a soft fade at the right edge, see blocks.css).
  * Re-checked when a picture loads or the column resizes (ResizeObserver) and

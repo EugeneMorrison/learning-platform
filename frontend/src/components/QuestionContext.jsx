@@ -2,7 +2,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from './pycharmDarcula';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
-import { wrapImages } from '../lib/contentImages';
+import { wrapImages, wrapTables } from '../lib/contentImages';
 import './Question.css';
 
 // What a «Задать вопрос» message carries (Message.context, built on the server
@@ -21,13 +21,13 @@ const READ_ONLY_SETUP = {
 
 // Same test as QuizBlock: rich-text questions are HTML, older ones plain text.
 function isHtml(text) {
-    return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|strong|em|code|div|br)\b/i.test(text || '');
+    return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|table|strong|em|code|div|br)\b/i.test(text || '');
 }
 
 function AuthorHtml({ html }) {
     if (!html) return null;
     if (!isHtml(html)) return <p className="question-context__plain">{html}</p>;
-    return <div className="text-content" dangerouslySetInnerHTML={{ __html: wrapImages(highlightPreBlocks(html)) }} />;
+    return <div className="text-content" dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(highlightPreBlocks(html))) }} />;
 }
 
 // Python code in the lesson editor's Darcula style, read-only.
