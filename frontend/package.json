@@ -16,6 +16,7 @@
     "@lezer/highlight": "^1.2.3",
     "@tiptap/extension-image": "^3.26.0",
     "@tiptap/extension-table": "^3.26.0",
+    "@tiptap/extension-text-align": "^3.26.0",
     "@tiptap/pm": "^3.26.0",
     "@tiptap/react": "^3.26.0",
     "@tiptap/starter-kit": "^3.26.0",

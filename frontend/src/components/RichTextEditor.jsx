@@ -3,6 +3,7 @@ import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
+import TextAlign from '@tiptap/extension-text-align';
 import api from '../api';
 import './RichTextEditor.css';
 
@@ -20,6 +21,11 @@ import './RichTextEditor.css';
  * kept), or use the image row of the toolbar (smaller / larger / original
  * size). The size is saved as width/height attributes on the <img>; the lesson
  * view keeps height auto and max-width 100%, so it never outgrows the column.
+ *
+ * Alignment: paragraphs and headings can be centred or set to the right
+ * (saved as style="text-align: …"); left is the default, so «По левому краю»
+ * removes the style. No justify: without hyphenation Russian text gets wide
+ * gaps on phones.
  *
  * Tables: the toolbar button inserts a 3×3 table with a header row; while the
  * cursor is in a table, a second toolbar row adds and removes rows and columns.
@@ -57,6 +63,25 @@ const ResizableImage = Image.extend({
 });
 const HEADING_TITLES = { 1: 'Главный заголовок', 2: 'Заголовок', 3: 'Подзаголовок' };
 
+const ALIGN_BUTTONS = [
+    { align: 'left', title: 'По левому краю (Ctrl+Shift+L)' },
+    { align: 'center', title: 'По центру (Ctrl+Shift+E)' },
+    { align: 'right', title: 'По правому краю (Ctrl+Shift+R)' },
+];
+
+// Word-style alignment icon: four lines, short ones placed by `align`.
+function AlignIcon({ align }) {
+    const lines = [14, 9, 14, 9];
+    return (
+        <svg width="14" height="12" viewBox="0 0 14 12" aria-hidden="true" style={{ display: 'block', margin: '3px 0' }}>
+            {lines.map((w, i) => {
+                const x = align === 'center' ? (14 - w) / 2 : align === 'right' ? 14 - w : 0;
+                return <rect key={i} x={x} y={i * 3 + 0.25} width={w} height="1.5" rx="0.75" fill="currentColor" />;
+            })}
+        </svg>
+    );
+}
+
 function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_HEADING_LEVELS }) {
     const fileInputRef = useRef(null);
 
@@ -75,6 +100,7 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
                 },
             }),
             TableKit.configure({ table: { resizable: false } }),
+            TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right'] }),
         ],
         content: value || '',
         // Avoid SSR hydration warnings; harmless on the client.
@@ -117,15 +143,24 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
     }, [value, editor]);
 
     // The toolbar re-renders on edits only; this re-renders it when the cursor
-    // moves into or out of a table or an image is selected, so their toolbar
-    // rows show up on a click.
-    const { inTable, imageSelected } = useEditorState({
+    // moves into or out of a table, an image is selected or the cursor lands
+    // in text aligned differently, so rows and the alignment buttons follow a click.
+    const { inTable, imageSelected, align } = useEditorState({
         editor,
         selector: ({ editor }) => ({
             inTable: !!editor?.isActive('table'),
             imageSelected: !!editor?.isActive('image'),
+            align: editor?.isActive({ textAlign: 'center' }) ? 'center'
+                : editor?.isActive({ textAlign: 'right' }) ? 'right' : 'left',
         }),
     });
+
+    // Left is the default: it removes the alignment; centre/right toggle back to it.
+    function setAlign(value) {
+        const chain = editor.chain().focus();
+        if (value === 'left' || value === align) chain.unsetTextAlign().run();
+        else chain.setTextAlign(value).run();
+    }
 
     // The selected image's size buttons: scale its shown width by `factor`
     // (between MIN_IMAGE_WIDTH and the editor's text width), or null = the
@@ -210,6 +245,12 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
                         <button key={level} type="button" title={HEADING_TITLES[level] || `Заголовок ${level}`}
                             style={btn(editor.isActive('heading', { level }))}
                             onClick={() => editor.chain().focus().toggleHeading({ level }).run()}>H{level}</button>
+                    ))}
+                    <span className="rte-sep" />
+                    {ALIGN_BUTTONS.map(({ align: value, title }) => (
+                        <button key={value} type="button" title={title} aria-label={title}
+                            aria-pressed={align === value} style={btn(align === value)}
+                            onClick={() => setAlign(value)}><AlignIcon align={value} /></button>
                     ))}
                     <span className="rte-sep" />
                     <button type="button" title="Маркированный список" style={btn(editor.isActive('bulletList'))}
