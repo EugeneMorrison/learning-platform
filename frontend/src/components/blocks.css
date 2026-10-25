@@ -373,6 +373,12 @@
     margin: 0;
 }
 
+/* At the left instead (data-align="left", chosen in the formula dialog). */
+.text-content [data-type="block-math"][data-align="left"] .katex-display,
+.text-content [data-type="block-math"][data-align="left"] .katex-display > .katex {
+    text-align: left;
+}
+
 /* Inline code: .startswith() */
 .text-content code,
 .quiz-option code {

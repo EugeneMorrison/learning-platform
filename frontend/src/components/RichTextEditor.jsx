@@ -32,10 +32,11 @@ import './RichTextEditor.css';
  *
  * Formulas (LaTeX, drawn by KaTeX): «∑ Формула» opens FormulaDialog, with a
  * live preview; selected text becomes the formula. A formula sits inside the
- * line or on a line of its own, centred. Clicking a formula opens it again to
- * change or delete it. Saved as an empty <span data-type="inline-math"> or
- * <div data-type="block-math"> with the formula in data-latex; the lesson view
- * draws it (lib/contentMath.js).
+ * line or on a line of its own, centred or at the left. Clicking a formula
+ * opens it again to change, move or delete it. Saved as an empty
+ * <span data-type="inline-math"> or <div data-type="block-math"> with the
+ * formula in data-latex (and data-align="left" for one at the left); the
+ * lesson view draws it (lib/contentMath.js).
  *
  * Tables: the toolbar button inserts a 3×3 table with a header row; while the
  * cursor is in a table, a second toolbar row adds and removes rows and columns.
@@ -71,6 +72,38 @@ const ResizableImage = Image.extend({
         };
     },
 });
+
+// A formula on a line of its own, centred (no attribute, as before) or at the
+// left: data-align="left". Tiptap's view doesn't copy attributes to the editor
+// DOM, so the view sets it; a changed attribute redraws the view.
+const AlignedBlockMath = BlockMath.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            align: {
+                default: null,
+                parseHTML: el => (el.getAttribute('data-align') === 'left' ? 'left' : null),
+                renderHTML: attrs => (attrs.align ? { 'data-align': attrs.align } : {}),
+            },
+        };
+    },
+    addNodeView() {
+        const create = this.parent?.();
+        if (!create) return null;
+        return props => {
+            const view = create(props);
+            if (props.node.attrs.align) view.dom.setAttribute('data-align', props.node.attrs.align);
+            return view;
+        };
+    },
+});
+
+// Where a formula is (FormulaDialog's place) → its node type and attributes.
+function formulaNode(latex, place) {
+    if (place === 'inline') return { type: 'inlineMath', attrs: { latex } };
+    return { type: 'blockMath', attrs: { latex, align: place === 'left' ? 'left' : null } };
+}
+
 const HEADING_TITLES = { 1: 'Главный заголовок', 2: 'Заголовок', 3: 'Подзаголовок' };
 
 const ALIGN_BUTTONS = [
@@ -94,19 +127,20 @@ function AlignIcon({ align }) {
 
 function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_HEADING_LEVELS }) {
     const fileInputRef = useRef(null);
-    // The open formula dialog: { latex, display, editing, pos?, range? } or null.
+    // The open formula dialog: { latex, place, editing, pos?, range? } or null.
     const [formula, setFormula] = useState(null);
 
     // An existing formula (clicked, so `node` and `pos`), or a new one at the
     // cursor; selected text, if any, becomes the new formula and is replaced.
-    function openFormula({ node, pos, display }) {
+    function openFormula({ node, pos }) {
         if (node) {
-            setFormula({ latex: node.attrs.latex, display, editing: true, pos });
+            const place = node.type.name === 'inlineMath' ? 'inline' : node.attrs.align === 'left' ? 'left' : 'center';
+            setFormula({ latex: node.attrs.latex, place, editing: true, pos });
             return;
         }
         const { from, to, empty } = editor.state.selection;
         const text = empty ? '' : editor.state.doc.textBetween(from, to, ' ');
-        setFormula({ latex: text, display: false, editing: false, range: text ? { from, to } : null });
+        setFormula({ latex: text, place: 'inline', editing: false, range: text ? { from, to } : null });
     }
 
     function closeFormula() {
@@ -114,24 +148,23 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
         editor?.commands.focus();
     }
 
-    function submitFormula(latex, display) {
-        const type = display ? 'blockMath' : 'inlineMath';
+    function submitFormula(latex, place) {
+        const content = formulaNode(latex, place);
         const chain = editor.chain().focus();
         if (!formula.editing) {
-            chain.insertContentAt(formula.range || editor.state.selection.from, { type, attrs: { latex } }).run();
+            chain.insertContentAt(formula.range || editor.state.selection.from, content).run();
         } else {
             const node = editor.state.doc.nodeAt(formula.pos);
-            if (node?.type.name === type) {
+            if (node?.type.name === content.type) {
                 chain.command(({ tr }) => {
-                    tr.setNodeMarkup(formula.pos, undefined, { ...node.attrs, latex });
+                    tr.setNodeMarkup(formula.pos, undefined, { ...node.attrs, ...content.attrs });
                     return true;
                 }).run();
             } else if (node) {
-                // Moved between the line and a line of its own: a block formula
-                // needs a paragraph around it to sit inside a line.
-                const content = display ? { type, attrs: { latex } }
-                    : { type: 'paragraph', content: [{ type, attrs: { latex } }] };
-                chain.insertContentAt({ from: formula.pos, to: formula.pos + node.nodeSize }, content).run();
+                // Moved between the line and a line of its own: a formula from
+                // a line of its own needs a paragraph around it to sit inside a line.
+                const replacement = place === 'inline' ? { type: 'paragraph', content: [content] } : content;
+                chain.insertContentAt({ from: formula.pos, to: formula.pos + node.nodeSize }, replacement).run();
             }
         }
         setFormula(null);
@@ -164,11 +197,11 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
             // (large, centred), as in the lesson view.
             InlineMath.configure({
                 katexOptions: { throwOnError: false },
-                onClick: (node, pos) => openFormula({ node, pos, display: false }),
+                onClick: (node, pos) => openFormula({ node, pos }),
             }),
-            BlockMath.configure({
+            AlignedBlockMath.configure({
                 katexOptions: { throwOnError: false, displayMode: true },
-                onClick: (node, pos) => openFormula({ node, pos, display: true }),
+                onClick: (node, pos) => openFormula({ node, pos }),
             }),
         ],
         content: value || '',
@@ -339,7 +372,7 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
                     <button type="button" title="Вставить таблицу" style={btn(inTable)}
                         onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>▦ Таблица</button>
                     <button type="button" title="Вставить формулу (LaTeX)" style={btn(false)}
-                        onClick={() => openFormula({ display: false })}>∑ Формула</button>
+                        onClick={() => openFormula({})}>∑ Формула</button>
                 </div>
                 {inTable && (
                     <div className="rte-toolbar rte-toolbar--table">

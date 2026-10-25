@@ -132,6 +132,19 @@
     max-width: 100%;
 }
 
+.formula-dialog__preview--left {
+    justify-content: flex-start;
+}
+
+.formula-dialog__preview--left > div {
+    width: 100%;
+}
+
+.formula-dialog__preview--left .katex-display,
+.formula-dialog__preview--left .katex-display > .katex {
+    text-align: left;
+}
+
 .formula-dialog__preview .katex-display {
     margin: 0;
 }

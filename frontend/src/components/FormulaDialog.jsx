@@ -30,17 +30,25 @@ const SNIPPETS = [
     { label: '(…)', latex: '\\left( x \\right)', title: 'Скобки по высоте содержимого' },
 ];
 
+const PLACES = [
+    { place: 'inline', label: 'В строке текста' },
+    { place: 'left', label: 'Отдельной строкой, слева' },
+    { place: 'center', label: 'Отдельной строкой, по центру' },
+];
+
 /**
  * The lesson editor's formula dialog: LaTeX with a live preview, quick-insert
- * buttons, and where the formula goes (inside the line, or on a line of its
- * own, centred). Enter saves, Shift+Enter starts a new line in the field.
+ * buttons, and where the formula goes: PLACES (inside the line, or on a line
+ * of its own, at the left or centred). Enter saves, Shift+Enter starts a new
+ * line in the field.
  *
- * initial: { latex, display, editing }. onSubmit(latex, display); onDelete
+ * initial: { latex, place, editing }. onSubmit(latex, place); onDelete
  * (editing only); onClose.
  */
 function FormulaDialog({ initial, onSubmit, onDelete, onClose }) {
     const [latex, setLatex] = useState(initial.latex || '');
-    const [display, setDisplay] = useState(!!initial.display);
+    const [place, setPlace] = useState(initial.place || 'inline');
+    const display = place !== 'inline';
     const dialogRef = useRef(null);
     const fieldRef = useRef(null);
 
@@ -78,7 +86,7 @@ function FormulaDialog({ initial, onSubmit, onDelete, onClose }) {
     }
 
     function submit() {
-        if (canSubmit) onSubmit(trimmed, display);
+        if (canSubmit) onSubmit(trimmed, place);
     }
 
     function handleKeyDown(e) {
@@ -149,17 +157,17 @@ function FormulaDialog({ initial, onSubmit, onDelete, onClose }) {
 
                     <fieldset className="formula-dialog__where">
                         <legend className="visually-hidden">Где стоит формула</legend>
-                        <label>
-                            <input type="radio" name="formula-display" checked={!display} onChange={() => setDisplay(false)} />
-                            В строке текста
-                        </label>
-                        <label>
-                            <input type="radio" name="formula-display" checked={display} onChange={() => setDisplay(true)} />
-                            Отдельной строкой, по центру
-                        </label>
+                        {PLACES.map(p => (
+                            <label key={p.place}>
+                                <input type="radio" name="formula-place" checked={place === p.place}
+                                    onChange={() => setPlace(p.place)} />
+                                {p.label}
+                            </label>
+                        ))}
                     </fieldset>
 
-                    <div id="formula-dialog-preview" className="formula-dialog__preview" aria-live="polite">
+                    <div id="formula-dialog-preview" aria-live="polite"
+                        className={`formula-dialog__preview${place === 'left' ? ' formula-dialog__preview--left' : ''}`}>
                         {!trimmed && <span className="formula-dialog__placeholder">Здесь появится формула</span>}
                         {preview && <div dangerouslySetInnerHTML={{ __html: preview }} />}
                         {error && <p className="formula-dialog__error" role="alert">Ошибка в формуле: {error}</p>}
