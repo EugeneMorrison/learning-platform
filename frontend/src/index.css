@@ -11,6 +11,14 @@
     padding: 0;
 }
 
+/* No ligatures anywhere in the app. JetBrains Mono draws == != <= >= as single
+   joined glyphs (== as one long bar, != and <= as odd symbols), which a student
+   can't read as the two characters they must type. "none" also turns off the
+   contextual alternates (calt) these ligatures come from. */
+html {
+    font-variant-ligatures: none;
+}
+
 body {
     font-family: var(--font-body);
     background: var(--color-soft);

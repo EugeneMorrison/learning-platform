@@ -37,6 +37,8 @@ const darculaTheme = EditorView.theme(
             color: FG,
             caretColor: CURSOR,
             fontFamily: "'JetBrains Mono', Consolas, monospace",
+            // == != <= >= stay two separate characters (see index.css).
+            fontVariantLigatures: 'none',
             fontSize: '14px',
             padding: '8px 0',
         },
