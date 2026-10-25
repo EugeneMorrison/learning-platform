@@ -1,10 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { TableKit } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
+import { BlockMath, InlineMath } from '@tiptap/extension-mathematics';
+import 'katex/dist/katex.min.css';
 import api from '../api';
+import FormulaDialog from './FormulaDialog';
 import './RichTextEditor.css';
 
 /**
@@ -26,6 +29,13 @@ import './RichTextEditor.css';
  * (saved as style="text-align: …"); left is the default, so «По левому краю»
  * removes the style. No justify: without hyphenation Russian text gets wide
  * gaps on phones.
+ *
+ * Formulas (LaTeX, drawn by KaTeX): «∑ Формула» opens FormulaDialog, with a
+ * live preview; selected text becomes the formula. A formula sits inside the
+ * line or on a line of its own, centred. Clicking a formula opens it again to
+ * change or delete it. Saved as an empty <span data-type="inline-math"> or
+ * <div data-type="block-math"> with the formula in data-latex; the lesson view
+ * draws it (lib/contentMath.js).
  *
  * Tables: the toolbar button inserts a 3×3 table with a header row; while the
  * cursor is in a table, a second toolbar row adds and removes rows and columns.
@@ -84,6 +94,54 @@ function AlignIcon({ align }) {
 
 function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_HEADING_LEVELS }) {
     const fileInputRef = useRef(null);
+    // The open formula dialog: { latex, display, editing, pos?, range? } or null.
+    const [formula, setFormula] = useState(null);
+
+    // An existing formula (clicked, so `node` and `pos`), or a new one at the
+    // cursor; selected text, if any, becomes the new formula and is replaced.
+    function openFormula({ node, pos, display }) {
+        if (node) {
+            setFormula({ latex: node.attrs.latex, display, editing: true, pos });
+            return;
+        }
+        const { from, to, empty } = editor.state.selection;
+        const text = empty ? '' : editor.state.doc.textBetween(from, to, ' ');
+        setFormula({ latex: text, display: false, editing: false, range: text ? { from, to } : null });
+    }
+
+    function closeFormula() {
+        setFormula(null);
+        editor?.commands.focus();
+    }
+
+    function submitFormula(latex, display) {
+        const type = display ? 'blockMath' : 'inlineMath';
+        const chain = editor.chain().focus();
+        if (!formula.editing) {
+            chain.insertContentAt(formula.range || editor.state.selection.from, { type, attrs: { latex } }).run();
+        } else {
+            const node = editor.state.doc.nodeAt(formula.pos);
+            if (node?.type.name === type) {
+                chain.command(({ tr }) => {
+                    tr.setNodeMarkup(formula.pos, undefined, { ...node.attrs, latex });
+                    return true;
+                }).run();
+            } else if (node) {
+                // Moved between the line and a line of its own: a block formula
+                // needs a paragraph around it to sit inside a line.
+                const content = display ? { type, attrs: { latex } }
+                    : { type: 'paragraph', content: [{ type, attrs: { latex } }] };
+                chain.insertContentAt({ from: formula.pos, to: formula.pos + node.nodeSize }, content).run();
+            }
+        }
+        setFormula(null);
+    }
+
+    function deleteFormula() {
+        const node = editor.state.doc.nodeAt(formula.pos);
+        if (node) editor.chain().focus().deleteRange({ from: formula.pos, to: formula.pos + node.nodeSize }).run();
+        setFormula(null);
+    }
 
     const editor = useEditor({
         extensions: [
@@ -101,6 +159,17 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
             }),
             TableKit.configure({ table: { resizable: false } }),
             TextAlign.configure({ types: ['heading', 'paragraph'], alignments: ['left', 'center', 'right'] }),
+            // Configured one by one: the Mathematics bundle gives both the same
+            // KaTeX options, and a formula on its own line needs displayMode
+            // (large, centred), as in the lesson view.
+            InlineMath.configure({
+                katexOptions: { throwOnError: false },
+                onClick: (node, pos) => openFormula({ node, pos, display: false }),
+            }),
+            BlockMath.configure({
+                katexOptions: { throwOnError: false, displayMode: true },
+                onClick: (node, pos) => openFormula({ node, pos, display: true }),
+            }),
         ],
         content: value || '',
         // Avoid SSR hydration warnings; harmless on the client.
@@ -269,6 +338,8 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
                         style={btn(false)} onClick={() => fileInputRef.current?.click()}>🖼 Картинка</button>
                     <button type="button" title="Вставить таблицу" style={btn(inTable)}
                         onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}>▦ Таблица</button>
+                    <button type="button" title="Вставить формулу (LaTeX)" style={btn(false)}
+                        onClick={() => openFormula({ display: false })}>∑ Формула</button>
                 </div>
                 {inTable && (
                     <div className="rte-toolbar rte-toolbar--table">
@@ -312,6 +383,9 @@ function RichTextEditor({ value, onChange, placeholder, headingLevels = DEFAULT_
                 onChange={handleFilePick}
             />
             <EditorContent editor={editor} className="rte-content" data-placeholder={placeholder} />
+            {formula && (
+                <FormulaDialog initial={formula} onSubmit={submitFormula} onDelete={deleteFormula} onClose={closeFormula} />
+            )}
         </div>
     );
 }

@@ -1,0 +1,176 @@
+/* The lesson editor's formula dialog (FormulaDialog.jsx); same frame as the
+   question modal (Question.css). */
+
+.formula-dialog-open,
+.formula-dialog-open body {
+    overflow: hidden;
+}
+
+/* Above the sticky header and the editor's sticky toolbar. */
+.formula-dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-badge) + 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+}
+
+.formula-dialog__backdrop {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--color-scrim) 50%, transparent);
+}
+
+.formula-dialog {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(100%, 36rem);
+    max-height: calc(100dvh - 2 * var(--space-4));
+    border-radius: var(--radius-card);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    color: var(--color-ink);
+}
+
+.formula-dialog__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5) var(--space-3);
+    border-bottom: var(--border-width) solid var(--color-line);
+}
+
+.formula-dialog__title {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    line-height: var(--leading-tight);
+}
+
+.formula-dialog__close {
+    flex-shrink: 0;
+    padding: var(--space-2);
+}
+
+.formula-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-4) var(--space-5);
+}
+
+.formula-dialog__snippets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-bottom: var(--space-4);
+}
+
+.formula-dialog__snippet {
+    min-width: 2.25rem;
+    padding: var(--space-1) var(--space-2);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-soft);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+
+.formula-dialog__snippet:hover {
+    border-color: var(--color-muted);
+}
+
+.formula-dialog__label {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-weight: var(--weight-bold);
+}
+
+.formula-dialog__field {
+    resize: vertical;
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+}
+
+.formula-dialog__where {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-5);
+    margin: var(--space-3) 0;
+    padding: 0;
+    border: 0;
+}
+
+.formula-dialog__where label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+
+/* Live preview; a long formula scrolls sideways inside it. */
+.formula-dialog__preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 4.5rem;
+    padding: var(--space-3) var(--space-4);
+    overflow-x: auto;
+    border: var(--border-width) dashed var(--color-line);
+    border-radius: var(--radius-small);
+    font-size: var(--text-lg);
+}
+
+.formula-dialog__preview > div {
+    max-width: 100%;
+}
+
+.formula-dialog__preview .katex-display {
+    margin: 0;
+}
+
+.formula-dialog__placeholder {
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+.formula-dialog__error {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+}
+
+.formula-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5) var(--space-5);
+    border-top: var(--border-width) solid var(--color-line);
+}
+
+/* «Удалить формулу» on the left, away from «Сохранить». */
+.formula-dialog__delete {
+    margin-right: auto;
+}
+
+@media (max-width: 30rem) {
+    .formula-dialog-layer {
+        padding: var(--space-2);
+    }
+
+    .formula-dialog__actions {
+        flex-direction: column-reverse;
+    }
+
+    .formula-dialog__delete {
+        margin-right: 0;
+    }
+}

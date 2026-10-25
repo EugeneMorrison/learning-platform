@@ -360,6 +360,19 @@
     content: '\00a0';
 }
 
+/* LaTeX formulas (renderMath, lib/contentMath.js). One on a line of its own
+   is centred and scrolls sideways when it is wider than the column. */
+.text-content [data-type="block-math"] {
+    margin: var(--space-3) 0;
+    padding: var(--space-1) 0 var(--space-2); /* room for a scrollbar under limits */
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.text-content [data-type="block-math"] .katex-display {
+    margin: 0;
+}
+
 /* Inline code: .startswith() */
 .text-content code,
 .quiz-option code {

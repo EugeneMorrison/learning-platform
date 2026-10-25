@@ -3,6 +3,7 @@ import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from './pycharmDarcula';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages, wrapTables } from '../lib/contentImages';
+import { renderMath } from '../lib/contentMath';
 import './Question.css';
 
 // What a «Задать вопрос» message carries (Message.context, built on the server
@@ -27,7 +28,7 @@ function isHtml(text) {
 function AuthorHtml({ html }) {
     if (!html) return null;
     if (!isHtml(html)) return <p className="question-context__plain">{html}</p>;
-    return <div className="text-content" dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(highlightPreBlocks(html))) }} />;
+    return <div className="text-content" dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(highlightPreBlocks(html)))) }} />;
 }
 
 // Python code in the lesson editor's Darcula style, read-only.

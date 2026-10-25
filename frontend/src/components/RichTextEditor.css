@@ -214,6 +214,40 @@
     pointer-events: none;
 }
 
+/* Formulas (Tiptap mathematics, KaTeX): a click opens them for editing. */
+.rte-content .ProseMirror .tiptap-mathematics-render--editable {
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.rte-content .ProseMirror .tiptap-mathematics-render--editable:hover {
+    background: var(--color-soft);
+    outline: 1px solid var(--color-line);
+}
+
+.rte-content .ProseMirror [data-type="inline-math"] {
+    padding: 0 2px;
+}
+
+/* A formula on a line of its own: centred, scrolls sideways when too long. */
+.rte-content .ProseMirror [data-type="block-math"] {
+    margin: 0 0 10px 0;
+    padding: 4px 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.rte-content .ProseMirror [data-type="block-math"] .katex-display {
+    margin: 0;
+}
+
+.rte-content .ProseMirror .inline-math-error,
+.rte-content .ProseMirror .block-math-error {
+    color: var(--color-danger);
+    font-family: 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.9em;
+}
+
 /* Placeholder for empty editor */
 .rte-content .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);

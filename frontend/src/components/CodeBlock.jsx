@@ -3,6 +3,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from './pycharmDarcula';
 import { wrapImages, wrapTables } from '../lib/contentImages';
+import { renderMath } from '../lib/contentMath';
 import api from '../api';
 import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
@@ -158,7 +159,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
             {/* Task prompt */}
             <div
                 className="text-content lesson-block__prompt"
-                dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(content.prompt)) }}
+                dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(content.prompt))) }}
             />
 
             {/* Collapsible tests table, open on load. Line breaks in the data are

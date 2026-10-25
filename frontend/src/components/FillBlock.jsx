@@ -4,6 +4,7 @@ import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages, wrapTables } from '../lib/contentImages';
+import { renderMath } from '../lib/contentMath';
 import { parseTemplate } from '../lib/fillTemplate';
 
 /**
@@ -92,7 +93,7 @@ function FillBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
             {content.prompt && (
                 <div
                     className="text-content lesson-block__prompt"
-                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(highlightPreBlocks(content.prompt))) }}
+                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(highlightPreBlocks(content.prompt)))) }}
                 />
             )}
 

@@ -6,6 +6,7 @@ import { DiscussionBadge } from './DiscussionPanel';
 import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages, wrapTables } from '../lib/contentImages';
+import { renderMath } from '../lib/contentMath';
 
 hljs.registerLanguage('python', python);
 
@@ -113,7 +114,7 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
             {htmlQuestion ? (
                 <div
                     className="text-content lesson-block__prompt"
-                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(highlightPreBlocks(content.question))) }}
+                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(highlightPreBlocks(content.question)))) }}
                 />
             ) : (
                 <>
