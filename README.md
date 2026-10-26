@@ -202,7 +202,7 @@ There's an `iframe_test.html` in the repo root for trying this locally.
 
 You'll need [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-1. Clone, create `.env` from `.env.example` (set `SECRET_KEY` and `RUNNER_TOKEN`; Docker Compose refuses to start without `RUNNER_TOKEN`), and start:
+1. Clone, create `.env` from `.env.example` (set `SECRET_KEY` and `RUNNER_TOKEN`; Docker Compose refuses to start without `RUNNER_TOKEN`. With `DEBUG=False` also set the `EMAIL_*` variables, `DEFAULT_FROM_EMAIL` and `SITE_URL`, or Django refuses to start; check them with `python manage.py send_test_email you@example.ru`), and start:
 
 ```bash
 git clone https://github.com/EugeneMorrison/learning-platform.git
@@ -353,8 +353,10 @@ python manage.py import_lesson path/to/lesson.html --course-id <uuid> --order 1
 ### Auth
 
 ```
-POST   /api/auth/register/          Register new user
-POST   /api/auth/login/             Login, get JWT tokens
+POST   /api/auth/register/          Register new user (emails a confirmation link, no tokens)
+GET    /api/auth/confirm-email/     The emailed link: confirm, redirect to /login/
+POST   /api/auth/resend-confirmation/  Email a new confirmation link (3/hour)
+POST   /api/auth/login/             Login, get JWT tokens (403 until the email is confirmed)
 POST   /api/auth/token/refresh/     Refresh access token
 GET    /api/auth/me/                Current user info
 ```

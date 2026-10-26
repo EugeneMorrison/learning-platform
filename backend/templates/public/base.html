@@ -86,9 +86,14 @@
         <p class="site-footer__legal">{% translate "[Юридическое лицо, ИНН, ОГРН]" %}</p>
       </div>
       <ul class="site-footer__links">
-        {# Legal pages arrive in a later step; links are placeholders until then. #}
+        {# Legal pages (backend/views.py: LEGAL_PAGES). The offer and contacts arrive in a later #}
+        {# step; their links are placeholders until then.                                      #}
         <li><a href="#">{% translate "Публичная оферта" %}</a></li>
-        <li><a href="#">{% translate "Политика обработки персональных данных" %}</a></li>
+        {% with page=request.resolver_match.url_name %}
+          <li><a href="{% url 'terms' %}"{% if page == 'terms' %} aria-current="page"{% endif %}>{% translate "Пользовательское соглашение" %}</a></li>
+          <li><a href="{% url 'privacy' %}"{% if page == 'privacy' %} aria-current="page"{% endif %}>{% translate "Политика конфиденциальности" %}</a></li>
+          <li><a href="{% url 'consent' %}"{% if page == 'consent' %} aria-current="page"{% endif %}>{% translate "Согласие на обработку персональных данных" %}</a></li>
+        {% endwith %}
         <li><a href="#">{% translate "Контакты" %}</a></li>
       </ul>
     </div>

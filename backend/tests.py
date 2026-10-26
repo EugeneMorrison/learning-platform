@@ -1136,6 +1136,83 @@ class AboutPageTests(PublicPagesTestCase):
                 self.assertNotIn('https://stepik.org/users/1', html)
 
 
+class LegalPagesTests(PublicPagesTestCase):
+    """/terms/, /privacy/, /consent/ (backend/views.py: LEGAL_PAGES): the "Обо мне"
+    reading column, each text from its own template file, the edition from its
+    setting (the value stored at sign-up), and the footer links on every page."""
+
+    # url → (title, text template, edition setting, footer label)
+    PAGES = {
+        '/terms/': ('Пользовательское соглашение', 'public/includes/terms_text.html',
+                    'TERMS_VERSION', 'Пользовательское соглашение'),
+        '/privacy/': ('Политика конфиденциальности', 'public/includes/privacy_policy_text.html',
+                      'PRIVACY_POLICY_VERSION', 'Политика конфиденциальности'),
+        '/consent/': ('Согласие на обработку персональных данных', 'public/includes/consent_text.html',
+                      'PRIVACY_POLICY_VERSION', 'Согласие на обработку персональных данных'),
+    }
+    PLACEHOLDERS = {
+        '/terms/': 'Текст пользовательского соглашения готовится',
+        '/privacy/': 'Текст политики конфиденциальности готовится',
+        '/consent/': 'Текст согласия на обработку персональных данных готовится',
+    }
+
+    def get(self, url):
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200, url)
+        return response.content.decode()
+
+    def test_url_names(self):
+        # RegisterPage.jsx links to these paths.
+        self.assertEqual([reverse(name) for name in ('terms', 'privacy', 'consent')],
+                         ['/terms/', '/privacy/', '/consent/'])
+
+    def test_page_frame_and_placeholder_text(self):
+        for url, (title, _, _, _) in self.PAGES.items():
+            html = self.get(url)
+            with self.subTest(url=url):
+                self.assertIn(f'<title>{title} — УЧЁБУС</title>', html)
+                self.assertIn(f'<h1 id="legal-title" class="legal__title">{title}</h1>', html)
+                self.assertIn('public/css/about.css', html)
+                self.assertIn('public/css/legal.css', html)
+                body = html[html.index('<div class="about__body">'):html.index('</article>')]
+                self.assertIn(self.PLACEHOLDERS[url], body)
+                for other in self.PLACEHOLDERS.values():
+                    if other != self.PLACEHOLDERS[url]:
+                        self.assertNotIn(other, body)
+                self.assertNotIn('{% comment', html)  # the instructions stay in the template
+
+    def test_edition_is_the_settings_version(self):
+        with self.settings(TERMS_VERSION='2027-02', PRIVACY_POLICY_VERSION='2027-01'):
+            for url, (_, _, setting, _) in self.PAGES.items():
+                expected = {'TERMS_VERSION': '2027-02', 'PRIVACY_POLICY_VERSION': '2027-01'}[setting]
+                with self.subTest(url=url):
+                    self.assertIn(f'<p class="legal__version">Редакция {expected}</p>', self.get(url))
+
+    def test_text_comes_from_its_own_template(self):
+        from django.template.loader import get_template
+
+        for url, (_, template, _, _) in self.PAGES.items():
+            with self.subTest(url=url):
+                self.assertIn(get_template(template).render({}).strip(), self.get(url))
+
+    def test_footer_links_to_all_three_from_every_page(self):
+        course = self.make_course('Course')
+        for url in ['/', '/courses/', '/about/', *self.PAGES, f'/course/{course.slug}/']:
+            html = self.get(url)
+            footer = html[html.index('<footer class="site-footer">'):html.index('</footer>')]
+            with self.subTest(url=url):
+                for path, (_, _, _, label) in self.PAGES.items():
+                    self.assertRegex(footer, rf'<a href="{path}"[^>]*>{label}</a>')
+                self.assertNotIn('Политика обработки персональных данных', footer)
+                current = re.findall(r'<a href="([^"]+)" aria-current="page">', footer)
+                self.assertEqual(current, [url] if url in self.PAGES else [])
+
+    def test_has_the_theme_toggle(self):
+        for url in self.PAGES:
+            with self.subTest(url=url):
+                self.assertIn('id="theme-toggle"', self.get(url))
+
+
 class HeaderNavTests(PublicPagesTestCase):
     """The header nav (base.html): exactly Курсы · Отзывы · Обо мне, on every
     public page. "Отзывы" is a link only while published reviews
@@ -1486,7 +1563,7 @@ class ThemeTests(PublicPagesTestCase):
 
     def test_toggle_button_in_the_header_of_every_page(self):
         course = self.make_course('Course')
-        for url in ['/', '/courses/', '/about/', f'/course/{course.slug}/']:
+        for url in ['/', '/courses/', '/about/', '/terms/', '/privacy/', '/consent/', f'/course/{course.slug}/']:
             html = self.page(url)
             header = html[html.index('<header class="site-header">'):html.index('</header>')]
             with self.subTest(url=url):

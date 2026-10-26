@@ -8,6 +8,7 @@ The React app is served separately by spa_view / lesson_view in backend/urls.py.
 
 from datetime import timezone
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
@@ -119,6 +120,30 @@ def about_view(request):
     """"Обо мне" (/about/): the author hero (public/includes/hero.html) and the bio,
     both in the template (public/about.html)."""
     return render(request, 'public/about.html')
+
+
+# Legal pages, linked from the footer and the sign-up checkboxes:
+# url name → (title, the text's own template, the setting with its edition).
+# The editions are the values stored with each sign-up (see settings.TERMS_VERSION).
+LEGAL_PAGES = {
+    'terms': ('Пользовательское соглашение', 'public/includes/terms_text.html', 'TERMS_VERSION'),
+    'privacy': ('Политика конфиденциальности', 'public/includes/privacy_policy_text.html',
+                'PRIVACY_POLICY_VERSION'),
+    'consent': ('Согласие на обработку персональных данных', 'public/includes/consent_text.html',
+                'PRIVACY_POLICY_VERSION'),
+}
+
+
+def legal_page_view(request, page):
+    """/terms/, /privacy/, /consent/: one frame (public/legal_page.html), each
+    text in its own template under public/includes/ (replace it with the final
+    text and change the edition setting in backend/settings.py)."""
+    title, text_template, version_setting = LEGAL_PAGES[page]
+    return render(request, 'public/legal_page.html', {
+        'title': title,
+        'text_template': text_template,
+        'version': getattr(settings, version_setting),
+    })
 
 
 def favicon_view(request):

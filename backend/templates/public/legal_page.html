@@ -1,0 +1,28 @@
+{% extends "public/base.html" %}
+{% load i18n static public_site %}
+
+{% block title %}{{ title }} — {% brand_name %}{% endblock %}
+{% block meta_description %}{{ title }}.{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'public/css/about.css' %}">
+  <link rel="stylesheet" href="{% static 'public/css/legal.css' %}">
+{% endblock %}
+
+{# /terms/, /privacy/, /consent/ (backend/views.py: LEGAL_PAGES). The same reading  #}
+{# column as "Обо мне" (about.css), with a plain title instead of the author header. #}
+{# Each text is its own file (text_template), replaced without touching this frame.  #}
+{% block content %}
+  <article class="about legal" aria-labelledby="legal-title">
+    <div class="container about__inner">
+      <header class="legal__header">
+        <h1 id="legal-title" class="legal__title">{{ title }}</h1>
+        {# The edition setting: the value each sign-up stores with its acceptance. #}
+        <p class="legal__version">{% translate "Редакция" %} {{ version }}</p>
+      </header>
+      <div class="about__body">
+        {% include text_template %}
+      </div>
+    </div>
+  </article>
+{% endblock %}

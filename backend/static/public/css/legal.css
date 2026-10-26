@@ -1,0 +1,24 @@
+/*
+ * Legal pages (/terms/, /privacy/, /consent/): the reading column of the "Обо мне"
+ * page (about.css), with a plain title instead of the author header. Uses only
+ * the variables from tokens.css, so it follows the light / dark theme.
+ */
+
+/* about.css leaves the top to the author header; here the title starts the page. */
+.legal {
+  padding-top: var(--space-7);
+}
+
+.legal__header {
+  margin-bottom: var(--space-6);
+}
+
+.legal__title {
+  margin-bottom: var(--space-2);
+}
+
+.legal__version {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: var(--text-base);
+}

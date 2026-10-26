@@ -202,7 +202,7 @@ Django отдаёт каждый урок по адресу `/lesson/<uuid>/`. R
 
 Понадобится [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-1. Клонировать, создать `.env` из `.env.example` (задать `SECRET_KEY` и `RUNNER_TOKEN`; без `RUNNER_TOKEN` Docker Compose не запустится) и запустить:
+1. Клонировать, создать `.env` из `.env.example` (задать `SECRET_KEY` и `RUNNER_TOKEN`; без `RUNNER_TOKEN` Docker Compose не запустится. При `DEBUG=False` нужны ещё переменные `EMAIL_*`, `DEFAULT_FROM_EMAIL` и `SITE_URL`, иначе Django не запустится; проверка: `python manage.py send_test_email you@example.ru`) и запустить:
 
 ```bash
 git clone https://github.com/EugeneMorrison/learning-platform.git
@@ -353,8 +353,10 @@ python manage.py import_lesson path/to/lesson.html --course-id <uuid> --order 1
 ### Авторизация
 
 ```
-POST   /api/auth/register/          Регистрация нового пользователя
-POST   /api/auth/login/             Вход, получение JWT-токенов
+POST   /api/auth/register/          Регистрация (письмо со ссылкой подтверждения, без токенов)
+GET    /api/auth/confirm-email/     Ссылка из письма: подтверждение, переход на /login/
+POST   /api/auth/resend-confirmation/  Новое письмо со ссылкой (3 в час)
+POST   /api/auth/login/             Вход, получение JWT-токенов (403, пока почта не подтверждена)
 POST   /api/auth/token/refresh/     Обновление access-токена
 GET    /api/auth/me/                Информация о текущем пользователе
 ```

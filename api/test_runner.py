@@ -401,12 +401,19 @@ class HiddenCodeEndToEndTests(LiveRunnerMixin, APITestCase):
         self.assertEqual((response.data['stdout'], response.data['stderr']), ('3\n', ''))
 
 
+# Everything the server needs with DEBUG off besides SECRET_KEY (no real SMTP
+# server is contacted: these tests only start Django). The email startup
+# checks themselves are in api/test_email_settings.py.
+EMAIL_ENV = dict(EMAIL_HOST='smtp.example.com', EMAIL_PORT='465', EMAIL_USE_SSL='True',
+                 DEFAULT_FROM_EMAIL='noreply@example.com', SITE_URL='https://example.com')
+
+
 class SecretKeyStartupTests(SimpleTestCase):
     """Without DEBUG the server refuses to start unless SECRET_KEY is set."""
 
     def start(self, **env):
         clean = {k: v for k, v in os.environ.items() if k not in ('SECRET_KEY', 'DEBUG')}
-        clean.update(env, DJANGO_SETTINGS_MODULE='backend.settings')
+        clean.update(EMAIL_ENV, **env, DJANGO_SETTINGS_MODULE='backend.settings')
         return subprocess.run(
             [sys.executable, '-c', 'import django; django.setup(); print("started")'],
             cwd=settings.BASE_DIR, env=clean, capture_output=True, text=True, timeout=60)

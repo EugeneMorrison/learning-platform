@@ -80,11 +80,15 @@ def _env_flag(name, default='False'):
     return os.environ.get(name, default).lower() in ('true', '1', 'yes')
 
 
-# Email. SMTP settings come only from the environment (.env on the server, never
-# git). Without EMAIL_HOST every email is printed to the console instead, links
-# included (local development). Check a setup with
-# `python manage.py send_test_email <address>`. EMAIL_PORT must fit
-# EMAIL_USE_TLS / EMAIL_USE_SSL (465: SSL, 587: TLS): see backend/email_config.py.
+# Email (sign-up confirmation links). SMTP settings come only from the
+# environment (.env on the server, never git). Without EMAIL_HOST every email is
+# printed to the console instead, links included (local development). Check a
+# setup with `python manage.py send_test_email <address>`. Without DEBUG the
+# server refuses to start unless EMAIL_HOST, DEFAULT_FROM_EMAIL and SITE_URL are
+# set and EMAIL_PORT fits EMAIL_USE_TLS / EMAIL_USE_SSL (465: SSL, 587: TLS; see
+# backend/email_config.py), like SECRET_KEY above. With DEBUG on, a port
+# mismatch is only a system check warning (api/checks.py).
+_RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == 'test'
 EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
 if EMAIL_HOST:
     EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -99,9 +103,39 @@ else:
     EMAIL_BACKEND = 'api.mail_backends.ReadableConsoleEmailBackend'
 # Sender; with Yandex / Mail.ru it must be the EMAIL_HOST_USER address
 # (a display name in front is fine: УЧЁБУС <noreply@uchebus.ru>).
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', '') or 'webmaster@localhost'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', '')
 # Base of the links in emails, e.g. https://uchebus.ru (no trailing slash).
-SITE_URL = os.environ.get('SITE_URL', '').rstrip('/') or 'http://127.0.0.1:8000'
+SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
+if not DEBUG and not _RUNNING_TESTS:
+    from backend.email_config import smtp_port_problem
+    _missing_email_settings = [
+        name for name, value in [('EMAIL_HOST', EMAIL_HOST), ('DEFAULT_FROM_EMAIL', DEFAULT_FROM_EMAIL),
+                                 ('SITE_URL', SITE_URL)] if not value
+    ]
+    _email_problems = [f"{', '.join(_missing_email_settings)} not set."] if _missing_email_settings else []
+    if EMAIL_HOST and smtp_port_problem(EMAIL_PORT, EMAIL_USE_TLS, EMAIL_USE_SSL):
+        _email_problems.append(smtp_port_problem(EMAIL_PORT, EMAIL_USE_TLS, EMAIL_USE_SSL))
+    if _email_problems:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
+            ' '.join(_email_problems) + ' Fix the email settings in the environment or .env '
+            '(see .env.example); the server does not start without them when DEBUG is off.'
+        )
+DEFAULT_FROM_EMAIL = DEFAULT_FROM_EMAIL or 'webmaster@localhost'
+SITE_URL = SITE_URL or 'http://127.0.0.1:8000'
+
+# A sign-up confirmation link is valid this long (and only until it is used).
+EMAIL_CONFIRMATION_MAX_AGE = 24 * 60 * 60  # seconds
+# Editions of the legal texts (public pages /consent/, /privacy/, /terms/). At
+# sign-up two separate checkboxes are stored on the user, each with its time:
+# the consent to personal data processing (152-FZ art. 9: formalised separately
+# from other documents) → accepted_privacy_at + privacy_version, and the user
+# agreement with the privacy policy → accepted_terms_at + terms_version.
+# PRIVACY_POLICY_VERSION covers the consent text and the privacy policy (the
+# consent refers to the policy); change it when either text changes.
+PRIVACY_POLICY_VERSION = '2026-10'
+# The user agreement (/terms/); change it when its text changes.
+TERMS_VERSION = '2026-10'
 
 # Application definition
 
@@ -268,6 +302,12 @@ REST_FRAMEWORK = {
     # Counters live in the default cache (no CACHES setting → per-process LocMemCache).
     'DEFAULT_THROTTLE_RATES': {
         'code_run': '30/min',  # /api/run-code/ and /api/run-tests/ together
+        # Sign-up sends an email, so it is limited per IP too; generous, since a
+        # whole class often signs up from one school network (one address).
+        'register': '30/hour',
+        # POST /api/auth/resend-confirmation/: per client IP and per address.
+        'resend_confirmation': '3/hour',
+        'resend_confirmation_email': '3/hour',
     },
 }
 
@@ -296,6 +336,9 @@ LOGGING = {
         'api': {'handlers': ['stderr'], 'level': 'INFO', 'propagate': False},
     },
 }
+if _RUNNING_TESTS:
+    # Quiet test output (every sign-up test sends an email); assertLogs still sees all.
+    LOGGING['loggers']['api']['level'] = 'WARNING'
 
 # Custom user model
 AUTH_USER_MODEL = 'api.User'

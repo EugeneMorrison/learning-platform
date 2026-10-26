@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="ru">
+<body style="margin:0;padding:24px;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#111;">
+  <p style="margin:0 0 24px;font-size:20px;font-weight:bold;color:#2340D6;">{{ brand }}</p>
+  <p>Здравствуйте, {{ username }}!</p>
+  <p>Чтобы завершить регистрацию на {{ brand }}, подтвердите адрес почты:</p>
+  <p><a href="{{ link }}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#2340D6;color:#fff;text-decoration:none;">Подтвердить адрес почты</a></p>
+  <p style="color:#4B5165;">Если кнопка не работает, скопируйте ссылку в адресную строку браузера:<br><a href="{{ link }}" style="color:#2340D6;word-break:break-all;">{{ link }}</a></p>
+  <p style="color:#4B5165;">Ссылка действует 24 часа и только один раз.</p>
+  <p style="color:#4B5165;">Если вы не регистрировались на {{ brand }}, просто проигнорируйте это письмо.</p>
+  <p style="color:#4B5165;"><a href="{{ site_url }}" style="color:#2340D6;">{{ brand }}</a></p>
+</body>
+</html>

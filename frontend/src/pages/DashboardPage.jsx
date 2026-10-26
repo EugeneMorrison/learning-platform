@@ -13,7 +13,7 @@ function DashboardPage() {
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
     const location = useLocation();
-    // Set by RegisterPage after a successful sign-up; shown once.
+    // Set by LoginPage on the first login after the emailed confirmation link; shown once.
     const [justRegistered] = useState(() => Boolean(location.state?.justRegistered));
 
     // Clear that state from the history entry so a refresh (or Back to this

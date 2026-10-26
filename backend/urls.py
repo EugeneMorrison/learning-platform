@@ -7,6 +7,7 @@ Includes:
   is a React route and still goes to the SPA catch-all)
 - Course page: /course/<slug>/ (Django)
 - About me ("Обо мне"): /about/ (Django)
+- Legal pages: /terms/, /privacy/, /consent/ (Django; the sign-up checkboxes link here)
 - Old English URLs: /en/<path> → 301 to /<path>, query string kept
 - Admin panel: /admin/
 - API endpoints: /api/
@@ -23,7 +24,7 @@ from django.views.static import serve
 from django.conf import settings
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from .views import about_view, course_detail_view, courses_view, favicon_view, landing_view
+from .views import about_view, course_detail_view, courses_view, favicon_view, landing_view, legal_page_view
 
 
 @xframe_options_exempt
@@ -89,6 +90,9 @@ urlpatterns += [
     path('courses/', courses_view, name='courses'),
     path('course/<slug:slug>/', course_detail_view, name='course_detail'),
     path('about/', about_view, name='about'),
+    path('terms/', legal_page_view, {'page': 'terms'}, name='terms'),
+    path('privacy/', legal_page_view, {'page': 'privacy'}, name='privacy'),
+    path('consent/', legal_page_view, {'page': 'consent'}, name='consent'),
 ]
 
 urlpatterns += [

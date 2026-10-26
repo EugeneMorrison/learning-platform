@@ -1,8 +1,9 @@
 """
 SMTP port vs. encryption: 465 is SSL from the first byte (EMAIL_USE_SSL), 587
 upgrades a plain connection with STARTTLS (EMAIL_USE_TLS). The wrong pair hangs
-or fails at connect time, so it is reported before any email is sent: for now
-as a system check warning (api/checks.py).
+or fails at connect time, so it is reported before any email is sent: without
+DEBUG the server refuses to start (backend/settings.py), with DEBUG on it is a
+system check warning (api/checks.py).
 """
 
 # Port -> the (EMAIL_USE_TLS, EMAIL_USE_SSL) pair it needs.

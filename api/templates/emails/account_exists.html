@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ru">
+<body style="margin:0;padding:24px;font-family:Arial,sans-serif;font-size:16px;line-height:1.5;color:#111;">
+  <p style="margin:0 0 24px;font-size:20px;font-weight:bold;color:#2340D6;">{{ brand }}</p>
+  <p>Здравствуйте, {{ username }}!</p>
+  <p>Кто-то пытался зарегистрироваться на {{ brand }} с этим адресом почты. Аккаунт с этим адресом у вас уже есть, новый не создан.</p>
+  <p>Если это были вы, просто войдите:</p>
+  <p><a href="{{ login_link }}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:#2340D6;color:#fff;text-decoration:none;">Войти</a></p>
+  <p style="color:#4B5165;">Если это были не вы, ничего делать не нужно.</p>
+  <p style="color:#4B5165;"><a href="{{ site_url }}" style="color:#2340D6;">{{ brand }}</a></p>
+</body>
+</html>
