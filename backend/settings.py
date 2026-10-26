@@ -75,6 +75,34 @@ ALLOWED_HOSTS = ['185.186.140.57', 'localhost', '127.0.0.1'] + [
 CSRF_TRUSTED_ORIGINS = ['https://uchebus.ru', 'https://www.uchebus.ru']
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+
+def _env_flag(name, default='False'):
+    return os.environ.get(name, default).lower() in ('true', '1', 'yes')
+
+
+# Email. SMTP settings come only from the environment (.env on the server, never
+# git). Without EMAIL_HOST every email is printed to the console instead, links
+# included (local development). Check a setup with
+# `python manage.py send_test_email <address>`. EMAIL_PORT must fit
+# EMAIL_USE_TLS / EMAIL_USE_SSL (465: SSL, 587: TLS): see backend/email_config.py.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+if EMAIL_HOST:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT') or 465)  # empty in .env → 465
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+    EMAIL_USE_TLS = _env_flag('EMAIL_USE_TLS')
+    EMAIL_USE_SSL = _env_flag('EMAIL_USE_SSL')
+    EMAIL_TIMEOUT = 15  # seconds; a stuck SMTP server must not hang a request
+else:
+    # Django's console backend, but with the text readable (links copyable).
+    EMAIL_BACKEND = 'api.mail_backends.ReadableConsoleEmailBackend'
+# Sender; with Yandex / Mail.ru it must be the EMAIL_HOST_USER address
+# (a display name in front is fine: УЧЁБУС <noreply@uchebus.ru>).
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', '') or 'webmaster@localhost'
+# Base of the links in emails, e.g. https://uchebus.ru (no trailing slash).
+SITE_URL = os.environ.get('SITE_URL', '').rstrip('/') or 'http://127.0.0.1:8000'
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -232,6 +260,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
+    # Throttles tell anonymous clients apart by IP. 0: REMOTE_ADDR (local runserver,
+    # no proxy). Behind nginx set DRF_NUM_PROXIES=1, else every visitor has nginx's
+    # address; then the address nginx appended to X-Forwarded-For counts.
+    'NUM_PROXIES': int(os.environ.get('DRF_NUM_PROXIES') or 0),
     # Per-user limits for views that set throttle_scope (ScopedRateThrottle).
     # Counters live in the default cache (no CACHES setting → per-process LocMemCache).
     'DEFAULT_THROTTLE_RATES': {
@@ -247,6 +279,23 @@ REST_FRAMEWORK = {
 RUNNER_URL = os.environ.get('RUNNER_URL', '')
 RUNNER_TOKEN = os.environ.get('RUNNER_TOKEN', '')
 RUNNER_TIMEOUT = float(os.environ.get('RUNNER_TIMEOUT') or 30)
+
+# Our own loggers (api.*) write INFO and above to stderr, tracebacks included
+# (logger.exception), so they show in `docker compose logs web`. Django's own
+# logging is left as it is.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'plain': {'format': '{asctime} {levelname} {name}: {message}', 'style': '{'},
+    },
+    'handlers': {
+        'stderr': {'class': 'logging.StreamHandler', 'stream': 'ext://sys.stderr', 'formatter': 'plain'},
+    },
+    'loggers': {
+        'api': {'handlers': ['stderr'], 'level': 'INFO', 'propagate': False},
+    },
+}
 
 # Custom user model
 AUTH_USER_MODEL = 'api.User'
