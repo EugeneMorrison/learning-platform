@@ -4,12 +4,75 @@ import api from '../api';
 import ChatPanel from '../components/ChatPanel';
 import CourseCoverEditor from '../components/CourseCoverEditor';
 import EditableTitle from '../components/EditableTitle';
+import { TaskProgress } from '../components/LessonProgress';
 import StudentChat from '../components/StudentChat';
 import { MAX_MESSAGE_LENGTH, mergeMessages, messageLength, useChatSocket } from '../lib/chatSocket';
 import { COURSE_LEVELS, NO_LEVEL_LABEL } from '../lib/courseLevels';
+import { plural } from '../lib/plural';
 import { badgeText, useActiveChat, useNotifications } from '../lib/notifications';
 import '../components/Notifications.css';
 import './CoursePage.css';
+
+// Small pie-like ring for a lesson row: the arc is the solved share.
+function ProgressRing({ percent }) {
+    return (
+        <svg className="progress-ring" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+            <circle className="progress-ring__track" cx="10" cy="10" r="8" />
+            {/* At 0% no arc: the round cap would still draw a dot. */}
+            {percent > 0 && (
+                <circle
+                    className="progress-ring__arc"
+                    cx="10"
+                    cy="10"
+                    r="8"
+                    pathLength="100"
+                    strokeDasharray={`${percent} 100`}
+                />
+            )}
+        </svg>
+    );
+}
+
+/**
+ * A lesson row's progress, at its right: ring + "3 / 5" (the viewer's own
+ * solving), green with ✓ when all solved. The author (passed_students set)
+ * also sees how many of studentCount enrolled students passed the lesson.
+ * A lesson without tasks shows nothing.
+ */
+function LessonRowProgress({ item, studentCount }) {
+    if (!item || item.task_count === 0) return null;
+    const { solved_count: solved, task_count: total, passed_students: passed } = item;
+    const isAuthor = passed !== null && passed !== undefined;
+    const complete = solved === total;
+    const own = isAuthor ? 'Вы решили' : 'Решено';
+    return (
+        <span className="lesson-row__stats">
+            {isAuthor && studentCount > 0 && (
+                <span
+                    className={passed === studentCount
+                        ? 'lesson-row__progress lesson-row__progress--complete'
+                        : 'lesson-row__progress'}
+                    title="Студентов, решивших все задачи урока"
+                >
+                    Прошли {passed} из {studentCount}
+                    <span className="visually-hidden"> студентов</span>
+                </span>
+            )}
+            <span
+                className={complete ? 'lesson-row__progress lesson-row__progress--complete' : 'lesson-row__progress'}
+                title={isAuthor ? 'Ваше прохождение' : undefined}
+            >
+                {complete
+                    ? <span className="lesson-row__check" aria-hidden="true">✓</span>
+                    : <ProgressRing percent={Math.round((solved / total) * 100)} />}
+                <span aria-hidden="true">{solved} / {total}</span>
+                <span className="visually-hidden">
+                    {complete ? `Урок пройден: ${own.toLowerCase()} ${solved} из ${total} задач` : `${own} ${solved} из ${total} задач`}
+                </span>
+            </span>
+        </span>
+    );
+}
 
 function CoursePage() {
     const { courseId } = useParams();
@@ -17,6 +80,9 @@ function CoursePage() {
 
     const [course, setCourse] = useState(null);
     const [lessons, setLessons] = useState([]);
+    // Lesson id → {task_count, solved_count} from /lessons/outline/ (solved_count
+    // null for the author). Empty when it can't be loaded: no progress shown.
+    const [outline, setOutline] = useState({});
     const [enrollments, setEnrollments] = useState([]);
     // A student enrolled in this course (not the owner): the floating chat with the author.
     const [isEnrolled, setIsEnrolled] = useState(false);
@@ -64,12 +130,18 @@ function CoursePage() {
                 const userRes = await api.get('/auth/me/');
                 setUser(userRes.data);
 
-                const [courseRes, lessonsRes] = await Promise.all([
+                const [courseRes, lessonsRes, outlineRes] = await Promise.all([
                     api.get(`/courses/${courseId}/`),
                     api.get(`/lessons/?course=${courseId}`),
+                    // Progress is extra: the page still opens without it.
+                    api.get('/lessons/outline/', { params: { course: courseId } }).catch(err => {
+                        console.error('Failed to load course progress:', err);
+                        return { data: [] };
+                    }),
                 ]);
                 setCourse(courseRes.data);
                 setLessons(lessonsRes.data);
+                setOutline(Object.fromEntries(outlineRes.data.map(item => [item.id, item])));
 
                 // Only the course's own author manages its students.
                 if (courseRes.data.author === userRes.data.id) {
@@ -316,6 +388,17 @@ function CoursePage() {
     // another author included, sees the course like a reader.
     const isOwner = Boolean(user && course.author === user.id);
 
+    // Course totals, over the lessons on the page (so they follow add / delete).
+    const lessonsWithTasks = lessons.map(l => outline[l.id]).filter(item => item && item.task_count > 0);
+    const totalTasks = lessonsWithTasks.reduce((sum, item) => sum + item.task_count, 0);
+    const showStudentProgress = !isOwner && lessonsWithTasks.some(item => item.solved_count !== null);
+    const solvedTasks = lessonsWithTasks.reduce((sum, item) => sum + (item.solved_count || 0), 0);
+    const passedLessons = lessonsWithTasks.filter(item => item.solved_count === item.task_count).length;
+    // Author: enrolled students (as the server counts them: not the author) and
+    // their correct tasks, summed, for "в среднем N%".
+    const studentCount = enrollments.filter(e => e.student !== user?.id).length;
+    const studentsSolved = lessonsWithTasks.reduce((sum, item) => sum + (item.students_solved || 0), 0);
+
     return (
         <div className="page">
 
@@ -367,6 +450,43 @@ function CoursePage() {
                     )}
                     {course.description && <p className="page__lead">{course.description}</p>}
                 </div>
+                {/* Its own line of the header, so the bar has a width on any screen. */}
+                {showStudentProgress && (
+                    <div className="course-progress">
+                        <TaskProgress solved={solvedTasks} total={totalTasks} completeText="✓ Курс пройден" />
+                        <p className="course-progress__lessons">
+                            Пройдено уроков: {passedLessons} из {lessonsWithTasks.length}
+                        </p>
+                    </div>
+                )}
+                {/* Author: the course in numbers, the students' average, then their own solving. */}
+                {isOwner && lessons.length > 0 && (
+                    <div className="course-progress">
+                        <p className="course-progress__lessons">
+                            {plural(lessons.length, 'урок', 'урока', 'уроков')}
+                            {' · '}
+                            {plural(totalTasks, 'задача', 'задачи', 'задач')}
+                            {' · '}
+                            {plural(studentCount, 'студент', 'студента', 'студентов')}
+                        </p>
+                        {studentCount > 0 && (
+                            <TaskProgress
+                                solved={studentsSolved}
+                                total={totalTasks * studentCount}
+                                label="Студенты в среднем решили"
+                                ariaLabel="Студенты в среднем решили"
+                                completeText="✓ Все прошли курс"
+                            />
+                        )}
+                        {totalTasks > 0 && (
+                            <p className="course-progress__lessons">
+                                Вы решили {solvedTasks} из {totalTasks} задач
+                                {' · '}
+                                пройдено уроков: {passedLessons} из {lessonsWithTasks.length}
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className={isOwner ? 'course-layout course-layout--with-aside' : 'course-layout'}>
@@ -422,6 +542,7 @@ function CoursePage() {
                                 />
                                 <p className="lesson-row__hint">→ Открыть урок</p>
                             </div>
+                            <LessonRowProgress item={outline[lesson.id]} studentCount={studentCount} />
                             {isOwner && (
                                 <div className="lesson-row__actions">
                                     <button

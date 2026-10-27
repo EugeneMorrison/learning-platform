@@ -110,3 +110,75 @@
 .course-level__status--error {
     color: var(--color-danger);
 }
+
+/* Course progress under the title: the student's bar over all tasks
+   (TaskProgress) + passed lessons; the author's lesson / task count. */
+.course-progress {
+    flex: 1 0 100%;
+    max-width: 32rem;
+}
+
+.course-progress__lessons {
+    margin: var(--space-2) 0 0;
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+}
+
+/* Author: the students' bar below the numbers line. */
+.course-progress__lessons + .lesson-progress {
+    margin-top: var(--space-3);
+}
+
+/* A lesson row's progress at its right: the author's "Прошли 4 из 7", then
+   ring + "3 / 5". */
+.lesson-row__stats {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+}
+
+.lesson-row__progress {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-muted);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* All tasks solved: green, as the lesson header's bar. */
+.lesson-row__progress--complete {
+    color: var(--color-success-on-light);
+    font-weight: var(--weight-bold);
+}
+
+.lesson-row__check {
+    display: inline-grid;
+    place-items: center;
+    width: var(--space-5);
+    height: var(--space-5);
+}
+
+.progress-ring {
+    width: var(--space-5);
+    height: var(--space-5);
+    transform: rotate(-90deg); /* the arc starts at the top */
+}
+
+.progress-ring__track,
+.progress-ring__arc {
+    fill: none;
+    stroke-width: 3;
+}
+
+.progress-ring__track {
+    stroke: var(--color-line);
+}
+
+.progress-ring__arc {
+    stroke: var(--color-accent);
+    stroke-linecap: round;
+}

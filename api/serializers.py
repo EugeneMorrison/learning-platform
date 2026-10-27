@@ -394,6 +394,8 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.username', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
     course_cover = serializers.SerializerMethodField()
+    task_count = serializers.SerializerMethodField()
+    solved_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Enrollment
@@ -404,9 +406,19 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             'course',
             'course_title',  # Extra: course title
             'course_cover',  # Extra: absolute cover URL, or null (dashboard cards)
-            'enrolled_at'
+            'enrolled_at',
+            'task_count',    # Extra: tasks in the course (dashboard progress), or null
+            'solved_count',  # Extra: of them solved by this student, or null
         ]
         read_only_fields = ['id', 'enrolled_at', 'student']
+
+    # Annotated only by the student's own list (EnrollmentListCreateView);
+    # elsewhere (author's student list, POST response) they are null.
+    def get_task_count(self, obj):
+        return getattr(obj, 'task_count', None)
+
+    def get_solved_count(self, obj):
+        return getattr(obj, 'solved_count', None)
 
     def get_course_cover(self, obj):
         """The course's cover as an absolute URL (like CourseSerializer.cover), or None."""

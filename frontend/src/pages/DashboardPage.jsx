@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
 import { COURSE_LEVELS, NO_LEVEL_LABEL } from '../lib/courseLevels';
+import { plural } from '../lib/plural';
 import { badgeText, conversationLink, formatMessageTime, useNotifications } from '../lib/notifications';
 import CourseCover from '../components/CourseCover';
 import DiscussionReports from '../components/DiscussionReports';
+import { TaskProgress } from '../components/LessonProgress';
 import '../components/Notifications.css';
 import './DashboardPage.css';
 
@@ -110,6 +112,16 @@ function StudentDashboard({ user }) {
                             <p className="dash-card__meta">
                                 Записан: {new Date(enrollment.enrolled_at).toLocaleDateString('ru-RU')}
                             </p>
+                            {/* Course progress, as on the course page; nothing for a course without tasks. */}
+                            {enrollment.task_count > 0 && (
+                                <div className="dash-card__progress">
+                                    <TaskProgress
+                                        solved={enrollment.solved_count}
+                                        total={enrollment.task_count}
+                                        completeText="✓ Курс пройден"
+                                    />
+                                </div>
+                            )}
                             <div className="dash-card__actions">
                                 <button
                                     className="btn btn-secondary btn-sm"
@@ -280,6 +292,25 @@ function AuthorDashboard() {
                                 </Link>
                             </h3>
                             <p className="dash-card__desc">{course.description}</p>
+                            {/* Students' average, then the author's own solving; nothing without tasks. */}
+                            {course.task_count > 0 && (
+                                <div className="dash-card__progress">
+                                    {course.student_count > 0 ? (
+                                        <TaskProgress
+                                            solved={course.students_solved}
+                                            total={course.task_count * course.student_count}
+                                            label={`${plural(course.student_count, 'студент', 'студента', 'студентов')} · в среднем`}
+                                            ariaLabel="Студенты в среднем решили"
+                                            completeText="✓ Все прошли курс"
+                                        />
+                                    ) : (
+                                        <p className="dash-card__meta">Студентов пока нет</p>
+                                    )}
+                                    <p className="dash-card__meta dash-card__own">
+                                        Вы решили {course.solved_count} из {course.task_count} задач
+                                    </p>
+                                </div>
+                            )}
                             <div className="dash-card__actions">
                                 <span className="pill">Уроков: {course.lesson_count}</span>
                             </div>

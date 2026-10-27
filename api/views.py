@@ -22,6 +22,8 @@ from django.http import Http404
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import models, transaction
+from django.db.models.functions import Coalesce
+from collections import Counter
 from datetime import datetime
 import subprocess
 import copy
@@ -99,6 +101,12 @@ def get_accessible_block(user, block_id, missing_message, forbidden_message):
     if not Block.objects.visible_to(user).filter(pk=block.pk).exists():
         raise PermissionDenied(forbidden_message)
     return block
+
+
+def count_subquery(queryset, group_by):
+    """COUNT(*) of a correlated subquery (grouped on a field it's already filtered to one value of), 0 if empty."""
+    counted = queryset.order_by().values(group_by).annotate(n=models.Count('pk')).values('n')[:1]
+    return Coalesce(models.Subquery(counted), 0)
 
 
 def record_answer(user, block, answer, is_correct):
@@ -426,10 +434,30 @@ class CourseViewSet(viewsets.ModelViewSet):
         - Easy "My Courses" dashboard for authors
         - No need to filter on frontend
         - Shows unpublished courses too
+
+        Each course also carries progress (dashboard cards), by the course
+        page's rule (QUIZ/CODE/FILL tasks, solved = is_correct): task_count,
+        solved_count (the author's own), student_count (enrolled) and
+        students_solved (their correct tasks, summed). Subqueries, one query.
         """
-        courses = Course.objects.filter(author=request.user)
+        course = models.OuterRef('pk')
+        tasks = Block.objects.filter(lesson__course=course, type__in=TASK_TYPES)
+        solved = Progress.objects.filter(is_correct=True, block__lesson__course=course, block__type__in=TASK_TYPES)
+        courses = list(Course.objects.filter(author=request.user).annotate(
+            task_count=count_subquery(tasks, 'lesson__course'),
+            solved_count=count_subquery(solved.filter(student=request.user), 'student'),
+            student_count=count_subquery(
+                Enrollment.objects.filter(course=course).exclude(student=request.user), 'course'),
+            students_solved=count_subquery(
+                solved.filter(student__enrollments__course=course).exclude(student=request.user),
+                'block__lesson__course'),
+        ))
         serializer = self.get_serializer(courses, many=True)
-        return Response(serializer.data)
+        stats = ('task_count', 'solved_count', 'student_count', 'students_solved')
+        return Response([
+            {**row, **{name: getattr(c, name) for name in stats}}
+            for row, c in zip(serializer.data, courses)
+        ])
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsOwnerOrReadOnly])
     def publish(self, request, pk=None):
@@ -619,11 +647,15 @@ class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
         GET /api/lessons/outline/?course=<id>  (lesson viewer's lessons panel)
 
         Every lesson of the course in order, with the REQUESTING user's progress:
-        [{id, title, position, task_count, solved_count}]. Same rule as the
-        viewer's "Решено X из Y задач": tasks are QUIZ/CODE/FILL blocks, solved
-        means is_correct. solved_count is null for the course author. Only the
-        course author and enrolled students get it (others: 404). The counts come
-        from one query, whatever the number of lessons.
+        [{id, title, position, task_count, solved_count, passed_students,
+        students_solved}]. Same rule as the viewer's "Решено X из Y задач":
+        tasks are QUIZ/CODE/FILL blocks, solved means is_correct. The course
+        author's solved_count is their own (trying out their tasks), and they also
+        get the enrolled students': passed_students (solved every task of the
+        lesson) and students_solved (their correct tasks, summed); null for
+        anyone else. Only the course author and enrolled students get it
+        (others: 404). One query for the counts, one more for the author's
+        student stats, whatever the number of lessons.
         """
         try:
             course_id = uuid.UUID(str(request.query_params.get('course', '')))
@@ -639,13 +671,34 @@ class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
             solved_count=models.Count('blocks__progress', distinct=True, filter=tasks & models.Q(
                 blocks__progress__student=request.user, blocks__progress__is_correct=True)),
         ).in_bulk()
+
+        passed_students = students_solved = None
+        if is_author:
+            passed_students, students_solved = Counter(), Counter()
+            per_student = (
+                Progress.objects.filter(
+                    block__lesson__course=course, block__type__in=TASK_TYPES, is_correct=True,
+                    student__enrollments__course=course,
+                ).exclude(student=request.user)
+                .values('block__lesson', 'student').annotate(n=models.Count('pk', distinct=True))
+            )
+            for row in per_student:
+                lesson = lessons.get(row['block__lesson'])
+                if lesson is None:
+                    continue
+                students_solved[lesson.pk] += row['n']
+                if row['n'] == lesson.task_count:
+                    passed_students[lesson.pk] += 1
+
         return Response([
             {
                 'id': lesson_id,
                 'title': lessons[lesson_id].title,
                 'position': position,
                 'task_count': lessons[lesson_id].task_count,
-                'solved_count': None if is_author else lessons[lesson_id].solved_count,
+                'solved_count': lessons[lesson_id].solved_count,
+                'passed_students': None if passed_students is None else passed_students[lesson_id],
+                'students_solved': None if students_solved is None else students_solved[lesson_id],
             }
             # Positions from the same helper as the viewer's lesson_position.
             for position, lesson_id in enumerate(course_lesson_ids_in_order(course.id), start=1)
@@ -915,7 +968,17 @@ class EnrollmentListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         # Student only sees their own enrollments
         # select_related: course_title / course_cover / student_name per row, one query.
-        return Enrollment.objects.filter(student=self.request.user).select_related('course', 'student')
+        # task_count / solved_count (dashboard progress): the course page's rule,
+        # QUIZ/CODE/FILL tasks, solved = is_correct. Subqueries, so still one query.
+        tasks = Block.objects.filter(lesson__course=models.OuterRef('course'), type__in=TASK_TYPES)
+        solved = Progress.objects.filter(
+            student=models.OuterRef('student'), is_correct=True,
+            block__lesson__course=models.OuterRef('course'), block__type__in=TASK_TYPES,
+        )
+        return Enrollment.objects.filter(student=self.request.user).select_related('course', 'student').annotate(
+            task_count=count_subquery(tasks, 'lesson__course'),
+            solved_count=count_subquery(solved, 'student'),
+        )
 
     def create(self, request, *args, **kwargs):
         course = self._published_course(request.data.get('course'))

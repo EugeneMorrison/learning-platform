@@ -471,7 +471,30 @@ class DashboardCoverApiTests(APITestCase):
         self.assertEqual(rows['Covered']['course_cover'], 'http://testserver/media/covers/c.webp')
         self.assertIsNone(rows['Plain']['course_cover'])
         self.assertEqual(set(rows['Covered']), {'id', 'student', 'student_name', 'course', 'course_title',
-                                                'course_cover', 'enrolled_at'})
+                                                'course_cover', 'enrolled_at', 'task_count', 'solved_count'})
+
+    def test_author_my_courses_carry_progress(self):
+        lesson = Lesson.objects.create(course=self.covered, title='L', order_index=1)
+        quiz, code, text = (Block.objects.create(lesson=lesson, type=t, order_index=i, content={})
+                            for i, t in enumerate(['QUIZ', 'CODE', 'TEXT']))
+        classmate = User.objects.create_user(username='classmate', password='x', role='STUDENT')
+        outsider = User.objects.create_user(username='outsider', password='x', role='STUDENT')
+        Enrollment.objects.create(student=classmate, course=self.covered)
+        for user, block, correct in [(self.author, quiz, True),
+                                     (self.student, quiz, True), (self.student, code, False),
+                                     (self.student, text, True),
+                                     (classmate, quiz, True), (classmate, code, True),
+                                     (outsider, quiz, True)]:  # not enrolled: doesn't count
+            Progress.objects.create(student=user, lesson=lesson, block=block, answer={}, is_correct=correct)
+
+        self.client.force_authenticate(self.author)
+        rows = {row['title']: row for row in self.client.get('/api/courses/my_courses/').data}
+        covered = rows['Covered']
+        self.assertEqual((covered['task_count'], covered['solved_count']), (2, 1))
+        self.assertEqual((covered['student_count'], covered['students_solved']), (2, 3))
+        plain = rows['Plain']
+        self.assertEqual((plain['task_count'], plain['solved_count'], plain['student_count'],
+                          plain['students_solved']), (0, 0, 1, 0))
 
     def test_author_my_courses_have_the_cover(self):
         self.client.force_authenticate(self.author)
@@ -489,6 +512,23 @@ class DashboardCoverApiTests(APITestCase):
         with self.assertNumQueries(1):
             response = self.client.get('/api/enrollments/')
         self.assertEqual(len(response.data), 5)
+
+    def test_enrollments_carry_course_progress_by_the_viewer_rule(self):
+        lesson = Lesson.objects.create(course=self.covered, title='L', order_index=1)
+        other = Lesson.objects.create(course=self.covered, title='M', order_index=2)
+        quiz, code, fill, text = (Block.objects.create(lesson=l, type=t, order_index=i, content={})
+                                  for i, (l, t) in enumerate([(lesson, 'QUIZ'), (lesson, 'CODE'),
+                                                              (other, 'FILL'), (other, 'TEXT')]))
+        classmate = User.objects.create_user(username='classmate', password='x', role='STUDENT')
+        for user, block, correct in [(self.student, quiz, True), (self.student, code, False),
+                                     (self.student, text, True), (classmate, fill, True)]:
+            Progress.objects.create(student=user, lesson=block.lesson, block=block, answer={}, is_correct=correct)
+
+        self.client.force_authenticate(self.student)
+        rows = {row['course_title']: row for row in self.client.get('/api/enrollments/').data}
+        # 3 tasks (TEXT isn't one); 1 solved (wrong code, TEXT and a classmate's don't count).
+        self.assertEqual((rows['Covered']['task_count'], rows['Covered']['solved_count']), (3, 1))
+        self.assertEqual((rows['Plain']['task_count'], rows['Plain']['solved_count']), (0, 0))
 
     def test_author_student_list_carries_the_cover_too(self):
         self.client.force_authenticate(self.author)
@@ -656,11 +696,22 @@ class LessonOutlineTests(APITestCase):
         response = self.client.get(self.URL, {'course': str(self.course.id), 'student': self.classmate.id})
         self.assertEqual({r['title']: r['solved_count'] for r in response.data}['First'], 2)
 
-    def test_author_gets_lessons_without_progress(self):
+    def test_author_gets_own_progress_and_students_stats(self):
+        # The author tries out their own quiz; it is not a student's answer.
+        quiz = Block.objects.get(lesson=self.l1, type='QUIZ')
+        Progress.objects.create(student=self.author, lesson=self.l1, block=quiz, answer={}, is_correct=True)
         rows = self.rows(self.author)
         self.assertEqual(len(rows), 3)
-        self.assertTrue(all(row['solved_count'] is None for row in rows.values()))
-        self.assertEqual(rows['First']['task_count'], 3)
+        self.assertEqual((rows['First']['task_count'], rows['First']['solved_count']), (3, 1))
+        # First: classmate solved all 3, student 2 of 3. Third: classmate 1 of 1.
+        self.assertEqual((rows['First']['passed_students'], rows['First']['students_solved']), (1, 5))
+        self.assertEqual((rows['Theory only']['passed_students'], rows['Theory only']['students_solved']), (0, 0))
+        self.assertEqual((rows['Third']['passed_students'], rows['Third']['students_solved']), (1, 1))
+
+    def test_students_get_no_students_stats(self):
+        rows = self.rows(self.student)
+        self.assertTrue(all(row['passed_students'] is None and row['students_solved'] is None
+                            for row in rows.values()))
 
     def test_access(self):
         self.assertEqual(self.outline(self.outsider).status_code, 404)

@@ -25,8 +25,8 @@ const FOCUSABLE = 'a[href], button:not([disabled])';
  * "Список уроков": every lesson of the course, sliding in from the left.
  * Data: GET /api/lessons/outline/?course=<id>, fetched on each open so the
  * counts agree with the header's "Решено X из Y задач" (same rule on the
- * server: QUIZ/CODE/FILL tasks, solved = correct). The course author gets
- * solved_count null and sees no counts. Modal dialog: focus moves in, Tab
+ * server: QUIZ/CODE/FILL tasks, solved = correct). The course author sees
+ * their own counts, as in the header. Modal dialog: focus moves in, Tab
  * stays inside, Esc / backdrop / close button / choosing a lesson close it,
  * and the page behind doesn't scroll. The caller returns focus on close.
  * The current lesson is scrolled into view once the list loads.

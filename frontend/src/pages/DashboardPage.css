@@ -51,6 +51,22 @@
     padding-top: var(--space-3);
 }
 
+/* Student's course progress: at the bottom with the buttons, so the bars of
+   cards in a row line up whatever the title length. */
+.dash-card__progress {
+    margin-top: auto;
+    padding-top: var(--space-3);
+}
+
+.dash-card__progress + .dash-card__actions {
+    margin-top: 0;
+}
+
+/* Author's card: their own solving under the students' bar. */
+.dash-card__own {
+    margin-top: var(--space-2);
+}
+
 /* New-course form: title, then description on its own row, then submit. */
 .dash-form > textarea.input {
     flex-basis: 100%;
