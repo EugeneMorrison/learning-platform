@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
@@ -8,6 +8,8 @@ import api from '../api';
 function StudentProgressPage() {
     const { courseId, studentId } = useParams();
     const navigate = useNavigate();
+    // Opened from the course page's own "Прогресс" (student or author): "Мой прогресс".
+    const own = Boolean(useLocation().state?.own);
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [openBlocks, setOpenBlocks] = useState(() => new Set());
@@ -138,7 +140,7 @@ function StudentProgressPage() {
             <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${courseId}/`)}>
                 ← Назад
             </button>
-            <h2>Прогресс студента: {data.student_username}</h2>
+            <h2>{own ? 'Мой прогресс' : `Прогресс студента: ${data.student_username}`}</h2>
             <p style={{ color: 'var(--color-muted)' }}>Курс: {data.course_title}</p>
 
             {/* Summary */}

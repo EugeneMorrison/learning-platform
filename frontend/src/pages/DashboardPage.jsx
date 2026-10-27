@@ -58,7 +58,7 @@ function DashboardPage() {
             </div>
             {user.role === 'AUTHOR' && <StudentQuestions />}
             {user.role === 'AUTHOR' && <DiscussionReports />}
-            {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard user={user} />}
+            {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard />}
         </div>
     );
 }
@@ -69,10 +69,9 @@ function withBreakHints(name) {
     return name.split(/(?<=[_.\-@])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
 }
 
-function StudentDashboard({ user }) {
+function StudentDashboard() {
     const [enrollments, setEnrollments] = useState([]);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
 
     useEffect(() => {
         async function fetchEnrollments() {
@@ -122,14 +121,7 @@ function StudentDashboard({ user }) {
                                     />
                                 </div>
                             )}
-                            <div className="dash-card__actions">
-                                <button
-                                    className="btn btn-secondary btn-sm"
-                                    onClick={() => navigate(`/courses/${enrollment.course}/students/${user.id}/`)}
-                                >
-                                    Прогресс
-                                </button>
-                            </div>
+                            {/* No "Прогресс" button: it was clicked instead of the card; it's on the course page now. */}
                         </div>
                     ))}
                 </div>

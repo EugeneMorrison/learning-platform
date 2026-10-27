@@ -182,3 +182,8 @@
     stroke: var(--color-accent);
     stroke-linecap: round;
 }
+
+/* "Прогресс" (own detailed page) under the bar, for students and the author. */
+.course-progress__details {
+    margin-top: var(--space-3);
+}

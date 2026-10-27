@@ -74,6 +74,20 @@ function LessonRowProgress({ item, studentCount }) {
     );
 }
 
+// "Прогресс" under the course progress: the viewer's own detailed progress
+// (student or author), every task with answers and attempts.
+function OwnProgressLink({ courseId, userId }) {
+    return (
+        <Link
+            className="btn btn-secondary btn-sm course-progress__details"
+            to={`/courses/${courseId}/students/${userId}/`}
+            state={{ own: true }}
+        >
+            Прогресс
+        </Link>
+    );
+}
+
 function CoursePage() {
     const { courseId } = useParams();
     const navigate = useNavigate();
@@ -451,12 +465,18 @@ function CoursePage() {
                     {course.description && <p className="page__lead">{course.description}</p>}
                 </div>
                 {/* Its own line of the header, so the bar has a width on any screen. */}
-                {showStudentProgress && (
+                {!isOwner && (showStudentProgress || isEnrolled) && (
                     <div className="course-progress">
-                        <TaskProgress solved={solvedTasks} total={totalTasks} completeText="✓ Курс пройден" />
-                        <p className="course-progress__lessons">
-                            Пройдено уроков: {passedLessons} из {lessonsWithTasks.length}
-                        </p>
+                        {showStudentProgress && (
+                            <>
+                                <TaskProgress solved={solvedTasks} total={totalTasks} completeText="✓ Курс пройден" />
+                                <p className="course-progress__lessons">
+                                    Пройдено уроков: {passedLessons} из {lessonsWithTasks.length}
+                                </p>
+                            </>
+                        )}
+                        {/* Detailed progress (every task); moved here from the dashboard card. */}
+                        {isEnrolled && <OwnProgressLink courseId={courseId} userId={user.id} />}
                     </div>
                 )}
                 {/* Author: the course in numbers, the students' average, then their own solving. */}
@@ -485,6 +505,7 @@ function CoursePage() {
                                 пройдено уроков: {passedLessons} из {lessonsWithTasks.length}
                             </p>
                         )}
+                        <OwnProgressLink courseId={courseId} userId={user.id} />
                     </div>
                 )}
             </div>
