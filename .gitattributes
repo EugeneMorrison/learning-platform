@@ -1,0 +1,4 @@
+# Shell scripts run on the Linux server and must keep LF line endings in every
+# checkout: with core.autocrlf=true Windows would give them CRLF, and bash
+# fails on the extra \r if such a copy ever reaches the server.
+*.sh text eol=lf
