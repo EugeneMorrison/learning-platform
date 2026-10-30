@@ -500,6 +500,13 @@
 
 /* ---- FILL ------------------------------------------------------------------ */
 
+/* Keep Python operators as separate characters, including in native inputs. */
+.fill-template,
+.fill-blank {
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0;
+}
+
 .fill-template {
     color: var(--color-ink);
     font-family: var(--font-code);

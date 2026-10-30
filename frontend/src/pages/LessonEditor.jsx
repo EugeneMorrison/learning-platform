@@ -1035,7 +1035,7 @@ function FillFields({ content, setContent }) {
                 <textarea
                     value={content.template}
                     onChange={e => setContent(c => ({ ...c, template: e.target.value }))}
-                    style={{ ...input, minHeight: 70, fontFamily: "'JetBrains Mono', Consolas, monospace" }}
+                    style={{ ...input, minHeight: 70, fontFamily: "'JetBrains Mono', Consolas, monospace", fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' }}
                     placeholder="print({{8}})"
                 />
             </Field>
@@ -1043,7 +1043,7 @@ function FillFields({ content, setContent }) {
             {/* Live preview of how the blanks will look + which answers are accepted */}
             {hasBlanks && (
                 <Field label="Предпросмотр">
-                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 2.2, fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14, color: 'var(--color-ink)' }}>
+                    <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 2.2, fontFamily: "'JetBrains Mono', Consolas, monospace", fontSize: 14, color: 'var(--color-ink)', fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' }}>
                         {segments.map((seg, idx) => (
                             seg.type === 'text'
                                 ? <span key={idx}>{seg.value}</span>
