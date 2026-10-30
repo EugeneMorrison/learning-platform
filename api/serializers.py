@@ -10,6 +10,7 @@ Serializers convert between:
 from django.utils.translation import gettext
 from rest_framework import serializers
 from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
+from .output_comparison import comparison_error
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message, Thread, Comment
 
 
@@ -356,6 +357,9 @@ def block_content_error(block_type, value):
             return "QUIZ 'shuffle_options' must be true or false"
 
     elif block_type == 'CODE':
+        error = comparison_error(value)
+        if error:
+            return error
         for field in ['prompt', 'starter_code']:
             if field not in value:
                 return f"CODE blocks must have '{field}' field in content"

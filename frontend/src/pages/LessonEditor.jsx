@@ -6,6 +6,7 @@ import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
 import EditableTitle from '../components/EditableTitle';
 import { parseTemplate } from '../lib/fillTemplate';
+import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
 import api from '../api';
 
 const TYPE_LABELS = {
@@ -22,7 +23,7 @@ function defaultContent(type) {
         case 'QUIZ':
             return { question: '', options: ['', ''], correct_answer: 0, explanation: '' };
         case 'CODE':
-            return { prompt: '', header: '', starter_code: '# Ваш код здесь\n', footer: '', solution: '', tests: [{ input: '', expected: '', visible: true }] };
+            return { prompt: '', header: '', starter_code: '# Ваш код здесь\n', footer: '', solution: '', output_comparison: 'exact', tests: [{ input: '', expected: '', visible: true }] };
         case 'FILL':
             return { prompt: '', template: '', case_sensitive: false, explanation: '' };
         default:
@@ -423,7 +424,9 @@ function LessonEditor() {
             await reloadBlocks({ key, block: res.data, startedFrom });
         } catch (e) {
             console.error('Failed to save block:', e);
-            updateDraft(key, d => ({ ...d, error: 'Не удалось сохранить блок. Проверьте поля.' }));
+            const contentErrors = e.response?.data?.content;
+            const message = Array.isArray(contentErrors) ? contentErrors.join(' ') : contentErrors;
+            updateDraft(key, d => ({ ...d, error: typeof message === 'string' ? message : 'Не удалось сохранить блок. Проверьте поля.' }));
         } finally {
             updateDraft(key, d => ({ ...d, saving: false }));
         }
@@ -925,6 +928,7 @@ function BulkOptions({ setContent }) {
 }
 
 function CodeFields({ content, setContent }) {
+    const comparison = OUTPUT_COMPARISONS.find(option => option.value === (content.output_comparison ?? 'exact'));
     return (
         <>
             <Field label="Условие задачи">
@@ -951,6 +955,22 @@ function CodeFields({ content, setContent }) {
 
             <Field label="Решение (необязательно, студентам не показывается)">
                 <CodeField field="solution" value={content.solution || ''} setContent={setContent} />
+            </Field>
+
+            <Field label="Проверка вывода" hint={comparison?.hint}>
+                <select
+                    aria-label="Проверка вывода"
+                    value={content.output_comparison ?? 'exact'}
+                    onChange={e => setContent(c => ({ ...c, output_comparison: e.target.value }))}
+                    style={input}
+                >
+                    {OUTPUT_COMPARISONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                </select>
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8 }}>
+                    Режим применяется ко всем тестам этой задачи, включая скрытые. Сохраните блок перед проверкой.
+                </div>
             </Field>
 
             <Field label="Тесты" hint="Ввод подаётся в stdin, ожидаемый вывод сравнивается со stdout. Пустые тесты игнорируются. Решение проверяется на всех тестах; ученик видит только отмеченные «Показывать ученику», об остальных — лишь «пройден / не пройден».">

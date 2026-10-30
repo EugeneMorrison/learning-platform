@@ -332,6 +332,64 @@ class RunEndpointsEndToEndTests(LiveRunnerMixin, RunEndpointsTestData, APITestCa
         self.assertEqual((response.data['status'], response.data['test_number']), ('wrong_answer', 2))
         self.assertFalse(Progress.objects.get(student=self.student, block=self.block).is_correct)
 
+    def test_output_comparison_through_real_runner(self):
+        cases = (
+            ('unordered_lines', 'a\nb\na', 'print("b\\na\\na")'),
+            ('unordered_tokens', '1 2 2', 'print("2\\n2 1")'),
+            ('python_sets', '{1, 2}', 'print({2, True})'),
+        )
+        for version in VERSIONS:
+            for mode, expected, code in cases:
+                with self.subTest(version=version, mode=mode):
+                    self.block.content.update(output_comparison=mode, tests=[
+                        {'input': '', 'expected': expected, 'visible': False},
+                    ])
+                    self.block.save()
+                    response = self.post('/api/run-tests/', code=code, version=version)
+                    self.assertEqual(response.data['status'], 'success', response.data)
+                    self.assertEqual(response.data['results'], [
+                        {'test_number': 1, 'passed': True, 'hidden': True},
+                    ])
+
+    @needs_runner_folder
+    def test_matching_stdout_cannot_hide_real_execution_failures(self):
+        cases = (
+            ('nonzero exit', 'raise SystemExit(7)'),
+            ('runtime error', 'raise RuntimeError("SECRET-RUNTIME-ERROR")'),
+            ('timeout', 'import time; time.sleep(10)'),
+        )
+        for mode in ('exact', 'unordered_lines', 'unordered_tokens', 'python_sets'):
+            for visible in (True, False):
+                for name, ending in cases:
+                    with self.subTest(mode=mode, visible=visible, failure=name):
+                        self.block.content.update(output_comparison=mode, tests=[
+                            {'input': '', 'expected': '{1}', 'visible': visible},
+                        ])
+                        self.block.save()
+                        completed = []
+
+                        def run_and_capture(*args, **kwargs):
+                            result = run_python(*args, **kwargs)
+                            completed.append(result)
+                            return result
+
+                        with mock.patch.object(runner_sandbox, 'TIMEOUT_SECONDS', 1), \
+                                mock.patch('api.views.run_python', side_effect=run_and_capture):
+                            response = self.post('/api/run-tests/', code='print("{1}", flush=True)\n' + ending)
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(response.data['status'], 'error', response.data)
+                        self.assertFalse(response.data['is_correct'])
+                        self.assertEqual(response.data['passed'], 0)
+                        self.assertFalse(Progress.objects.get(student=self.student, block=self.block).is_correct)
+                        self.assertFalse(Attempt.objects.filter(block=self.block, is_correct=True).exists())
+                        if name != 'timeout':
+                            self.assertEqual(len(completed), 1)
+                            self.assertEqual(completed[0].stdout.strip(), '{1}')
+                            self.assertNotEqual(completed[0].returncode, 0)
+                        if not visible:
+                            self.assertNotIn('SECRET', response.content.decode())
+                            self.assertNotIn('stderr', response.data)
+
     def test_expected_outputs_never_reach_the_runner(self):
         sent = []
         real = run_python

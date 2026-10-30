@@ -4,6 +4,7 @@ import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from './pycharmDarcula';
 import { wrapImages, wrapTables } from '../lib/contentImages';
 import { renderMath } from '../lib/contentMath';
+import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
 import api from '../api';
 import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
@@ -15,6 +16,7 @@ const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 const SHOWN_TESTS = 2;
 
 function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk, discussion }) {
+    const comparison = OUTPUT_COMPARISONS.find(option => option.value === content.output_comparison);
     const wasSolved = savedProgress?.is_correct === true;
     const savedCode = savedProgress?.answer?.code;
 
@@ -161,6 +163,10 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
                 className="text-content lesson-block__prompt"
                 dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(content.prompt))) }}
             />
+
+            {comparison && comparison.value !== 'exact' && (
+                <p className="lesson-block__label" title={comparison.hint}>{comparison.label}</p>
+            )}
 
             {/* Collapsible tests table, open on load. Line breaks in the data are
                 kept (pre-wrap); a wide table scrolls inside its own box. Only the

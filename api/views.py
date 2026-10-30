@@ -41,6 +41,7 @@ from .questions import MAX_DRAFT_LENGTH, build_context
 from .discussions import (can_see_all, check_not_banned, check_post_interval, clean_text, discussion_block,
                           is_banned, is_course_author, open_reports)
 from .runner import RunnerBusy, RunnerUnavailable, run_python
+from .output_comparison import outputs_match
 from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
@@ -217,6 +218,9 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
     compared stdout. The server decides is_correct and records Progress +
     Attempt (see record_answer) with the student's code only.
 
+    Comparison uses the block's stored output_comparison (missing = exact),
+    for every test. The request cannot override it; the runner never sees it.
+
     Results reveal input / expected / actual output (or stderr) only for tests
     visible to students (block_content.test_visibility); hidden tests report only
     passed / not passed. Response: status (success | wrong_answer | error),
@@ -235,7 +239,9 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
             return Response({'error': 'No tests provided'}, status=400)
 
         try:
-            outcome = self.run_all(code, version, tests, **self.hidden_code(block))
+            outcome = self.run_all(code, version, tests,
+                                   output_comparison=block.content.get('output_comparison', 'exact'),
+                                   **self.hidden_code(block))
         except RunnerBusy:
             return Response({'error': 'Code runner is busy, try again'}, status=503)
         except RunnerUnavailable:
@@ -250,7 +256,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
         return Response(outcome)
 
     @staticmethod
-    def run_all(code, version, tests, header='', footer=''):
+    def run_all(code, version, tests, header='', footer='', output_comparison='exact'):
         visible = test_visibility(tests)
         total = len(tests)
         results = []
@@ -284,7 +290,7 @@ class RunTestsView(CodeRunnerAccessMixin, APIView):
                 return stop('error', i, input=stdin, stderr=proc.stderr)
 
             actual = proc.stdout.strip()
-            passed = actual == expected.strip()
+            passed = outputs_match(expected, actual, output_comparison)
             result = {'test_number': i + 1, 'passed': passed, 'hidden': not visible[i]}
             if visible[i]:
                 result.update(input=stdin, expected=expected.strip(), actual=actual)
