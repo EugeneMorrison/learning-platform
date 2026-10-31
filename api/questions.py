@@ -21,6 +21,7 @@ Context shape (Message.context):
 
 from .block_content import student_content
 from .models import Attempt, Progress
+from .quiz_state import saved_quiz_snapshot
 
 # CODE runs Python only; the student's chosen Python version isn't stored.
 CODE_LANGUAGE = 'Python'
@@ -59,8 +60,13 @@ def latest_submission(block, student):
     if block.type == 'CODE':
         return {**base, 'code': answer.get('code') or '', 'language': CODE_LANGUAGE}
     if block.type == 'QUIZ':
-        options = block.content.get('options') or []
+        snapshot = saved_quiz_snapshot(answer) if is_correct is True else None
+        options = snapshot['options'] if snapshot is not None else block.content.get('options') or []
         selected = answer.get('selected')
+        if isinstance(selected, list):
+            chosen = [options[index] for index in selected
+                      if type(index) is int and 0 <= index < len(options)]
+            return {**base, 'option': '<br />'.join(chosen) if chosen else None}
         valid = isinstance(selected, int) and not isinstance(selected, bool) and 0 <= selected < len(options)
         return {**base, 'option': options[selected] if valid else None}
     return {**base, 'blanks': list(answer.get('blanks') or [])}
@@ -80,6 +86,11 @@ def build_context(block, student, draft=None):
         'task': task_view(block),
         'submission': submission,
     }
+    if block.type == 'QUIZ':
+        progress = Progress.objects.filter(student=student, block=block, is_correct=True).first()
+        snapshot = saved_quiz_snapshot(progress.answer) if progress is not None else None
+        if snapshot is not None:
+            context['task'] = {'question': snapshot['question'], 'options': snapshot['options']}
     if block.type == 'CODE' and draft and draft.strip():
         same_as = {(block.content.get('starter_code') or '').strip()}
         if submission:

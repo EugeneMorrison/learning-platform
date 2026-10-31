@@ -185,7 +185,9 @@ function validate(type, content) {
         if (!stripHtml(content.question)) return 'Введите вопрос.';
         const filled = content.options.filter(o => o.trim());
         if (filled.length < 2) return 'Нужно минимум два варианта ответа.';
-        if (content.correct_answer == null || !content.options[content.correct_answer]?.trim())
+        if (content.multiple_answers
+            ? !content.correct_answers?.length || content.correct_answers.some(i => !content.options[i]?.trim())
+            : content.correct_answer == null || !content.options[content.correct_answer]?.trim())
             return 'Отметьте правильный вариант ответа.';
     } else if (type === 'CODE') {
         if (!stripHtml(content.prompt)) return 'Опишите условие задачи.';
@@ -201,11 +203,18 @@ function validate(type, content) {
 // Content as sent to the server: QUIZ options trimmed, empty CODE tests dropped.
 function cleanContent(type, content) {
     if (type === 'QUIZ') {
-        const options = content.options.map(o => o.trim()).filter(Boolean);
-        // Keep correct_answer pointing at the same option after trimming/removal.
-        const correctText = content.options[content.correct_answer];
-        const correct_answer = Math.max(0, options.indexOf((correctText || '').trim()));
-        return { ...content, options, correct_answer };
+        const kept = content.options.map((text, index) => ({ text: text.trim(), index })).filter(o => o.text);
+        const options = kept.map(o => o.text);
+        if (content.multiple_answers) {
+            const correct_answers = kept.flatMap((o, index) => content.correct_answers.includes(o.index) ? [index] : []);
+            const cleaned = { ...content, options, correct_answers };
+            delete cleaned.correct_answer;
+            return cleaned;
+        }
+        const correct_answer = kept.findIndex(o => o.index === content.correct_answer);
+        const cleaned = { ...content, options, correct_answer };
+        delete cleaned.correct_answers;
+        return cleaned;
     }
     if (type === 'CODE') {
         const tests = (content.tests || [])
@@ -775,14 +784,31 @@ function QuizFields({ uid, content, setContent }) {
                 <RichField field="question" value={content.question} setContent={setContent} placeholder="Что выведет этот код?" />
             </Field>
 
-            <Field label="Варианты ответа" hint="Отметьте кружком правильный вариант.">
+            <Field label="Варианты ответа" hint={content.multiple_answers ? 'Отметьте все правильные варианты. Для зачёта нужно выбрать их все.' : 'Отметьте кружком правильный вариант.'}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <input
+                        type="checkbox"
+                        checked={content.multiple_answers === true}
+                        onChange={e => {
+                            const multiple_answers = e.target.checked;
+                            setContent(c => ({ ...c, multiple_answers,
+                                correct_answers: multiple_answers ? (c.correct_answer == null ? [] : [c.correct_answer]) : c.correct_answers,
+                                correct_answer: multiple_answers ? c.correct_answer : (c.correct_answers?.[0] ?? 0),
+                            }));
+                        }}
+                    />
+                    Несколько правильных ответов
+                </label>
                 {content.options.map((opt, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <input
-                            type="radio"
+                            type={content.multiple_answers ? 'checkbox' : 'radio'}
                             name={`correct-${uid}`}
-                            checked={content.correct_answer === i}
-                            onChange={() => setContent(c => ({ ...c, correct_answer: i }))}
+                            checked={content.multiple_answers ? (content.correct_answers || []).includes(i) : content.correct_answer === i}
+                            onChange={() => setContent(c => c.multiple_answers
+                                ? { ...c, correct_answers: (c.correct_answers || []).includes(i)
+                                    ? c.correct_answers.filter(index => index !== i) : [...(c.correct_answers || []), i] }
+                                : { ...c, correct_answer: i })}
                             title="Правильный ответ"
                         />
                         <input
@@ -804,7 +830,9 @@ function QuizFields({ uid, content, setContent }) {
                                 let correct_answer = c.correct_answer;
                                 if (correct_answer === i) correct_answer = 0;
                                 else if (correct_answer > i) correct_answer -= 1;
-                                return { ...c, options, correct_answer };
+                                const correct_answers = (c.correct_answers || [])
+                                    .filter(index => index !== i).map(index => index > i ? index - 1 : index);
+                                return { ...c, options, correct_answer, correct_answers };
                             })}
                             disabled={content.options.length <= 2}
                             style={iconBtn}
@@ -845,17 +873,17 @@ function QuizFields({ uid, content, setContent }) {
 // Turns pasted text into quiz options: one non-empty line = one option.
 // A line starting with "* " (asterisk + space) is marked as the correct answer;
 // "*args" without a space stays a normal option.
-// Returns { options, correct } where correct is an index or null.
+// Returns { options, correct } where correct contains the marked indices.
 function parseBulkOptions(text) {
     const options = [];
-    let correct = null;
+    const correct = [];
     for (const raw of text.split(/\r?\n/)) {
         let line = raw.trim();
         if (!line) continue;
         const marked = /^\*\s+/.test(line);
         if (marked) {
             line = line.replace(/^\*\s+/, '');
-            if (correct === null) correct = options.length;
+            correct.push(options.length);
         }
         options.push(line);
     }
@@ -871,19 +899,25 @@ function BulkOptions({ setContent }) {
     const apply = (mode) => {
         if (options.length === 0) return;
         setContent(c => {
-            const kept = mode === 'append' ? c.options.filter(o => o.trim()) : [];
+            const keptIndices = mode === 'append' ? c.options.flatMap((text, index) => text.trim() ? [index] : []) : [];
+            const kept = keptIndices.map(index => c.options[index]);
             const next = [...kept, ...options];
             while (next.length < 2) next.push('');
+            if (c.multiple_answers) {
+                const keptCorrect = keptIndices.flatMap((original, index) => (c.correct_answers || []).includes(original) ? [index] : []);
+                return { ...c, options: next,
+                    correct_answers: [...keptCorrect, ...correct.map(index => kept.length + index)] };
+            }
             let correct_answer;
-            if (correct !== null) correct_answer = kept.length + correct;
+            if (correct.length) correct_answer = kept.length + correct[0];
             else if (mode === 'append' && c.options[c.correct_answer]?.trim())
-                correct_answer = kept.indexOf(c.options[c.correct_answer]);
+                correct_answer = keptIndices.indexOf(c.correct_answer);
             else correct_answer = 0;
             return { ...c, options: next, correct_answer: Math.max(0, correct_answer) };
         });
-        setNote(correct !== null
-            ? `Добавлено вариантов: ${options.length}. Правильный ответ отмечен.`
-            : `Добавлено вариантов: ${options.length}. Отметьте кружком правильный.`);
+        setNote(correct.length
+            ? `Добавлено вариантов: ${options.length}. Правильные ответы отмечены с учётом режима теста.`
+            : `Добавлено вариантов: ${options.length}. Отметьте правильные ответы.`);
         setText('');
     };
 

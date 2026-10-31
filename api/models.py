@@ -370,6 +370,8 @@ class Block(models.Model):
     - Different block types need different data structures
     - TEXT: {"html": "<p>Theory here</p>"}
     - QUIZ: {"question": "...", "options": [...], "correct_answer": 1}
+      Multiple answers: add "multiple_answers": true and "correct_answers": [0, 2]
+      instead of "correct_answer".
     - CODE: {"prompt": "...", "starter_code": "...", "tests": [...]}
     - Flexible! Can add new fields without migrations
     - PostgreSQL has native JSON support (fast queries)

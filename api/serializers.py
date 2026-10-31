@@ -11,6 +11,7 @@ from django.utils.translation import gettext
 from rest_framework import serializers
 from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
 from .output_comparison import comparison_error
+from .quiz_state import saved_quiz_snapshot
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message, Thread, Comment
 
 
@@ -349,9 +350,24 @@ def block_content_error(block_type, value):
             return "TEXT blocks must have 'html' field in content"
 
     elif block_type == 'QUIZ':
-        for field in ['question', 'options', 'correct_answer']:
+        for field in ['question', 'options']:
             if field not in value:
                 return f"QUIZ blocks must have '{field}' field in content"
+        if 'multiple_answers' in value and not isinstance(value['multiple_answers'], bool):
+            return "QUIZ 'multiple_answers' must be true or false"
+        options = value['options']
+        if not isinstance(options, list) or len(options) < 2 or not all(isinstance(o, str) for o in options):
+            return "QUIZ 'options' must contain at least two strings"
+        if value.get('multiple_answers'):
+            correct = value.get('correct_answers')
+            if (not isinstance(correct, list) or not correct
+                    or any(type(i) is not int or not 0 <= i < len(options) for i in correct)
+                    or len(set(correct)) != len(correct)):
+                return "QUIZ 'correct_answers' must contain unique valid option indices"
+        elif 'correct_answer' not in value:
+            return "QUIZ blocks must have 'correct_answer' field in content"
+        elif type(value['correct_answer']) is not int or not 0 <= value['correct_answer'] < len(options):
+            return "QUIZ 'correct_answer' must be a valid option index"
         # Optional: show the options to students in random order (missing = true).
         if 'shuffle_options' in value and not isinstance(value['shuffle_options'], bool):
             return "QUIZ 'shuffle_options' must be true or false"
@@ -452,6 +468,10 @@ class ProgressSerializer(serializers.ModelSerializer):
     feedback = serializers.SerializerMethodField()
 
     def get_feedback(self, obj):
+        if obj.block.type == 'QUIZ' and obj.is_correct is True:
+            snapshot = saved_quiz_snapshot(obj.answer)
+            if snapshot is not None:
+                return {'explanation': snapshot['explanation']} if snapshot.get('explanation') else {}
         return feedback(obj.block.type, obj.block.content, obj.answer, obj.is_correct)
 
     class Meta:

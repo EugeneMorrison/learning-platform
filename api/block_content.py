@@ -10,7 +10,8 @@ Answer-bearing fields per type:
 - CODE: `solution`; `tests` (each {input, expected, visible?}, or a legacy string
   meaning expected output with empty stdin); `header` / `footer`, hidden code
   run before / after the student's (api/runner.py), missing = "".
-- QUIZ: `correct_answer` (option index), `explanation`.
+- QUIZ: `correct_answer` (option index), or `correct_answers` (indices) when
+  `multiple_answers` is true; `explanation`.
 - FILL: the answers inside `{{a|b}}` in `template`, `explanation`.
 """
 
@@ -64,6 +65,7 @@ def student_content(block_type, content):
         content['hidden_test_count'] = flags.count(False)
     elif block_type == 'QUIZ':
         content.pop('correct_answer', None)
+        content.pop('correct_answers', None)
         content.pop('explanation', None)
     elif block_type == 'FILL':
         content['template'] = FILL_GAP_RE.sub('{{}}', content.get('template', '') or '')
@@ -77,7 +79,14 @@ def student_content(block_type, content):
 
 def grade_quiz(content, answer):
     selected = answer.get('selected') if isinstance(answer, dict) else None
-    return selected is not None and selected == content.get('correct_answer')
+    if content.get('multiple_answers') is True:
+        correct = content.get('correct_answers')
+        return (isinstance(selected, list) and bool(selected)
+                and all(type(index) is int for index in selected)
+                and len(set(selected)) == len(selected)
+                and isinstance(correct, list) and bool(correct)
+                and set(selected) == set(correct))
+    return type(selected) is int and selected == content.get('correct_answer')
 
 
 def fill_blank_results(content, answer):

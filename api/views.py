@@ -42,7 +42,8 @@ from .discussions import (can_see_all, check_not_banned, check_post_interval, cl
                           is_banned, is_course_author, open_reports)
 from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .output_comparison import outputs_match
-from .block_content import TASK_TYPES, grade_fill, grade_quiz, normalize_test, test_visibility
+from .quiz_state import submit_quiz
+from .block_content import TASK_TYPES, grade_fill, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
     LessonSerializer,
@@ -1092,7 +1093,10 @@ class ProgressSubmitView(generics.CreateAPIView):
 
         answer = request.data.get('answer')
         if block.type == 'QUIZ':
-            is_correct = grade_quiz(block.content, answer)
+            progress, recorded = submit_quiz(request.user, block, answer)
+            data = dict(self.get_serializer(progress).data)
+            data['recorded'] = recorded
+            return Response(data, status=status.HTTP_200_OK)
         elif block.type == 'FILL':
             is_correct = grade_fill(block.content, answer)
         else:
