@@ -345,7 +345,7 @@ function LessonViewer() {
                 inner = <TextBlock blockId={block.id} content={block.content} />;
                 break;
             case 'QUIZ':
-                inner = <QuizBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
+                inner = <QuizBlock blockId={block.id} quizRevision={block.updated_at} content={block.content} savedProgress={blockProgress} number={number}
                     onSubmitted={handleAnswerSubmitted} discussion={discussion}
                     onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;

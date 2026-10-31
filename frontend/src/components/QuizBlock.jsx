@@ -7,6 +7,7 @@ import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages, wrapTables } from '../lib/contentImages';
 import { renderMath } from '../lib/contentMath';
+import { orderOptions, restoreQuiz } from '../lib/quizState';
 
 hljs.registerLanguage('python', python);
 
@@ -16,59 +17,44 @@ function isHtmlQuestion(q) {
     return /<(p|h[1-6]|ul|ol|li|pre|blockquote|img|table|strong|em|code|div|br)\b/i.test(q || '');
 }
 
-// The options in display order, each with its index in content.options (the
-// index the server grades and progress stores). Fisher–Yates when shuffling.
-function orderOptions(options, shuffle) {
-    const order = options.map((text, originalIndex) => ({ text, originalIndex }));
-    if (!shuffle) return order;
-    for (let i = order.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [order[i], order[j]] = [order[j], order[i]];
-    }
-    return order;
-}
-
-function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk, discussion }) {
-    // Missing shuffle_options = shuffle. The order is fixed on mount and changes
-    // only on «Решить снова», never on a re-render.
+function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSubmitted, onAsk, discussion }) {
+    const [initial] = useState(() => restoreQuiz(content, savedProgress, quizRevision));
+    const [practice, setPractice] = useState(false);
+    const shown = !practice && initial.snapshot ? initial.snapshot : content;
+    const multiple = shown.multiple_answers === true;
     const shuffle = content.shuffle_options !== false;
-    const [order, setOrder] = useState(() => orderOptions(content.options, shuffle));
-    // `selected` is always an original index: sent as answer.selected and
-    // restored from saved progress as is.
-    const savedSelected = savedProgress?.answer?.selected;
-    const hasAttempt = typeof savedSelected === 'number';
-    const [selected, setSelected] = useState(hasAttempt ? savedSelected : null);
-    // The server's verdict on `selected` (students never receive correct_answer).
-    // Restored on page load from the student's own saved progress.
-    const [result, setResult] = useState(hasAttempt ? {
-        isCorrect: savedProgress.is_correct === true,
-        explanation: savedProgress.feedback?.explanation || '',
-    } : null);
+    const [order, setOrder] = useState(initial.order);
+    const [selected, setSelected] = useState(initial.selected);
+    const [result, setResult] = useState(initial.result);
     const [checking, setChecking] = useState(false);
     const [checkError, setCheckError] = useState('');
 
     const submitted = result !== null;
     const isCorrect = result?.isCorrect === true;
 
-    const htmlQuestion = isHtmlQuestion(content.question);
+    const htmlQuestion = isHtmlQuestion(shown.question);
 
     // Legacy plain-text format: split question into text + code parts.
-    const parts = content.question.split('\n\n');
+    const parts = shown.question.split('\n\n');
     const hasCode = !htmlQuestion && parts.length >= 2;
-    const questionText = hasCode ? parts[0] : content.question;
+    const questionText = hasCode ? parts[0] : shown.question;
     const codePart = hasCode ? parts.slice(1).join('\n') : null;
     const highlightedCode = codePart
         ? hljs.highlight(codePart, { language: 'python', ignoreIllegals: true }).value
         : '';
 
     async function handleSubmit() {
-        if (selected === null || checking) return;
+        if (selected === null || (Array.isArray(selected) && selected.length === 0) || checking) return;
         setChecking(true);
         setCheckError('');
         try {
             const res = await api.post('/progress/submit/', {
                 block: blockId,
-                answer: { selected },
+                answer: {
+                    selected,
+                    display_order: order.map(option => option.originalIndex),
+                    quiz_revision: quizRevision,
+                },
             });
             setResult({
                 isCorrect: res.data.is_correct === true,
@@ -86,15 +72,21 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
     function handleReset() {
         // «Решить снова» (after a correct answer) deals a new order;
         // «Попробовать снова» keeps the current one.
-        if (isCorrect) setOrder(orderOptions(content.options, shuffle));
+        if (isCorrect) {
+            setPractice(true);
+            setOrder(orderOptions(content.options, shuffle));
+        }
         setSelected(null);
         setResult(null);
     }
 
     function handleOptionClick(index) {
         // Only allow clicking if correct answer not yet found
-        if (isCorrect) return;
-        setSelected(index);
+        if (isCorrect || checking) return;
+        setSelected(previous => multiple
+            ? (previous || []).includes(index)
+                ? previous.filter(value => value !== index) : [...(previous || []), index]
+            : index);
         setResult(null);
     }
 
@@ -111,10 +103,17 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
                 <DiscussionBadge blockId={blockId} discussion={discussion} />
             </div>
 
+            {!practice && initial.historical && (
+                <p className="lesson-block__label">Показана версия задания на момент вашего решения</p>
+            )}
+            {!practice && initial.legacyChanged && (
+                <p className="lesson-block__label">Задание изменено; варианты на момент вашего решения не сохранены.</p>
+            )}
+
             {htmlQuestion ? (
                 <div
                     className="text-content lesson-block__prompt"
-                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(highlightPreBlocks(content.question)))) }}
+                    dangerouslySetInnerHTML={{ __html: wrapTables(wrapImages(renderMath(highlightPreBlocks(shown.question)))) }}
                 />
             ) : (
                 <>
@@ -133,14 +132,20 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
                 </>
             )}
 
+            {multiple && <p className="lesson-block__label">Выберите все правильные варианты ответа.</p>}
             <div className={isCorrect ? 'quiz-options quiz-options--locked' : 'quiz-options'}>
                 {order.map(({ text, originalIndex }) => (
                     <button
                         key={originalIndex}
+                        type="button"
+                        aria-pressed={Array.isArray(selected) ? selected.includes(originalIndex) : selected === originalIndex}
+                        disabled={checking || isCorrect}
                         onClick={() => handleOptionClick(originalIndex)}
                         className={optionClass(originalIndex, selected, submitted, isCorrect)}
-                        dangerouslySetInnerHTML={{ __html: text }}
-                    />
+                    >
+                        {multiple && <span aria-hidden="true" style={{ marginRight: 8 }}>{selected?.includes(originalIndex) ? '☑' : '☐'}</span>}
+                        <span dangerouslySetInnerHTML={{ __html: text }} />
+                    </button>
                 ))}
             </div>
 
@@ -178,7 +183,7 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
                         <button
                             className="btn btn-primary"
                             onClick={handleSubmit}
-                            disabled={selected === null || checking}
+                            disabled={selected === null || (Array.isArray(selected) && selected.length === 0) || checking}
                         >
                             {checking ? 'Проверяем…' : 'Проверить ответ'}
                         </button>
@@ -192,7 +197,7 @@ function QuizBlock({ content, blockId, savedProgress, number, onSubmitted, onAsk
 // Only the selected option is coloured after checking (green if the server said
 // correct, red otherwise); the correct option is never revealed.
 function optionClass(index, selected, submitted, isCorrect) {
-    if (index !== selected) return 'quiz-option';
+    if (!(Array.isArray(selected) ? selected.includes(index) : index === selected)) return 'quiz-option';
     if (!submitted) return 'quiz-option quiz-option--selected';
     return isCorrect ? 'quiz-option quiz-option--correct' : 'quiz-option quiz-option--wrong';
 }
