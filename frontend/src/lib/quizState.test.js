@@ -9,6 +9,21 @@ const solved = {
     feedback: { explanation: 'Correct explanation' },
 };
 
+test('fresh shuffles consume randomness and may repeat while preserving duplicate-text identities', () => {
+    const options = ['same', 'same', 'different'];
+    const first = orderOptions(options, true, () => 0);
+    const before = structuredClone(first);
+    let draws = 0;
+    const retry = orderOptions(options, true, () => { draws++; return 0; });
+    assert.equal(draws, options.length - 1);
+    assert.deepEqual(retry, first);
+    assert.notEqual(retry, first);
+    assert.deepEqual(retry.map(o => o.originalIndex).sort(), [0, 1, 2]);
+    assert.ok(retry.every(o => o.text === options[o.originalIndex]));
+    assert.deepEqual(first, before);
+    assert.deepEqual(orderOptions(options, false, () => { throw Error('disabled'); }), orderOptions(options, false));
+});
+
 test('multiple selections restore original identities and historical selection mode', () => {
     const snapshot = { ...content, multiple_answers: true };
     const progress = { is_correct: true, answer: {

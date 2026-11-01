@@ -7,7 +7,7 @@ import api from '../api';
 import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages, wrapTables } from '../lib/contentImages';
 import { renderMath } from '../lib/contentMath';
-import { orderOptions, restoreQuiz } from '../lib/quizState';
+import { reshuffleOptions, restoreQuiz } from '../lib/quizState';
 
 hljs.registerLanguage('python', python);
 
@@ -18,7 +18,8 @@ function isHtmlQuestion(q) {
 }
 
 function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSubmitted, onAsk, discussion }) {
-    const [initial] = useState(() => restoreQuiz(content, savedProgress, quizRevision));
+    // Retain the first saved completion independently of temporary practice.
+    const [initial, setInitial] = useState(() => restoreQuiz(content, savedProgress, quizRevision));
     const [practice, setPractice] = useState(false);
     const shown = !practice && initial.snapshot ? initial.snapshot : content;
     const multiple = shown.multiple_answers === true;
@@ -56,10 +57,16 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
                     quiz_revision: quizRevision,
                 },
             });
-            setResult({
-                isCorrect: res.data.is_correct === true,
-                explanation: res.data.feedback?.explanation || '',
-            });
+            if (res.data.is_correct === true && res.data.recorded) {
+                const completion = restoreQuiz(content, res.data, quizRevision);
+                setInitial(completion);
+                showCompletion(completion);
+            } else {
+                setResult({
+                    isCorrect: res.data.is_correct === true,
+                    explanation: res.data.feedback?.explanation || '',
+                });
+            }
             onSubmitted?.(res.data); // the lesson's progress (app header, "next task")
         } catch (err) {
             console.error('Failed to check answer:', err);
@@ -69,20 +76,28 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
         }
     }
 
+    function showCompletion(completion) {
+        setPractice(false);
+        setOrder(completion.order);
+        setSelected(completion.selected);
+        setResult(completion.result);
+        setCheckError('');
+    }
+
     function handleReset() {
-        // «Решить снова» (after a correct answer) deals a new order;
-        // «Попробовать снова» keeps the current one.
-        if (isCorrect) {
-            setPractice(true);
-            setOrder(orderOptions(content.options, shuffle));
-        }
+        if (checking) return;
+        if (initial.result?.isCorrect) setPractice(true);
+        // Retry uses today's options, with a different text order when possible.
+        // The first saved success remains separate from this practice order.
+        setOrder(reshuffleOptions(content.options, shuffle, order));
         setSelected(null);
         setResult(null);
+        setCheckError('');
     }
 
     function handleOptionClick(index) {
-        // Only allow clicking if correct answer not yet found
-        if (isCorrect || checking) return;
+        // A verdict ends this attempt; the retry action starts the next one.
+        if (submitted || checking) return;
         setSelected(previous => multiple
             ? (previous || []).includes(index)
                 ? previous.filter(value => value !== index) : [...(previous || []), index]
@@ -108,6 +123,9 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
             )}
             {!practice && initial.legacyChanged && (
                 <p className="lesson-block__label">Задание изменено; варианты на момент вашего решения не сохранены.</p>
+            )}
+            {practice && (
+                <p className="lesson-block__label">Тренировка. Сохранённое решение не изменится.</p>
             )}
 
             {htmlQuestion ? (
@@ -139,7 +157,7 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
                         key={originalIndex}
                         type="button"
                         aria-pressed={Array.isArray(selected) ? selected.includes(originalIndex) : selected === originalIndex}
-                        disabled={checking || isCorrect}
+                        disabled={checking || submitted}
                         onClick={() => handleOptionClick(originalIndex)}
                         className={optionClass(originalIndex, selected, submitted, isCorrect)}
                     >
@@ -175,6 +193,11 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
                     </button>
                 </div>
                 <div className="lesson-block__actions-end">
+                    {practice && initial.result?.isCorrect && (
+                        <button className="btn btn-secondary" disabled={checking} onClick={() => showCompletion(initial)}>
+                            Вернуться к сохранённому решению
+                        </button>
+                    )}
                     {submitted ? (
                         <button className="btn btn-secondary" onClick={handleReset}>
                             {isCorrect ? 'Решить снова' : 'Попробовать снова'}

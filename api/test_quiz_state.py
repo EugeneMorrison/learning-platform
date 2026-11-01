@@ -80,6 +80,25 @@ class QuizStateTests(APITestCase):
             self.assertEqual(progress.attempts, 1)
         self.assertEqual(Attempt.objects.filter(block=self.block).count(), 1)
 
+    def test_retry_order_is_saved_at_first_success_and_survives_practice_in_other_orders(self):
+        wrong = self.submit(selected=0, order=[3, 0, 1, 2])
+        self.assertFalse(wrong.data['is_correct'])
+        first = self.submit(selected=1, order=[2, 3, 0, 1])
+        self.assertTrue(first.data['recorded'])
+        stored = copy.deepcopy(self.restored())
+        for selected, order in ((0, [1, 0, 3, 2]), (1, [0, 1, 2, 3])):
+            response = self.submit(selected=selected, order=order)
+            self.assertEqual(response.data['is_correct'], selected == 1)
+            self.assertFalse(response.data['recorded'])
+            for _ in range(3):
+                current = self.restored()
+                self.assertEqual(current['answer'], stored['answer'])
+                self.assertEqual(current['completed_at'], stored['completed_at'])
+                self.assertEqual(Progress.objects.get(block=self.block).attempts, 2)
+        self.assertEqual(stored['answer']['display_order'], [2, 3, 0, 1])
+        self.assertEqual(stored['answer']['selected'], 1)
+        self.assertEqual(Attempt.objects.filter(block=self.block).count(), 2)
+
     def test_students_save_independent_orders_and_cannot_read_each_others_progress(self):
         self.submit()
         self.submit(user=self.other, order=[1, 0, 2, 3])

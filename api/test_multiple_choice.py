@@ -19,11 +19,11 @@ class MultipleChoiceTests(APITestCase):
             'multiple_answers': True, 'correct_answers': [0, 2], 'explanation': 'Why',
         })
 
-    def submit(self, selected):
+    def submit(self, selected, order=None):
         self.client.force_authenticate(self.student)
         return self.client.post('/api/progress/submit/', {
             'block': str(self.block.pk), 'answer': {
-                'selected': selected, 'display_order': [3, 2, 1, 0],
+                'selected': selected, 'display_order': order if order is not None else [3, 2, 1, 0],
                 'quiz_revision': self.block.updated_at.isoformat(),
             },
         }, format='json')
@@ -50,6 +50,26 @@ class MultipleChoiceTests(APITestCase):
         restored = self.client.get(f'/api/progress/course/{self.course.pk}/').data[0]
         self.assertEqual(restored['answer'], first)
         self.assertEqual(restored['feedback'], {'explanation': 'Why'})
+
+    def test_retry_and_practice_orders_never_replace_the_first_success(self):
+        self.assertFalse(self.submit([0], order=[3, 0, 1, 2]).data['is_correct'])
+        first = self.submit([2, 0], order=[1, 3, 0, 2])
+        self.assertTrue(first.data['recorded'])
+        stored = Progress.objects.get(block=self.block)
+        answer, when = stored.answer, stored.completed_at
+        for selected, order in (([1], [2, 0, 3, 1]), ([0, 2], [0, 1, 2, 3])):
+            practice = self.submit(selected, order=order)
+            self.assertEqual(practice.data['is_correct'], selected == [0, 2])
+            self.assertFalse(practice.data['recorded'])
+            for _ in range(3):
+                restored = self.client.get(f'/api/progress/course/{self.course.pk}/').data[0]
+                self.assertEqual(restored['answer'], answer)
+                self.assertEqual(Progress.objects.get(block=self.block).attempts, 2)
+            stored.refresh_from_db()
+            self.assertEqual(stored.completed_at, when)
+        self.assertEqual(answer['display_order'], [1, 3, 0, 2])
+        self.assertEqual(answer['selected'], [2, 0])
+        self.assertEqual(Attempt.objects.filter(block=self.block).count(), 2)
 
     def test_malformed_answers_are_rejected_without_recording(self):
         for selected in ([], 0, None, '0,2', [0, 0, 2], [True, 2], [0.0, 2], [-1, 2], [0, 4], [{}]):

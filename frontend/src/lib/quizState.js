@@ -10,6 +10,18 @@ export function orderOptions(options, shuffle, random = Math.random) {
     return order;
 }
 
+export function reshuffleOptions(options, shuffle, previous, random = Math.random) {
+    const next = orderOptions(options, shuffle, random);
+    if (shuffle && next.length === previous.length
+        && next.every((option, index) => option.text === previous[index].text)) {
+        // Another random draw could repeat forever. Swap two different labels
+        // once, comparing text rather than indices so duplicates cannot hide it.
+        const different = next.findIndex(option => option.text !== next[0].text);
+        if (different > 0) [next[0], next[different]] = [next[different], next[0]];
+    }
+    return next;
+}
+
 export function validDisplayOrder(order, count) {
     return Array.isArray(order) && order.length === count
         && order.every(index => Number.isInteger(index) && index >= 0 && index < count)
