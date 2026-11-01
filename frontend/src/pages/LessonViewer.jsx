@@ -425,6 +425,7 @@ function LessonViewer() {
                 {/* The author can open the editor from the regular lesson view. */}
                 {canEdit && (
                     <div className="lesson-toolbar">
+                        {!lesson.next_lesson_id && <PreviousLessonLink lessonId={lesson.previous_lesson_id} />}
                         <Link
                             className="btn btn-secondary btn-sm lesson-toolbar__edit"
                             to={`/lesson/${lesson.id}/edit/`}
@@ -443,7 +444,7 @@ function LessonViewer() {
                     </div>
                 )}
 
-                {!isInIframe && (lesson.previous_lesson_id || lesson.next_lesson_id) && (
+                {!isInIframe && (!canEdit || lesson.next_lesson_id) && (lesson.previous_lesson_id || lesson.next_lesson_id) && (
                     <nav className="lesson-nav lesson-nav--top" aria-label="Навигация по курсу в начале урока">
                         <PreviousLessonLink lessonId={lesson.previous_lesson_id} />
                         {lesson.next_lesson_id && (
