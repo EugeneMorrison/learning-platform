@@ -83,7 +83,9 @@ function LessonViewer() {
     }
 
     useEffect(() => {
-        loadLesson();
+        let active = true;
+        loadLesson(() => active);
+        return () => { active = false; };
     }, []);
 
     // Last lesson: course_completed was loaded with the page. When the student
@@ -186,7 +188,7 @@ function LessonViewer() {
         };
     }, [loading, hash]);
 
-    async function loadLesson() {
+    async function loadLesson(isActive) {
         try {
             const lessonId = getLessonIdFromUrl();
             if (!lessonId) {
@@ -198,23 +200,26 @@ function LessonViewer() {
                 getLesson(lessonId),
                 getBlocks(lessonId),
             ]);
-            setLesson(lessonResponse.data);
-            setBlocks(blocksResponse.data);
+            if (!isActive()) return;
             const courseResponse = await api.get(`/courses/${lessonResponse.data.course}/`);
-            setCourse(courseResponse.data);
+            let loadedUser = null;
             try {
                 const userResponse = await api.get('/auth/me/');
-                setUser(userResponse.data);
+                loadedUser = userResponse.data;
             } catch {
-                setUser(null);
+                // User decoration is optional; saved task state is not.
             }
-            try {
-                const progressResponse = await api.get(`/progress/course/${lessonResponse.data.course}/`);
-                setProgress(progressResponse.data);
-            } catch {
-                setProgress([]);
-            }
+            const progressResponse = await api.get(`/progress/course/${lessonResponse.data.course}/`);
+            if (!isActive()) return;
+            // Mount tasks only with the matching saved progress. QuizBlock's
+            // initial state is restored once, when it mounts.
+            setLesson(lessonResponse.data);
+            setBlocks(blocksResponse.data);
+            setCourse(courseResponse.data);
+            setUser(loadedUser);
+            setProgress(progressResponse.data);
         } catch (err) {
+            if (!isActive()) return;
             const status = err.response?.status;
             if (status === 401 || status === 404) {
                 // No access (anonymous, or not enrolled) — lessons open only after enrolment.
@@ -234,11 +239,11 @@ function LessonViewer() {
                     linkLabel: 'Все курсы',
                 });
             } else {
-                setError({ message: 'Failed to load lesson. Check console for details.' });
+                setError({ message: 'Не удалось загрузить урок и сохранённые ответы. Обновите страницу, чтобы повторить попытку.' });
             }
             console.error(err);
         } finally {
-            setLoading(false);
+            if (isActive()) setLoading(false);
         }
     }
 
