@@ -17,7 +17,6 @@ from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
 from slugify import slugify
 
-from .block_content import TASK_TYPES
 from .covers import shrink_cover
 
 
@@ -646,9 +645,9 @@ class ThreadQuerySet(models.QuerySet):
         """
         Threads the user may read, and so reply to (the one rule; every
         discussion endpoint goes through it):
-        - only on task blocks of courses the user has content access to
+        - only on blocks of courses the user has content access to
           (own ∪ enrolled, as BlockQuerySet.visible_to);
-        - the course author sees all of them;
+        - the course author sees all of them, as do students on theory blocks;
         - anyone else sees all of them once they have solved the block
           (Progress.is_correct, which stays True), before that only the pinned
           threads and the ones they started themselves.
@@ -657,10 +656,10 @@ class ThreadQuerySet(models.QuerySet):
             return self.none()
         solved = Progress.objects.filter(student=user, block=models.OuterRef('block'), is_correct=True)
         return self.filter(
-            block__type__in=TASK_TYPES,
             block__lesson__course__in=Course.objects.with_content_access(user).values('pk'),
         ).filter(
             models.Q(block__lesson__course__author=user)
+            | models.Q(block__type='TEXT')
             | models.Q(is_pinned=True)
             | models.Q(starter=user)
             | models.Exists(solved)

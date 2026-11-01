@@ -1362,7 +1362,7 @@ class MessageView(APIView):
 def _question_block(request):
     """The task block of a «Задать вопрос» request and the CODE editor draft.
 
-    400: block_id missing or not a UUID, not a task block, draft not a string or
+    400: block_id missing or not a UUID, draft not a string or
     longer than MAX_DRAFT_LENGTH. 404: no such block. 403: the user is not
     enrolled in the block's course (the course author included: questions go
     to the author).
@@ -1374,8 +1374,6 @@ def _question_block(request):
     block = Block.objects.select_related('lesson__course').filter(pk=block_id).first()
     if block is None:
         raise NotFound(gettext('Задание не найдено.'))
-    if block.type not in TASK_TYPES:
-        raise ParseError(gettext('Вопрос можно задать только по заданию.'))
     if not Enrollment.objects.filter(course=block.lesson.course, student=request.user).exists():
         raise PermissionDenied(gettext('Задать вопрос могут только записанные на курс учащиеся.'))
 
@@ -1569,7 +1567,7 @@ class BlockThreadsView(APIView):
     course author, or solved the block), "hidden_count": threads not shown
     until the block is solved, "can_post": false when the course author has
     banned the user}.
-    POST 201: the new thread. 400: empty / too long text, a TEXT block.
+    POST 201: the new thread. 400: empty / too long text.
     403: banned by the course author. 404: no such block, or the user is
     neither the course's author nor an enrolled student. 429: posted less
     than a minute ago (not the course author).

@@ -15,13 +15,13 @@ function QuestionCard({ message, own }) {
     const { context } = message;
     return (
         <article className="question-card">
-            <p className="question-card__kicker">Вопрос по заданию</p>
+            <p className="question-card__kicker">{context.block.type === 'TEXT' ? 'Вопрос по теории' : 'Вопрос по заданию'}</p>
             {!own && <p className="question-card__who">{message.sender_name || message.sender_username}</p>}
             <p className="question-card__where">{context.course.title} › {context.lesson.title}</p>
             <p className="question-card__text">{message.text}</p>
             <QuestionContext context={context} collapsible />
             <Link className="question-card__open" to={`/lesson/${context.lesson.id}/#block-${context.block.id}`}>
-                Открыть задание →
+                {context.block.type === 'TEXT' ? 'Открыть теорию →' : 'Открыть задание →'}
             </Link>
         </article>
     );

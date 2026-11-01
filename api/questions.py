@@ -11,7 +11,7 @@ Context shape (Message.context):
     lesson:     {id, title}
     block:      {id, type}
     task:       CODE {prompt, starter_code} · QUIZ {question, options} ·
-                FILL {prompt, template (gaps blanked)}
+                FILL {prompt, template (gaps blanked)} · TEXT {html}
     submission: the latest recorded submission, or null:
                 CODE {code, language} · QUIZ {option: the chosen option's text} ·
                 FILL {blanks}; all with is_correct and submitted_at
@@ -34,6 +34,8 @@ def task_view(block):
     """The task as the student sees it: only the fields that state it, taken
     from student_content() (so nothing hidden can get in)."""
     content = student_content(block.type, block.content)
+    if block.type == 'TEXT':
+        return {'html': content.get('html', '')}
     if block.type == 'CODE':
         return {'prompt': content.get('prompt', ''), 'starter_code': content.get('starter_code', '')}
     if block.type == 'QUIZ':
@@ -78,7 +80,7 @@ def build_context(block, student, draft=None):
     or the starter code."""
     lesson = block.lesson
     course = lesson.course
-    submission = latest_submission(block, student)
+    submission = None if block.type == 'TEXT' else latest_submission(block, student)
     context = {
         'course': {'id': str(course.id), 'title': course.title},
         'lesson': {'id': str(lesson.id), 'title': lesson.title},

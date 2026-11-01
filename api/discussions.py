@@ -29,7 +29,6 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from rest_framework.exceptions import NotFound, ParseError, PermissionDenied, Throttled
 
-from .block_content import TASK_TYPES
 from .models import Block, Comment, CommentReport, DiscussionBan, Progress
 
 # Longest post, in characters (code points); the panel uses the same number
@@ -47,20 +46,17 @@ def is_course_author(user, block):
 
 def can_see_all(user, block):
     """Every thread on the block, not only the pinned and own ones."""
-    return is_course_author(user, block) or Progress.objects.filter(
+    return block.type == 'TEXT' or is_course_author(user, block) or Progress.objects.filter(
         student=user, block=block, is_correct=True).exists()
 
 
 def discussion_block(user, block_id):
-    """The task block whose discussion the user may read and join. 404 when
-    there's no such block or it is outside the user's content access, 400 for
-    a theory (TEXT) block."""
+    """The block whose discussion the user may read and join; 404 outside
+    the user's content access."""
     block = (Block.objects.visible_to(user).select_related('lesson__course')
              .filter(pk=block_id).first())
     if block is None:
         raise NotFound(gettext('Задание не найдено.'))
-    if block.type not in TASK_TYPES:
-        raise ParseError(gettext('Обсуждения есть только у заданий.'))
     return block
 
 

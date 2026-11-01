@@ -33,6 +33,7 @@
     flex-direction: column;
     width: min(100%, var(--reading-width));
     max-height: calc(100dvh - 2 * var(--space-4));
+    border: calc(var(--border-width) * 2) solid var(--color-accent);
     border-radius: var(--radius-card);
     background: var(--color-surface);
     box-shadow: var(--shadow-lg);

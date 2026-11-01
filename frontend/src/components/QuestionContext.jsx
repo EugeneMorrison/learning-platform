@@ -48,6 +48,7 @@ export function CodeView({ code }) {
 }
 
 function Task({ type, task }) {
+    if (type === 'TEXT') return <AuthorHtml html={task.html} />;
     if (type === 'QUIZ') {
         return (
             <>
@@ -126,12 +127,12 @@ function QuestionContext({ context, collapsible = false }) {
     const type = context.block.type;
     return (
         <div className="question-context">
-            <Part title="Задание" collapsible={collapsible}>
+            <Part title={type === 'TEXT' ? 'Теория' : 'Задание'} collapsible={collapsible}>
                 <Task type={type} task={context.task} />
             </Part>
-            <Part title="Решение студента" collapsible={collapsible}>
+            {type !== 'TEXT' && <Part title="Решение студента" collapsible={collapsible}>
                 <Submission type={type} submission={context.submission} />
-            </Part>
+            </Part>}
             {context.draft && (
                 <Part title="Черновик в редакторе (не отправлялся)" collapsible={collapsible}>
                     <CodeView code={context.draft.code} />

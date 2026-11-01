@@ -595,6 +595,18 @@ class LessonNavigationTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(str(self.get_lesson(self.first)['next_lesson_id']), str(self.middle.id))
 
+    def test_previous_lesson_follows_course_order(self):
+        self.assertIsNone(self.get_lesson(self.first)['previous_lesson_id'])
+        self.assertEqual(str(self.get_lesson(self.middle)['previous_lesson_id']), str(self.first.id))
+        self.assertEqual(str(self.get_lesson(self.last)['previous_lesson_id']), str(self.middle.id))
+
+    def test_previous_lesson_id_is_read_only(self):
+        self.client.force_authenticate(self.author)
+        response = self.client.patch(f'/api/lessons/{self.middle.id}/',
+                                     {'previous_lesson_id': str(self.last.id)}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(self.get_lesson(self.middle)['previous_lesson_id']), str(self.first.id))
+
     def test_lesson_title_is_still_validated(self):
         # Guards LessonSerializer.validate_title (it once ended up on a subclass).
         self.client.force_authenticate(self.author)
@@ -1273,6 +1285,8 @@ class LessonReorderTests(APITestCase):
         self.assertEqual((d['lesson_position'], str(d['next_lesson_id'])), (1, str(self.a.id)))
         c = self.client.get(f'/api/lessons/{self.c.id}/').data
         self.assertEqual((c['lesson_position'], c['next_lesson_id']), (4, None))
+        self.assertIsNone(d['previous_lesson_id'])
+        self.assertEqual(str(c['previous_lesson_id']), str(self.b.id))
         outline = self.client.get('/api/lessons/outline/', {'course': str(self.course.id)}).data
         self.assertEqual([(r['title'], r['position']) for r in outline],
                          [('D', 1), ('A', 2), ('B', 3), ('C', 4)])
@@ -2308,12 +2322,31 @@ class QuestionTests(APITestCase):
         self.assertEqual(self.ask(self.student, self.code, text='x' * (MAX_MESSAGE_LENGTH + 1)).status_code, 400)
         self.assertFalse(Message.objects.exists())
 
-    def test_only_existing_task_blocks(self):
-        self.assertEqual(self.ask(self.student, self.text).status_code, 400)
+    def test_only_existing_blocks(self):
         self.client.force_authenticate(self.student)
         for block_id, code in [('not-a-uuid', 400), ('00000000-0000-0000-0000-000000000000', 404)]:
             response = self.client.post('/api/questions/', {'block_id': block_id, 'text': 'q'}, format='json')
             self.assertEqual(response.status_code, code)
+
+    def test_theory_question_previews_and_sends_theory_snapshot(self):
+        preview = self.ask(self.student, self.text, path='/api/questions/preview/')
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.data['task'], {'html': '<p>t</p>'})
+        self.assertIsNone(preview.data['submission'])
+        self.assertFalse(Message.objects.exists())
+        response = self.ask(self.student, self.text, text='Объясните теорию', draft='ignored')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['context'], preview.data)
+        message = Message.objects.get()
+        self.assertEqual(message.receiver, self.author)
+        self.assertEqual(message.block, self.text)
+        self.text.content = {'html': '<p>edited</p>'}
+        self.text.save()
+        message.refresh_from_db()
+        self.assertEqual(message.context['task'], {'html': '<p>t</p>'})
+        for user in (self.outsider, self.author):
+            self.assertEqual(self.ask(user, self.text).status_code, 403)
+            self.assertEqual(self.ask(user, self.text, path='/api/questions/preview/').status_code, 403)
 
     def test_context_is_the_students_view_and_latest_submission(self):
         from datetime import timedelta

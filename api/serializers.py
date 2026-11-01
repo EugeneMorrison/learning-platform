@@ -232,6 +232,7 @@ class LessonViewerSerializer(LessonSerializer):
     - lesson_position / lesson_count: "Урок N из M"; N is the place in the
       course's ordered lessons (1-based), not order_index.
     - next_lesson_id: the next lesson of the same course, null on the last one.
+    - previous_lesson_id: the previous lesson, null on the first one.
     - course_completed: the requesting user has solved every task (QUIZ, CODE,
       FILL) in the course; a course without tasks counts as completed.
     """
@@ -239,15 +240,16 @@ class LessonViewerSerializer(LessonSerializer):
     lesson_position = serializers.SerializerMethodField()
     lesson_count = serializers.SerializerMethodField()
     next_lesson_id = serializers.SerializerMethodField()
+    previous_lesson_id = serializers.SerializerMethodField()
     course_completed = serializers.SerializerMethodField()
 
     class Meta(LessonSerializer.Meta):
         fields = LessonSerializer.Meta.fields + [
-            'lesson_position', 'lesson_count', 'next_lesson_id', 'course_completed',
+            'lesson_position', 'lesson_count', 'next_lesson_id', 'previous_lesson_id', 'course_completed',
         ]
 
     def _ordered_ids(self, obj):
-        # One query for the three navigation fields.
+        # One query for all navigation fields.
         if getattr(self, '_ids_course', None) != obj.course_id:
             self._ids_course = obj.course_id
             self._ids = course_lesson_ids_in_order(obj.course_id)
@@ -263,6 +265,11 @@ class LessonViewerSerializer(LessonSerializer):
         ids = self._ordered_ids(obj)
         position = ids.index(obj.id) + 1
         return ids[position] if position < len(ids) else None
+
+    def get_previous_lesson_id(self, obj):
+        ids = self._ordered_ids(obj)
+        position = ids.index(obj.id)
+        return ids[position - 1] if position > 0 else None
 
     def get_course_completed(self, obj):
         request = self.context.get('request')

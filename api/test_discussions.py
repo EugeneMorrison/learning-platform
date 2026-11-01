@@ -154,10 +154,19 @@ class VisibilityTests(DiscussionTestCase):
         self.assertEqual(self.counts(self.solver).data['counts'], {code: 3, quiz: 1})
         self.assertEqual(self.counts(self.author).data['counts'], {code: 3, quiz: 1})
 
-    def test_theory_blocks_have_no_discussions(self):
-        self.assertEqual(self.threads(self.student, self.text).status_code, 400)
-        self.assertEqual(self.start(self.student, self.text).status_code, 400)
-        self.assertFalse(Thread.objects.filter(block=self.text).exists())
+    def test_theory_discussions_are_visible_without_solving(self):
+        response = self.start(self.student, self.text)
+        self.assertEqual(response.status_code, 201)
+        thread_id = response.data['id']
+        for user in (self.student, self.classmate, self.author):
+            self.assertEqual(self.thread_ids(user, self.text), [thread_id])
+            self.assertTrue(self.threads(user, self.text).data['can_see_all'])
+            self.assertEqual(self.counts(user).data['counts'][str(self.text.id)], 1)
+        reply = self.reply(self.classmate, Thread.objects.get(pk=thread_id), 'Ответ по теории')
+        self.assertEqual(reply.status_code, 201)
+        for user in (self.outsider, self.other_author):
+            self.assertEqual(self.threads(user, self.text).status_code, 404)
+            self.assertEqual(self.start(user, self.text).status_code, 404)
 
 
 class EnrolmentTests(DiscussionTestCase):

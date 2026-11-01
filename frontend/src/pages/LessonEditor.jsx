@@ -5,6 +5,7 @@ import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
 import EditableTitle from '../components/EditableTitle';
+import UnsavedBlockMarkers from '../components/UnsavedBlockMarkers';
 import { parseTemplate } from '../lib/fillTemplate';
 import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
 import api from '../api';
@@ -98,7 +99,7 @@ function stripHtml(html) {
 }
 
 // =============================================================================
-// Drafts: every block is open for editing at once, each with its own draft
+// Drafts: each editable block has its own draft
 // =============================================================================
 //
 // A draft: { key, id, type, content, baseline, savedType, insertBefore, seq,
@@ -227,8 +228,10 @@ function cleanContent(type, content) {
 function LessonEditor() {
     const { lessonId } = useParams();
     const navigate = useNavigate();
-    // ?block=<id> ("✎ Изменить" on the lesson page): scroll to that block.
-    const [searchParams, setSearchParams] = useSearchParams();
+    // ?block=<id> opens only that block; no parameter opens the full lesson.
+    const [searchParams] = useSearchParams();
+    const selectedBlockId = searchParams.get('block');
+    const singleBlockMode = selectedBlockId !== null;
 
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]); // the server's list, in order
@@ -307,18 +310,13 @@ function LessonEditor() {
             setBlocks(blocksRes.data);
             setDrafts(prev => mergeDrafts(prev, blocksRes.data));
 
-            // An unknown id is ignored. The parameter goes (replace, not
-            // push), so Back and a reload behave normally.
-            const blockId = searchParams.get('block');
-            if (blockId) {
-                if (blocksRes.data.some(b => b.id === blockId)) {
-                    scrollToRef.current = blockId;
-                    setFlashId(blockId);
+            if (singleBlockMode) {
+                if (blocksRes.data.some(b => b.id === selectedBlockId)) {
+                    scrollToRef.current = selectedBlockId;
+                    setFlashId(selectedBlockId);
+                } else {
+                    setError('Блок не найден в этом уроке.');
                 }
-                setSearchParams(params => {
-                    params.delete('block');
-                    return params;
-                }, { replace: true });
             }
         } catch (err) {
             console.error('Failed to load lesson editor:', err);
@@ -356,11 +354,12 @@ function LessonEditor() {
 
     // Unsaved changes are never lost without asking:
     // - leaving this page inside the app (any link or button, Back / Forward):
-    //   useBlocker; only a different page counts, so dropping ?block= never asks;
+    //   useBlocker, including switching between a block and the full editor;
     // - tab close, reload, plain links to Django pages (the header): the
     //   browser's own dialog (beforeunload; browsers don't allow custom text).
     const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-        dirtyCount > 0 && currentLocation.pathname !== nextLocation.pathname);
+        dirtyCount > 0 && (currentLocation.pathname !== nextLocation.pathname
+            || new URLSearchParams(currentLocation.search).get('block') !== new URLSearchParams(nextLocation.search).get('block')));
 
     useEffect(() => {
         if (blocker.state !== 'blocked') return;
@@ -383,7 +382,8 @@ function LessonEditor() {
 
     // Back to the lesson at the last block saved.
     function previewPath() {
-        return lastSavedId ? `/lesson/${lessonId}/#block-${lastSavedId}` : `/lesson/${lessonId}/`;
+        const blockId = lastSavedId || selectedBlockId;
+        return blockId ? `/lesson/${lessonId}/#block-${blockId}` : `/lesson/${lessonId}/`;
     }
 
     // One block's draft, from the previous state; no-op once it's gone.
@@ -564,25 +564,49 @@ function LessonEditor() {
     const newDrafts = Object.values(drafts).filter(d => d.id === null).sort((a, b) => a.seq - b.seq);
     const newAbove = id => newDrafts.filter(d => d.insertBefore === id);
     const newAtEnd = newDrafts.filter(d => !d.insertBefore);
+    const visibleDrafts = singleBlockMode ? [drafts[selectedBlockId]].filter(Boolean)
+        : [...blocks.flatMap(block => [...newAbove(block.id), drafts[block.id]].filter(Boolean)), ...newAtEnd];
+    const markerBlocks = visibleDrafts.map((draft, index) => ({
+        dirty: draft.dirty,
+        elementId: draft.id === null ? `edit-new-${draft.key}` : `edit-block-${draft.id}`,
+        label: `Несохранённые изменения: ${TYPE_LABELS[draft.type]}, блок ${index + 1}`,
+    }));
     const renderCard = (draft, index = -1) => (
         <BlockCard
             key={draft.key}
             draft={draft}
             actions={actions}
             busy={busy}
+            singleBlockMode={singleBlockMode}
             canMoveUp={index > 0}
             canMoveDown={index >= 0 && index < blocks.length - 1}
             flash={flashId !== null && flashId === draft.id}
         />
     );
 
+    if (singleBlockMode) {
+        const draft = drafts[selectedBlockId];
+        return (
+            <div className="page">
+                <UnsavedBlockMarkers blocks={markerBlocks} />
+                <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(previewPath())}>
+                    ← Назад к уроку
+                </button>
+                <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Редактор блока · Урок {lesson.lesson_position}</div>
+                <h2>{lesson.title}</h2>
+                {draft ? renderCard(draft) : <p role="alert">Блок не найден в этом уроке.</p>}
+            </div>
+        );
+    }
+
     return (
         <div className="page">
+            <UnsavedBlockMarkers blocks={markerBlocks} />
             <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${lesson.course}/`)}>
                 ← Назад к курсу
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div>
                 <div>
                     {/* Position in the course, as on the course page (not order_index). */}
                     <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Редактор урока {lesson.lesson_position}</div>
@@ -596,11 +620,14 @@ function LessonEditor() {
                         }}
                     />
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
-                    <button onClick={() => navigate(previewPath())} style={ghostBtn}>
-                        👁 Предпросмотр
-                    </button>
-                    <NextLessonButton nextLessonId={lesson.next_lesson_id} />
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 'var(--space-4)' }}>
+                    <PreviousLessonButton previousLessonId={lesson.previous_lesson_id} />
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto' }}>
+                        <button onClick={() => navigate(previewPath())} style={ghostBtn}>
+                            👁 Предпросмотр
+                        </button>
+                        <NextLessonButton nextLessonId={lesson.next_lesson_id} />
+                    </div>
                 </div>
             </div>
             <hr style={{ margin: '20px 0' }} />
@@ -639,11 +666,15 @@ function LessonEditor() {
                 </div>
             </div>
 
-            {/* The same «Следующий урок →» again, for an author who has
-                scrolled down through the blocks. */}
-            {lesson.next_lesson_id && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-                    <NextLessonButton nextLessonId={lesson.next_lesson_id} />
+            {/* Repeat lesson navigation after the blocks. */}
+            {(lesson.previous_lesson_id || lesson.next_lesson_id) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 16 }}>
+                    <PreviousLessonButton previousLessonId={lesson.previous_lesson_id} />
+                    {lesson.next_lesson_id && (
+                        <div style={{ marginLeft: 'auto' }}>
+                            <NextLessonButton nextLessonId={lesson.next_lesson_id} />
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -653,6 +684,16 @@ function LessonEditor() {
 // «Следующий урок →»: the next lesson's editor. next_lesson_id is the lesson
 // page's own "next" (GET /api/lessons/<id>/); none on the last lesson.
 // Unsaved changes ask first (useBlocker in LessonEditor).
+function PreviousLessonButton({ previousLessonId }) {
+    const navigate = useNavigate();
+    if (!previousLessonId) return null;
+    return (
+        <button onClick={() => navigate(`/lesson/${previousLessonId}/edit/`)} style={ghostBtn}>
+            ← Предыдущий урок
+        </button>
+    );
+}
+
 function NextLessonButton({ nextLessonId }) {
     const navigate = useNavigate();
     if (!nextLessonId) return null;
@@ -693,7 +734,7 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
 // One block, always open for editing. Memoized: it re-renders only when its
 // own draft (or busy / position / highlight) changes, not when another block
 // is typed in.
-const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, canMoveDown, flash }) {
+const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, canMoveDown, flash, singleBlockMode = false }) {
     const { key, id, type, content, dirty, saving, error } = draft;
     const isNew = id === null;
     const setContent = useCallback(updater => actions.setContent(key, updater), [actions, key]);
@@ -702,6 +743,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
         // scroll-margin: ?block= scrolls the card clear of the sticky app header.
         <div
             id={isNew ? `edit-new-${key}` : `edit-block-${id}`}
+            tabIndex={-1}
             style={{
                 ...blockCard,
                 borderLeft: `4px solid ${dirty ? 'var(--color-warning)' : 'var(--color-success-on-light)'}`,
@@ -720,7 +762,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
                         </select>
                     </label>
                 </div>
-                {!isNew && (
+                {!isNew && !singleBlockMode && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         <button title="Вверх" disabled={busy || !canMoveUp} onClick={() => actions.move(id, -1)} style={iconBtn}>↑</button>
                         <button title="Вниз" disabled={busy || !canMoveDown} onClick={() => actions.move(id, 1)} style={iconBtn}>↓</button>
@@ -1253,12 +1295,13 @@ const previewBlank = {
     padding: '2px 12px', color: 'var(--color-success-on-light)', fontWeight: 600,
 };
 
-// The router reuses the component when only :lessonId changes («Следующий
-// урок →»); a key per lesson remounts it, so the next lesson starts with no
-// drafts of the previous one (as LessonViewerPage does for the lesson page).
+// Remount when the lesson or selected block changes so drafts stay within
+// the editor that created them. useBlocker protects unsaved changes.
 function LessonEditorPage() {
     const { lessonId } = useParams();
-    return <LessonEditor key={lessonId} />;
+    const [searchParams] = useSearchParams();
+    const blockId = searchParams.get('block');
+    return <LessonEditor key={JSON.stringify([lessonId, blockId])} />;
 }
 
 export default LessonEditorPage;

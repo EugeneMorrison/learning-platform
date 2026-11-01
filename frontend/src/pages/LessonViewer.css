@@ -43,8 +43,17 @@
    "Курс пройден → к курсу": full text, never shortened. */
 .lesson-nav {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--space-2);
+}
+
+.lesson-nav--top {
+    margin-bottom: var(--space-5);
+}
+
+.lesson-nav__previous {
+    margin-right: auto;
 }
 
 .lesson-nav .btn {

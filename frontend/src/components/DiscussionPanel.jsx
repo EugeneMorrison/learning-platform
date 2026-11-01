@@ -16,10 +16,10 @@ const MAX_COMMENT_LENGTH = 2000;
  * reports on it. discussion: { count, reports, open, onToggle, panelId }
  * (LessonViewer), or nothing (no discussions: embeds, logged out).
  */
-export function DiscussionBadge({ blockId, discussion }) {
+export function DiscussionBadge({ blockId, discussion, subject = 'задания' }) {
     if (!discussion) return null;
     const { count, reports = 0, open, onToggle, panelId } = discussion;
-    const label = `Обсуждение задания: ${count}` + (reports > 0 ? `, жалоб: ${reports}` : '');
+    const label = `Обсуждение ${subject}: ${count}` + (reports > 0 ? `, жалоб: ${reports}` : '');
     return (
         <button
             type="button"

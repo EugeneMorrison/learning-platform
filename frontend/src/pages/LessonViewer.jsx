@@ -161,7 +161,7 @@ function LessonViewer() {
     const discussionParam = new URLSearchParams(search).get('discussion');
     useEffect(() => {
         if (loading || !discussionsOn || !discussionParam) return;
-        if (blocks.some(b => b.id === discussionParam && TASK_TYPES.has(b.type))) {
+        if (blocks.some(b => b.id === discussionParam && (b.type === 'TEXT' || TASK_TYPES.has(b.type)))) {
             setDiscussionBlockId(discussionParam);
         }
     }, [loading, discussionsOn, discussionParam, blocks]);
@@ -347,7 +347,8 @@ function LessonViewer() {
         let inner = null;
         switch (block.type) {
             case 'TEXT':
-                inner = <TextBlock blockId={block.id} content={block.content} />;
+                inner = <TextBlock blockId={block.id} content={block.content} discussion={discussion}
+                    onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             case 'QUIZ':
                 inner = <QuizBlock blockId={block.id} quizRevision={block.updated_at} content={block.content} savedProgress={blockProgress} number={number}
@@ -372,7 +373,7 @@ function LessonViewer() {
                 {canEdit && (
                     <div className="lesson-anchor__tools">
                         <Link className="btn btn-secondary btn-sm" to={`/lesson/${lesson.id}/edit/?block=${block.id}`}>
-                            ✎ Изменить
+                            ✎ Редактировать блок
                         </Link>
                     </div>
                 )}
@@ -421,9 +422,7 @@ function LessonViewer() {
         <div className={discussionBlock ? 'lesson-viewer lesson-viewer--discussion' : 'lesson-viewer'}>
             <div className="page page--narrow lesson-page">
 
-                {/* The lessons button, lesson title and progress are in the app
-                    header. Here, for the author only: "✎ Редактировать урок" (no
-                    row at all for students; never in an embed, see canEdit). */}
+                {/* The author can open the editor from the regular lesson view. */}
                 {canEdit && (
                     <div className="lesson-toolbar">
                         <Link
@@ -442,6 +441,18 @@ function LessonViewer() {
                         <h1 className="lesson-header__title">{lesson.title}</h1>
                         <LessonProgress taskIds={taskIds} solvedIds={solvedBlockIds} />
                     </div>
+                )}
+
+                {!isInIframe && (lesson.previous_lesson_id || lesson.next_lesson_id) && (
+                    <nav className="lesson-nav lesson-nav--top" aria-label="Навигация по курсу в начале урока">
+                        <PreviousLessonLink lessonId={lesson.previous_lesson_id} />
+                        {lesson.next_lesson_id && (
+                            <Link className="btn btn-secondary btn-sm" to={`/lesson/${lesson.next_lesson_id}/`}
+                                onClick={() => window.scrollTo(0, 0)}>
+                                Следующий урок →
+                            </Link>
+                        )}
+                    </nav>
                 )}
 
                 {/* «Задать вопрос» (students: same people as the chat). */}
@@ -474,6 +485,7 @@ function LessonViewer() {
                     const step = nextStep(lesson);
                     return (
                         <nav className="lesson-nav" aria-label="Навигация по курсу">
+                            <PreviousLessonLink lessonId={lesson.previous_lesson_id} />
                             {step.isNextLesson ? (
                                 <Link
                                     className="btn btn-secondary btn-sm"
@@ -525,7 +537,7 @@ function LessonViewer() {
                     key={discussionBlock.id}
                     id={DISCUSSION_PANEL_ID}
                     blockId={discussionBlock.id}
-                    title={`${TASK_LABELS[discussionBlock.type]} ${blockNumbers[discussionBlock.id]}`}
+                    title={discussionBlock.type === 'TEXT' ? 'Теория' : `${TASK_LABELS[discussionBlock.type]} ${blockNumbers[discussionBlock.id]}`}
                     solved={solvedBlockIds.has(discussionBlock.id)}
                     onClose={closeDiscussion}
                     onThreadsChanged={loadDiscussionCounts}
@@ -535,8 +547,17 @@ function LessonViewer() {
     );
 }
 
-// The router reuses the component when only :lessonId changes ("Следующий
-// урок →"); a key per lesson remounts it so the new lesson loads from scratch.
+function PreviousLessonLink({ lessonId }) {
+    if (!lessonId) return null;
+    return (
+        <Link className="btn btn-secondary btn-sm lesson-nav__previous" to={`/lesson/${lessonId}/`}
+            onClick={() => window.scrollTo(0, 0)}>
+            ← Предыдущий урок
+        </Link>
+    );
+}
+
+// Remount on lesson navigation so the new lesson loads from scratch.
 function LessonViewerPage() {
     const { lessonId } = useParams();
     return <LessonViewer key={lessonId} />;
