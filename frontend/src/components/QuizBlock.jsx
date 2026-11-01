@@ -193,11 +193,6 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
                     </button>
                 </div>
                 <div className="lesson-block__actions-end">
-                    {practice && initial.result?.isCorrect && (
-                        <button className="btn btn-secondary" disabled={checking} onClick={() => showCompletion(initial)}>
-                            Вернуться к сохранённому решению
-                        </button>
-                    )}
                     {submitted ? (
                         <button className="btn btn-secondary" onClick={handleReset}>
                             {isCorrect ? 'Решить снова' : 'Попробовать снова'}

@@ -346,16 +346,16 @@ test('practice on an edited quiz uses current options without replacing the hist
     assert.equal(options(reopened)[2].props['aria-pressed'], true);
 });
 
-test('practice can be canceled back to legacy saved work without changing progress', async t => {
+test('refresh during practice restores legacy saved work without changing progress', async t => {
     progress = [{ block: 'quiz', is_correct: true, answer: { selected: 1 } }];
     const stored = structuredClone(progress);
     const renderer = await mount(t);
     await clickAction(renderer, 'Решить снова');
     await choose(renderer, ['a']);
-    await clickAction(renderer, 'Вернуться к сохранённому решению');
-    assert.deepEqual(displayed(renderer), content.options);
-    assert.equal(options(renderer)[1].props['aria-pressed'], true);
-    assert.ok(options(renderer).every(node => node.props.disabled));
+    const reopened = await mount(t);
+    assert.deepEqual(displayed(reopened), content.options);
+    assert.equal(options(reopened)[1].props['aria-pressed'], true);
+    assert.ok(options(reopened).every(node => node.props.disabled));
     assert.deepEqual(progress, stored);
 });
 
