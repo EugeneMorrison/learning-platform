@@ -23,6 +23,7 @@ const server = await createServer({
             if (id === '\0editor-api') return `export default {
                 get: (...args) => globalThis.__blockEditorTest.get(...args),
                 patch: (...args) => globalThis.__blockEditorTest.patch(...args),
+                post: (...args) => globalThis.__blockEditorTest.post(...args),
             };`;
             if (id === '\0editor-router') return `
                 export const useParams = () => ({ lessonId: 'lesson' });
@@ -45,6 +46,7 @@ const server = await createServer({
 });
 const { default: LessonEditor } = await server.ssrLoadModule('/src/pages/LessonEditor.jsx');
 const { default: UnsavedBlockMarkers } = await server.ssrLoadModule('/src/components/UnsavedBlockMarkers.jsx');
+const { dropPosition } = await server.ssrLoadModule('/src/lib/useDragReorder.js');
 after(() => server.close());
 
 let blocks;
@@ -60,6 +62,8 @@ beforeEach(t => {
     globalThis.requestAnimationFrame = callback => { fixture.frame = callback; return 1; };
     globalThis.cancelAnimationFrame = () => {};
     globalThis.document = {
+        addEventListener() {},
+        removeEventListener() {},
         getElementById: () => null,
         querySelector: () => null,
         documentElement: { scrollHeight: 4000 },
@@ -90,6 +94,13 @@ beforeEach(t => {
         Object.assign(block, structuredClone(payload));
         return { data: structuredClone(block) };
     };
+    fixture.post = t.mock.fn(async (url, payload) => {
+        const index = blocks.findIndex(block => url === `/blocks/${block.id}/reorder/`);
+        if (index < 0) throw Error(`Unexpected request: ${url}`);
+        const [moved] = blocks.splice(index, 1);
+        blocks.splice(payload.new_order - 1, 0, moved);
+        return { data: structuredClone(blocks) };
+    });
     t.mock.method(console, 'error', () => {});
 });
 
@@ -212,4 +223,54 @@ test('failed saves retain markers; reverting removes them', async t => {
     assert.equal(markers().length, 1);
     await act(async () => buttons(renderer).find(node => node.children.join('') === 'Отменить изменения').props.onClick());
     assert.equal(markers().length, 0);
+});
+
+test('dropping a block far down saves one move and preserves its unsaved draft', async t => {
+    fixture.search = '';
+    const renderer = await mount(t);
+    await act(async () => renderer.root.findAllByType('textarea')[0].props.onChange({ target: { value: '<p>Unsaved theory</p>' } }));
+    const source = cards(renderer)[0].findAllByType('button').find(node => node.props.draggable);
+    const dataTransfer = { setData() {}, setDragImage() {} };
+    await act(async () => source.props.onDragStart({ clientY: 200, dataTransfer, currentTarget: { closest: () => null } }));
+    const destination = cards(renderer).at(-1);
+    await act(async () => destination.props.onDrop({ clientY: 95, dataTransfer, preventDefault() {}, stopPropagation() {},
+        currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 100 }) } }));
+    assert.equal(fixture.post.mock.calls.length, 1);
+    assert.deepEqual(fixture.post.mock.calls[0].arguments, ['/blocks/theory/reorder/', { new_order: 4 }]);
+    assert.deepEqual(cards(renderer).map(card => card.props.id), ['edit-block-quiz', 'edit-block-code', 'edit-block-fill', 'edit-block-theory']);
+    assert.equal(cards(renderer).at(-1).findByType('textarea').props.value, '<p>Unsaved theory</p>');
+    assert.equal(cards(renderer).at(-1).findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.disabled, false);
+    assert.equal(patches.length, 0);
+});
+
+test('block arrows use one atomic reorder request too', async t => {
+    fixture.search = '';
+    const renderer = await mount(t);
+    await act(async () => cards(renderer)[0].findAllByType('button').find(node => node.props.title === 'Вниз').props.onClick());
+    assert.deepEqual(fixture.post.mock.calls[0].arguments, ['/blocks/theory/reorder/', { new_order: 2 }]);
+    assert.equal(patches.length, 0);
+});
+
+test('drop positions account for removing the source and ignore unchanged drops', () => {
+    const ids = Array.from({ length: 50 }, (_, i) => String(i));
+    assert.equal(dropPosition(ids, '0', '14', true), 15);
+    assert.equal(dropPosition(ids, '49', '0', false), 1);
+    assert.equal(dropPosition(ids, '0', '1', false), null);
+    assert.equal(dropPosition(ids, '1', '0', true), null);
+    assert.equal(dropPosition(ids, '1', '1', true), null);
+    assert.equal(dropPosition(ids, 'unknown', '2', true), null);
+});
+
+test('drag scrolls near the viewport edge and cancellation sends no request', async t => {
+    fixture.search = '';
+    window.scrollBy = t.mock.fn();
+    const renderer = await mount(t);
+    const source = cards(renderer)[0].findAllByType('button').find(node => node.props.draggable);
+    await act(async () => source.props.onDragStart({ clientY: 790,
+        dataTransfer: { setData() {}, setDragImage() {} }, currentTarget: { closest: () => null } }));
+    await act(async () => fixture.frame(0));
+    assert.ok(window.scrollBy.mock.calls[0].arguments[1] > 0);
+    await act(async () => source.props.onDragEnd());
+    assert.equal(fixture.post.mock.calls.length, 0);
+    assert.ok(cards(renderer).every(card => !card.props.className.includes('--dragging')));
 });

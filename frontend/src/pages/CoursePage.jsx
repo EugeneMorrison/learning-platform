@@ -3,6 +3,9 @@ import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api';
 import ChatPanel from '../components/ChatPanel';
 import CourseCoverEditor from '../components/CourseCoverEditor';
+import CourseDescriptionEditor from '../components/CourseDescriptionEditor';
+import DragHandle from '../components/DragHandle';
+import { useDragReorder } from '../lib/useDragReorder';
 import EditableTitle from '../components/EditableTitle';
 import { TaskProgress } from '../components/LessonProgress';
 import StudentChat from '../components/StudentChat';
@@ -217,20 +220,25 @@ function CoursePage() {
     // the course in one transaction and returns the list in the new order;
     // the "Урок N" labels follow the list position.
     async function handleMoveLesson(index, dir) {
+        return handleReorderLesson(lessons[index].id, index + 1 + dir, dir);
+    }
+
+    async function handleReorderLesson(id, newOrder, dir) {
         if (movingRef.current) return;
-        const lesson = lessons[index];
+        const lesson = lessons.find(item => item.id === id);
+        if (!lesson) return;
         movingRef.current = true;
         setMovingLesson(true);
         setMoveStatus('');
         try {
-            const res = await api.post(`/lessons/${lesson.id}/reorder/`, { new_order: index + 1 + dir });
+            const res = await api.post(`/lessons/${lesson.id}/reorder/`, { new_order: newOrder });
             setLessons(res.data);
             const position = res.data.findIndex(l => l.id === lesson.id) + 1;
             setMoveStatus(`Урок «${lesson.title}» теперь ${position}-й.`);
             // Keep keyboard focus on the moved lesson's arrow (or the other
             // one once it reaches the top / bottom).
             requestAnimationFrame(() => {
-                const same = moveButtonRefs.current[`${lesson.id}:${dir}`];
+                const same = moveButtonRefs.current[`${lesson.id}:${dir || 'drag'}`];
                 const other = moveButtonRefs.current[`${lesson.id}:${-dir}`];
                 (same && !same.disabled ? same : other)?.focus();
             });
@@ -394,6 +402,12 @@ function CoursePage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [loading, course, user, enrollments, chatParam, setSearchParams]);
 
+    const lessonDrag = useDragReorder({
+        ids: lessons.map(item => item.id),
+        disabled: movingLesson || !user || !course || course.author !== user.id,
+        onMove: handleReorderLesson,
+    });
+
     if (loading) return <div className="page"><p className="page-status">Загрузка...</p></div>;
     if (!course) return <div className="page"><p className="page-status">Курс не найден.</p></div>;
 
@@ -462,7 +476,11 @@ function CoursePage() {
                             onSaved={cover => setCourse(prev => ({ ...prev, cover }))}
                         />
                     )}
-                    {course.description && <p className="page__lead">{course.description}</p>}
+                    <CourseDescriptionEditor key={courseId} value={course.description || ''} canEdit={isOwner}
+                        onSave={async description => {
+                            const res = await api.patch(`/courses/${courseId}/`, { description });
+                            setCourse(prev => ({ ...prev, description: res.data.description }));
+                        }} />
                 </div>
                 {/* Its own line of the header, so the bar has a width on any screen. */}
                 {!isOwner && (showStudentProgress || isEnrolled) && (
@@ -547,7 +565,8 @@ function CoursePage() {
                 ) : (
                     <div className="lesson-list">
                     {lessons.map((lesson, index) => (
-                        <div key={lesson.id} className="card card-link lesson-row">
+                        <div key={lesson.id} {...lessonDrag.getItemProps(lesson.id)}
+                            className={`card card-link lesson-row ${lessonDrag.getItemProps(lesson.id).className || ''}`}>
                             <div className="lesson-row__text">
                                 <EditableTitle
                                     as="strong"
@@ -566,6 +585,8 @@ function CoursePage() {
                             <LessonRowProgress item={outline[lesson.id]} studentCount={studentCount} />
                             {isOwner && (
                                 <div className="lesson-row__actions">
+                                    <DragHandle {...lessonDrag.getHandleProps(lesson.id)}
+                                        ref={el => { moveButtonRefs.current[`${lesson.id}:drag`] = el; }} />
                                     <button
                                         ref={el => { moveButtonRefs.current[`${lesson.id}:-1`] = el; }}
                                         className="btn btn-secondary btn-sm lesson-row__move"

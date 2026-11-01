@@ -6,6 +6,8 @@ import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
 import EditableTitle from '../components/EditableTitle';
 import UnsavedBlockMarkers from '../components/UnsavedBlockMarkers';
+import DragHandle from '../components/DragHandle';
+import { useDragReorder } from '../lib/useDragReorder';
 import { parseTemplate } from '../lib/fillTemplate';
 import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
 import api from '../api';
@@ -249,6 +251,7 @@ function LessonEditor() {
     const copyingRef = useRef(false); // a double click must not make two copies
     const newSeqRef = useRef(0); // numbers new blocks: keys "new-1", "new-2", …
     const reloadSeqRef = useRef(0); // only the latest block list is shown
+    const movingBlockRef = useRef(false);
 
     // Stable callbacks for the (memoized) cards read the current handlers and
     // state from here. Only to READ: every state change is a functional update.
@@ -483,26 +486,27 @@ function LessonEditor() {
         }
     }
 
-    // Swap order_index with the neighbour. Uses a temporary free index to dodge
-    // the (lesson, order_index) unique constraint during the swap.
     async function moveBlock(id, dir) {
         const index = blocks.findIndex(b => b.id === id);
         const target = index + dir;
         if (index < 0 || target < 0 || target >= blocks.length) return;
+        return moveBlockTo(id, target + 1);
+    }
+
+    async function moveBlockTo(id, position) {
+        if (movingBlockRef.current || busy) return;
+        movingBlockRef.current = true;
         setBusy(true);
         try {
-            const a = blocks[index];
-            const b = blocks[target];
-            const temp = Math.max(...blocks.map(x => x.order_index)) + 1;
-            await api.patch(`/blocks/${a.id}/`, { order_index: temp });
-            await api.patch(`/blocks/${b.id}/`, { order_index: a.order_index });
-            await api.patch(`/blocks/${a.id}/`, { order_index: b.order_index });
+            await api.post(`/blocks/${id}/reorder/`, { new_order: position });
             await reloadBlocks();
+            setCopyStatus(`Блок перемещён на позицию ${position}.`);
         } catch (e) {
             console.error('Failed to reorder blocks:', e);
             alert('Не удалось изменить порядок.');
             await reloadBlocks();
         } finally {
+            movingBlockRef.current = false;
             setBusy(false);
         }
     }
@@ -554,6 +558,12 @@ function LessonEditor() {
         delete: id => latest.current.handleDelete(latest.current.blocks.find(b => b.id === id)),
     }), []);
 
+    const blockDrag = useDragReorder({
+        ids: blocks.map(block => block.id),
+        disabled: busy || singleBlockMode || user?.role !== 'AUTHOR',
+        onMove: moveBlockTo,
+    });
+
     if (loading) return <p style={{ padding: 40, textAlign: 'center', color: 'var(--color-muted)' }}>Загрузка...</p>;
     if (error) return <p style={{ padding: 40, textAlign: 'center', color: 'var(--color-danger)' }}>{error}</p>;
     if (user?.role !== 'AUTHOR') {
@@ -578,6 +588,8 @@ function LessonEditor() {
             actions={actions}
             busy={busy}
             singleBlockMode={singleBlockMode}
+            reorderProps={draft.id !== null ? blockDrag.getItemProps(draft.id) : undefined}
+            dragHandleProps={draft.id !== null ? blockDrag.getHandleProps(draft.id) : undefined}
             canMoveUp={index > 0}
             canMoveDown={index >= 0 && index < blocks.length - 1}
             flash={flashId !== null && flashId === draft.id}
@@ -734,7 +746,7 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
 // One block, always open for editing. Memoized: it re-renders only when its
 // own draft (or busy / position / highlight) changes, not when another block
 // is typed in.
-const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, canMoveDown, flash, singleBlockMode = false }) {
+const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, canMoveDown, flash, singleBlockMode = false, reorderProps, dragHandleProps }) {
     const { key, id, type, content, dirty, saving, error } = draft;
     const isNew = id === null;
     const setContent = useCallback(updater => actions.setContent(key, updater), [actions, key]);
@@ -742,6 +754,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
     return (
         // scroll-margin: ?block= scrolls the card clear of the sticky app header.
         <div
+            {...reorderProps}
             id={isNew ? `edit-new-${key}` : `edit-block-${id}`}
             tabIndex={-1}
             style={{
@@ -764,6 +777,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
                 </div>
                 {!isNew && !singleBlockMode && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        <DragHandle {...dragHandleProps} />
                         <button title="Вверх" disabled={busy || !canMoveUp} onClick={() => actions.move(id, -1)} style={iconBtn}>↑</button>
                         <button title="Вниз" disabled={busy || !canMoveDown} onClick={() => actions.move(id, 1)} style={iconBtn}>↓</button>
                         <button

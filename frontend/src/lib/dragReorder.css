@@ -1,0 +1,33 @@
+.reorder-item {
+    position: relative;
+}
+
+.reorder-item--dragging {
+    opacity: 0.55;
+}
+
+.reorder-item--before::before,
+.reorder-item--after::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--color-accent);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.reorder-item--before::before { top: -8px; }
+.reorder-item--after::after { bottom: -8px; }
+
+.reorder-handle {
+    cursor: grab;
+    user-select: none;
+    font-size: var(--text-lg);
+    line-height: 1;
+}
+
+.reorder-handle:active { cursor: grabbing; }
+.reorder-handle:disabled { cursor: default; }

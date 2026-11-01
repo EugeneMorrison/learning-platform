@@ -902,6 +902,31 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
         return Response({'students': len(students)})
 
     @action(detail=True, methods=['post'])
+    def reorder(self, request, pk=None):
+        """Move a block to a 1-based position within its lesson, atomically.
+        Content, student progress and attempts are left intact.
+        """
+        block = self.get_object()
+        position = LessonViewSet._parse_position(request.data.get('new_order'))
+        if position is None or position < 1:
+            raise ParseError(gettext('Укажите положительную целую позицию: new_order.'))
+        with transaction.atomic():
+            blocks = list(Block.objects.select_for_update().filter(lesson_id=block.lesson_id)
+                          .order_by('order_index', 'id'))
+            slots = [item.order_index for item in blocks]
+            moved = next(item for item in blocks if item.pk == block.pk)
+            blocks.remove(moved)
+            blocks.insert(min(position - 1, len(blocks)), moved)
+            changed = [(item.pk, slot) for item, slot in zip(blocks, slots) if item.order_index != slot]
+            temporary = max(slots) + 1
+            for offset, (pk, _) in enumerate(changed):
+                Block.objects.filter(pk=pk).update(order_index=temporary + offset)
+            for pk, slot in changed:
+                Block.objects.filter(pk=pk).update(order_index=slot)
+        ordered = Block.objects.filter(lesson_id=block.lesson_id).order_by('order_index', 'id')
+        return Response(self.get_serializer(ordered, many=True).data)
+
+    @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):
         """
         POST /api/blocks/{id}/duplicate/  (lesson editor's "Копировать")

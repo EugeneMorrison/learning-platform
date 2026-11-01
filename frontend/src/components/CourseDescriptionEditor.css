@@ -1,0 +1,42 @@
+.course-description {
+    margin-top: var(--space-5);
+}
+
+.course-description__head,
+.course-description__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.course-description__title {
+    margin: 0;
+    font-size: var(--text-base);
+}
+
+.course-description__form {
+    padding: var(--space-4);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-surface);
+}
+
+.course-description__form textarea {
+    width: 100%;
+    resize: vertical;
+}
+
+.course-description__actions {
+    margin: var(--space-3) 0 0;
+}
+
+.course-description__text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.course-description__empty {
+    color: var(--color-muted);
+}
