@@ -161,7 +161,6 @@ function QuizBlock({ content, blockId, quizRevision, savedProgress, number, onSu
                         onClick={() => handleOptionClick(originalIndex)}
                         className={optionClass(originalIndex, selected, submitted, isCorrect)}
                     >
-                        {multiple && <span aria-hidden="true" style={{ marginRight: 8 }}>{selected?.includes(originalIndex) ? '☑' : '☐'}</span>}
                         <span dangerouslySetInnerHTML={{ __html: text }} />
                     </button>
                 ))}
