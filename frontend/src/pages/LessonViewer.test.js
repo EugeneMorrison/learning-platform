@@ -118,6 +118,19 @@ async function choose(renderer, texts) {
     }
 }
 
+test('code drafts receive the authenticated account ID after lesson loading', async t => {
+    blocks = [{ id: 'code', type: 'CODE', content: { starter_code: '# Start' } }];
+    progress = [];
+    const get = fixture.get;
+    fixture.get = async url => {
+        if (url === '/auth/me/') return { data: { id: 'student-account' } };
+        if (url === '/discussions/counts/') return { data: { counts: {} } };
+        return get(url);
+    };
+    const renderer = await mount(t);
+    assert.equal(renderer.root.findByProps({ blockId: 'code' }).props.userId, 'student-account');
+});
+
 test('failed progress retrieval must not render a completed quiz with a new shuffle', async t => {
     const get = fixture.get;
     fixture.get = url => url.startsWith('/progress/')

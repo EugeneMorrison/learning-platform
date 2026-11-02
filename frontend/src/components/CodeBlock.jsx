@@ -5,6 +5,7 @@ import { pycharmDarcula } from './pycharmDarcula';
 import { wrapImages, wrapTables } from '../lib/contentImages';
 import { renderMath } from '../lib/contentMath';
 import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
+import useCodeDraft from '../lib/useCodeDraft';
 import api from '../api';
 import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
@@ -15,7 +16,7 @@ const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
 // Students only receive visible tests, so hidden ones never count here.
 const SHOWN_TESTS = 2;
 
-function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk, discussion }) {
+function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitted, onAsk, discussion }) {
     const comparison = OUTPUT_COMPARISONS.find(option => option.value === content.output_comparison);
     const wasSolved = savedProgress?.is_correct === true;
     const savedCode = savedProgress?.answer?.code;
@@ -29,7 +30,9 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
     const hiddenTestCount = content.hidden_test_count || 0;
     const totalTestCount = (content.tests?.length || 0) + hiddenTestCount;
 
-    const [userCode, setUserCode] = useState(savedCode || content.starter_code);
+    const [userCode, setUserCode, draftStorageAvailable] = useCodeDraft(
+        userId, blockId, savedCode ?? content.starter_code ?? ''
+    );
     const [testsOpen, setTestsOpen] = useState(true);
     const [allTestsShown, setAllTestsShown] = useState(false);
     const hasMoreTests = (content.tests?.length || 0) > SHOWN_TESTS;
@@ -133,7 +136,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
     };
 
     const handleReset = () => {
-        setUserCode(content.starter_code);
+        setUserCode(content.starter_code ?? '');
         setTestInput(firstTestInput || '');
         setSelectedTestIndex(hasTests ? 0 : null);
         setRunOutput(null);
@@ -270,7 +273,7 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
             <div className="code-editor">
                 <CodeMirror
                     value={userCode}
-                    onChange={(value) => setUserCode(value)}
+                    onChange={setUserCode}
                     extensions={[python(), pycharmDarcula]}
                     theme="none"
                     basicSetup={{
@@ -288,6 +291,12 @@ function CodeBlock({ blockId, content, savedProgress, number, onSubmitted, onAsk
                     minHeight="120px"
                 />
             </div>
+
+            {!draftStorageAvailable && (
+                <p className="notice notice-danger" role="alert">
+                    Не удалось сохранить черновик в браузере. Скопируйте код перед уходом со страницы, чтобы не потерять изменения.
+                </p>
+            )}
 
             {/* Test input box */}
             <div className="lesson-block__label">Тестовый ввод:</div>

@@ -356,7 +356,7 @@ function LessonViewer() {
                     onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             case 'CODE':
-                inner = <CodeBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}
+                inner = <CodeBlock key={`${user?.id}:${block.id}`} blockId={block.id} userId={user?.id} content={block.content} savedProgress={blockProgress} number={number}
                     onSubmitted={data => handleCodeSubmitted(block.id, data)} discussion={discussion}
                     onAsk={hasChat ? draft => setQuestion({ blockId: block.id, draft }) : undefined} />;
                 break;

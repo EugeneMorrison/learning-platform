@@ -148,6 +148,22 @@ A few implementation notes:
 
 ---
 
+## Code drafts
+
+Code assignments save each edit immediately in the browser's `localStorage`,
+separately for each account and assignment. Returning to a lesson restores the
+draft before the last submitted answer or starter code, including an intentionally
+empty editor. Drafts survive refreshes, lesson changes, browser restarts, and
+logout/login. Running or submitting code keeps the draft; Reset replaces it with
+the starter code. Drafts do not submit answers or change course progress.
+
+Drafts belong to this browser and site address; they do not sync across devices
+and are removed if the site's browser storage is cleared. If storage is blocked
+or full, the editor shows a warning so the student can copy their code before
+leaving.
+
+---
+
 ## Real-time chat (WebSockets)
 
 Teacher and student chat over Django Channels WebSockets, so messages show up instantly with no polling and no refresh.
