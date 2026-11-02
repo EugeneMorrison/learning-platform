@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
 import api from '../api';
 import TextBlock from '../components/TextBlock';
+import FloatingLessonNav from '../components/FloatingLessonNav';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
@@ -55,6 +56,8 @@ function LessonViewer() {
     // «Задать вопрос» open for this task: { blockId, draft? } (draft: CODE editor code).
     const [question, setQuestion] = useState(null);
     const chatRef = useRef(null); // StudentChat: open(message?), close()
+    const topNavRef = useRef(null);
+    const bottomNavRef = useRef(null);
     // The task whose discussion is open (one at a time), «💬 N» per task and,
     // for the course author, open reports per task.
     const [discussionBlockId, setDiscussionBlockId] = useState(null);
@@ -420,11 +423,13 @@ function LessonViewer() {
     // buttons moved or hidden (LessonViewer.css).
     return (
         <div className={discussionBlock ? 'lesson-viewer lesson-viewer--discussion' : 'lesson-viewer'}>
+            {canEdit && <FloatingLessonNav previousLessonId={lesson.previous_lesson_id} nextLessonId={lesson.next_lesson_id}
+                topRef={topNavRef} bottomRef={bottomNavRef} />}
             <div className="page page--narrow lesson-page">
 
                 {/* The author can open the editor from the regular lesson view. */}
                 {canEdit && (
-                    <div className="lesson-toolbar">
+                    <div className="lesson-toolbar" ref={!lesson.next_lesson_id ? topNavRef : undefined}>
                         {!lesson.next_lesson_id && <PreviousLessonLink lessonId={lesson.previous_lesson_id} />}
                         <Link
                             className="btn btn-secondary btn-sm lesson-toolbar__edit"
@@ -445,7 +450,7 @@ function LessonViewer() {
                 )}
 
                 {!isInIframe && (!canEdit || lesson.next_lesson_id) && (lesson.previous_lesson_id || lesson.next_lesson_id) && (
-                    <nav className="lesson-nav lesson-nav--top" aria-label="Навигация по курсу в начале урока">
+                    <nav ref={topNavRef} className="lesson-nav lesson-nav--top" aria-label="Навигация по курсу в начале урока">
                         <PreviousLessonLink lessonId={lesson.previous_lesson_id} />
                         {lesson.next_lesson_id && (
                             <Link className="btn btn-secondary btn-sm" to={`/lesson/${lesson.next_lesson_id}/`}
@@ -485,7 +490,7 @@ function LessonViewer() {
                 {!isInIframe && (() => {
                     const step = nextStep(lesson);
                     return (
-                        <nav className="lesson-nav" aria-label="Навигация по курсу">
+                        <nav ref={bottomNavRef} className="lesson-nav" aria-label="Навигация по курсу">
                             <PreviousLessonLink lessonId={lesson.previous_lesson_id} />
                             {step.isNextLesson ? (
                                 <Link

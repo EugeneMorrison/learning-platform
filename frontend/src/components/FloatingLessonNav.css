@@ -1,0 +1,43 @@
+.floating-lesson-nav {
+    --floating-page-width: calc(var(--reading-width) + 2 * var(--space-5));
+    --floating-control-width: min(12rem, calc((100vw - 3 * var(--space-3)) / 2));
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: var(--z-floating);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-2);
+    /* Keep controls in the margins when there is room. At smaller widths,
+       clamp them to the window edges so they gradually move over the page. */
+    padding-inline: max(var(--space-3), calc((100% - var(--floating-page-width)) / 2 - var(--floating-control-width) - var(--space-4)));
+    pointer-events: none;
+}
+
+.floating-lesson-nav--editor {
+    --floating-page-width: var(--container-width);
+}
+
+.floating-lesson-nav__side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: var(--floating-control-width);
+    min-width: 0;
+}
+
+.floating-lesson-nav .btn {
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    pointer-events: auto;
+    box-shadow: var(--shadow-md);
+}
+
+/* The discussion and modal dialogs have their own navigation and focus. */
+.lesson-viewer--discussion .floating-lesson-nav,
+.question-modal-open .floating-lesson-nav,
+.edit-history-open .floating-lesson-nav {
+    display: none;
+}

@@ -7,6 +7,7 @@ import RichTextEditor from '../components/RichTextEditor';
 import EditableTitle from '../components/EditableTitle';
 import UnsavedBlockMarkers from '../components/UnsavedBlockMarkers';
 import DragHandle from '../components/DragHandle';
+import FloatingLessonNav from '../components/FloatingLessonNav';
 import EditHistoryButton from '../components/EditHistory';
 import { useDragReorder } from '../lib/useDragReorder';
 import { parseTemplate } from '../lib/fillTemplate';
@@ -251,6 +252,8 @@ function LessonEditor() {
     const newSeqRef = useRef(0); // numbers new blocks: keys "new-1", "new-2", …
     const reloadSeqRef = useRef(0); // only the latest block list is shown
     const movingBlockRef = useRef(false);
+    const topNavRef = useRef(null);
+    const bottomNavRef = useRef(null);
 
     // Stable callbacks for the (memoized) cards read the current handlers and
     // state from here. Only to READ: every state change is a functional update.
@@ -636,6 +639,8 @@ function LessonEditor() {
     return (
         <div className="page">
             <UnsavedBlockMarkers blocks={markerBlocks} />
+            <FloatingLessonNav previousLessonId={lesson.previous_lesson_id} nextLessonId={lesson.next_lesson_id}
+                topRef={topNavRef} bottomRef={bottomNavRef} editor previewTo={previewPath()} />
             <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(`/courses/${lesson.course}/`)}>
                 ← Назад к курсу
             </button>
@@ -654,7 +659,7 @@ function LessonEditor() {
                         }}
                     />
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 'var(--space-4)' }}>
+                <div ref={topNavRef} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 'var(--space-4)' }}>
                     <PreviousLessonButton previousLessonId={lesson.previous_lesson_id} />
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginLeft: 'auto' }}>
                         <button onClick={() => navigate(previewPath())} style={ghostBtn}>
@@ -703,7 +708,7 @@ function LessonEditor() {
 
             {/* Repeat lesson navigation after the blocks. */}
             {(lesson.previous_lesson_id || lesson.next_lesson_id) && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 16 }}>
+                <div ref={bottomNavRef} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 16 }}>
                     <PreviousLessonButton previousLessonId={lesson.previous_lesson_id} />
                     {lesson.next_lesson_id && (
                         <div style={{ marginLeft: 'auto' }}>
