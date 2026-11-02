@@ -22,7 +22,7 @@ from django.http import Http404
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.db import models, transaction
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, Greatest
 from collections import Counter
 from datetime import datetime
 import subprocess
@@ -34,7 +34,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import render
 from rest_framework.views import APIView
 
-from .models import (Course, Lesson, Block, Enrollment, Progress, Message, Attempt, Thread, Comment,
+from .models import (Course, CourseEdit, Lesson, Block, Enrollment, Progress, Message, Attempt, Thread, Comment,
                      CommentReport, DiscussionBan)
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed, message_preview, notify_user, push_message
 from .questions import MAX_DRAFT_LENGTH, build_context
@@ -391,6 +391,8 @@ class CourseViewSet(EditHistoryMixin, viewsets.ModelViewSet):
         elif self.action == 'create':
             # Must be authenticated author to create
             permission_classes = [IsAuthenticated, IsAuthor]
+        elif self.action in ('enroll_student', 'remove_student'):
+            permission_classes = [IsAuthenticated, IsAuthor, IsOwnerOrReadOnly]
         else:
             # Must be owner to edit/delete
             permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
@@ -446,12 +448,26 @@ class CourseViewSet(EditHistoryMixin, viewsets.ModelViewSet):
         Each course also carries progress (dashboard cards), by the course
         page's rule (QUIZ/CODE/FILL tasks, solved = is_correct): task_count,
         solved_count (the author's own), student_count (enrolled) and
-        students_solved (their correct tasks, summed). Subqueries, one query.
+        students_solved (their correct tasks, summed). Most recently edited
+        courses first, including lesson/block changes and deletion history.
+        Subqueries, one query for these annotations.
         """
         course = models.OuterRef('pk')
         tasks = Block.objects.filter(lesson__course=course, type__in=TASK_TYPES)
         solved = Progress.objects.filter(is_correct=True, block__lesson__course=course, block__type__in=TASK_TYPES)
         courses = list(Course.objects.filter(author=request.user).annotate(
+            # Separate subqueries avoid multiplying blocks, progress, and edits.
+            # History also captures deletions/reordering, whose targets may no
+            # longer exist or whose updated_at was not changed by a bulk update.
+            last_activity_at=Greatest(
+                'updated_at',
+                Coalesce(models.Subquery(Lesson.objects.filter(course=course)
+                    .order_by('-updated_at').values('updated_at')[:1]), 'updated_at'),
+                Coalesce(models.Subquery(Block.objects.filter(lesson__course=course)
+                    .order_by('-updated_at').values('updated_at')[:1]), 'updated_at'),
+                Coalesce(models.Subquery(CourseEdit.objects.filter(course=course)
+                    .order_by('-created_at').values('created_at')[:1]), 'updated_at'),
+            ),
             task_count=count_subquery(tasks, 'lesson__course'),
             solved_count=count_subquery(solved.filter(student=request.user), 'student'),
             student_count=count_subquery(
@@ -459,9 +475,9 @@ class CourseViewSet(EditHistoryMixin, viewsets.ModelViewSet):
             students_solved=count_subquery(
                 solved.filter(student__enrollments__course=course).exclude(student=request.user),
                 'block__lesson__course'),
-        ))
+        ).order_by('-last_activity_at', '-created_at', 'id'))
         serializer = self.get_serializer(courses, many=True)
-        stats = ('task_count', 'solved_count', 'student_count', 'students_solved')
+        stats = ('task_count', 'solved_count', 'student_count', 'students_solved', 'last_activity_at')
         return Response([
             {**row, **{name: getattr(c, name) for name in stats}}
             for row, c in zip(serializer.data, courses)
@@ -535,6 +551,20 @@ class CourseViewSet(EditHistoryMixin, viewsets.ModelViewSet):
             {'message': f'{username} successfully enrolled'},
             status=status.HTTP_201_CREATED
         )
+
+    @action(detail=True, methods=['delete'],
+            url_path=r'enrollments/(?P<enrollment_id>[^/.]+)',
+            permission_classes=[IsAuthenticated, IsAuthor, IsOwnerOrReadOnly])
+    def remove_student(self, request, pk=None, enrollment_id=None):
+        """Revoke course access; keep the student's progress and attempts."""
+        course = self.get_object()  # Enforce ownership even on published courses.
+        try:
+            enrollment_id = uuid.UUID(str(enrollment_id))
+        except ValueError:
+            raise NotFound(gettext('Запись на курс не найдена.'))
+        enrollment = get_object_or_404(Enrollment, pk=enrollment_id, course=course)
+        enrollment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ParentOwnerMixin:
@@ -658,7 +688,8 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
         GET /api/lessons/outline/?course=<id>  (lesson viewer's lessons panel)
 
         Every lesson of the course in order, with the REQUESTING user's progress:
-        [{id, title, position, task_count, solved_count, passed_students,
+        [{id, title, position, text_count, quiz_count, code_count, fill_count,
+        task_count, solved_count, passed_students,
         students_solved}]. Same rule as the viewer's "Решено X из Y задач":
         tasks are QUIZ/CODE/FILL blocks, solved means is_correct. The course
         author's solved_count is their own (trying out their tasks), and they also
@@ -677,6 +708,10 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
 
         tasks = models.Q(blocks__type__in=TASK_TYPES)
         lessons = Lesson.objects.filter(course=course).annotate(
+            text_count=models.Count('blocks', filter=models.Q(blocks__type='TEXT'), distinct=True),
+            quiz_count=models.Count('blocks', filter=models.Q(blocks__type='QUIZ'), distinct=True),
+            code_count=models.Count('blocks', filter=models.Q(blocks__type='CODE'), distinct=True),
+            fill_count=models.Count('blocks', filter=models.Q(blocks__type='FILL'), distinct=True),
             task_count=models.Count('blocks', filter=tasks, distinct=True),
             # One Progress row per student per block, so no double counting.
             solved_count=models.Count('blocks__progress', distinct=True, filter=tasks & models.Q(
@@ -706,6 +741,10 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
                 'id': lesson_id,
                 'title': lessons[lesson_id].title,
                 'position': position,
+                'text_count': lessons[lesson_id].text_count,
+                'quiz_count': lessons[lesson_id].quiz_count,
+                'code_count': lessons[lesson_id].code_count,
+                'fill_count': lessons[lesson_id].fill_count,
                 'task_count': lessons[lesson_id].task_count,
                 'solved_count': lessons[lesson_id].solved_count,
                 'passed_students': None if passed_students is None else passed_students[lesson_id],

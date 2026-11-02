@@ -232,6 +232,8 @@ function AuthorDashboard() {
                 </button>
             </div>
 
+            <p className="muted">Сначала недавно изменённые курсы.</p>
+
             {showForm && (
                 <form onSubmit={handleCreateCourse} className="inline-form dash-form">
                     <input

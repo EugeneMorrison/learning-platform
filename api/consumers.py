@@ -79,6 +79,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             ))
             return
 
+        # Enrollment may have been revoked after this socket connected.
+        if not await self._verify_participants(self.course_id, self.user_id, self.other_user_id):
+            await self.close(code=4003)
+            return
+
         message = await self._save_message(
             self.course_id, self.user_id, self.other_user_id, text
         )
@@ -94,6 +99,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def chat_message(self, event):
+        if not await self._verify_participants(self.course_id, self.user_id, self.other_user_id):
+            await self.close(code=4003)
+            return
         await self.send(text_data=json.dumps(event['message']))
 
     @database_sync_to_async

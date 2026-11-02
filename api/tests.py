@@ -689,6 +689,27 @@ class LessonOutlineTests(APITestCase):
         self.assertEqual((rows['Theory only']['task_count'], rows['Theory only']['solved_count']), (0, 0))
         self.assertEqual((rows['Third']['task_count'], rows['Third']['solved_count']), (1, 0))
 
+    def test_step_types_include_theory_without_multiplying_by_student_progress(self):
+        fields = ('text_count', 'quiz_count', 'code_count', 'fill_count')
+        for user in (self.author, self.student):
+            rows = self.rows(user)
+            self.assertEqual(tuple(rows['First'][field] for field in fields), (1, 1, 1, 1))
+            self.assertEqual(tuple(rows['Theory only'][field] for field in fields), (1, 0, 0, 0))
+            self.assertEqual(tuple(rows['Third'][field] for field in fields), (0, 1, 0, 0))
+
+    def test_step_counts_follow_content_changes_and_include_empty_lessons(self):
+        empty = Lesson.objects.create(course=self.course, title='Empty', order_index=11)
+        block = Block.objects.create(lesson=self.l1, type='CODE', order_index=5, content={})
+        self.assertEqual(self.rows(self.author)['First']['code_count'], 2)
+        block.lesson = empty
+        block.save(update_fields=['lesson'])
+        rows = self.rows(self.author)
+        self.assertEqual(rows['First']['code_count'], 1)
+        self.assertEqual(rows['Empty']['code_count'], 1)
+        block.delete()
+        row = self.rows(self.author)['Empty']
+        self.assertEqual(tuple(row[field] for field in ('text_count', 'quiz_count', 'code_count', 'fill_count')), (0, 0, 0, 0))
+
     def test_counts_match_what_the_viewer_computes(self):
         # The viewer: tasks from /api/blocks/?lesson=, solved from /api/progress/course/.
         self.client.force_authenticate(self.student)
@@ -2698,3 +2719,36 @@ class ChatConsumerTests(TransactionTestCase):
             await author.disconnect()
         async_to_sync(run)()
         self.assertEqual(Message.objects.count(), 0)
+
+    def test_existing_sockets_cannot_send_after_enrollment_is_removed(self):
+        from channels.db import database_sync_to_async
+
+        async def run():
+            student = self.connect(self.student, self.course.id, self.author.id)
+            author = self.connect(self.author, self.course.id, self.student.id)
+            await student.connect()
+            await author.connect()
+            await database_sync_to_async(Enrollment.objects.filter(student=self.student, course=self.course).delete)()
+            for side in (student, author):
+                await side.send_json_to({'text': 'Access revoked'})
+                self.assertEqual(await side.receive_output(), {'type': 'websocket.close', 'code': 4003})
+                await side.disconnect()
+
+        async_to_sync(run)()
+        self.assertEqual(Message.objects.count(), 0)
+
+    def test_existing_socket_stops_receiving_after_enrollment_is_removed(self):
+        from channels.db import database_sync_to_async
+        from channels.layers import get_channel_layer
+        from .chat import chat_group
+
+        async def run():
+            student = self.connect(self.student, self.course.id, self.author.id)
+            await student.connect()
+            await database_sync_to_async(Enrollment.objects.filter(student=self.student, course=self.course).delete)()
+            await get_channel_layer().group_send(chat_group(self.course.id, self.student.id, self.author.id),
+                                                 {'type': 'chat.message', 'message': {'text': 'Queued message'}})
+            self.assertEqual(await student.receive_output(), {'type': 'websocket.close', 'code': 4003})
+            await student.disconnect()
+
+        async_to_sync(run)()

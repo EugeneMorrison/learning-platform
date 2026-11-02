@@ -188,6 +188,15 @@ Every QUIZ and CODE submission is logged in the `Attempt` table. That's separate
 
 ## Authentication and roles
 
+The author's “Мои курсы” dashboard lists recently edited courses first, using
+the latest course, lesson, step, or edit-history timestamp (including deletions
+and reordering). Public catalog ordering is configured separately.
+
+On a course's student list, its author can select “Удалить из курса” and confirm
+removal. This removes the enrollment and access to every lesson in the course;
+saved answers and attempt history remain available if the student enrolls again.
+The owner-only endpoint is `DELETE /api/courses/{course_id}/enrollments/{enrollment_id}/`.
+
 JWT auth with two roles:
 
 * AUTHOR — create, edit, and delete their own courses, lessons, and blocks

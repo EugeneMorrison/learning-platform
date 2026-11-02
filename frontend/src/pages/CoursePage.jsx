@@ -17,6 +17,37 @@ import { badgeText, useActiveChat, useNotifications } from '../lib/notifications
 import '../components/Notifications.css';
 import './CoursePage.css';
 
+// Match the public syllabus labels and order; counts describe content, not
+// completion or whether an author considers a lesson ready to publish.
+const STEP_TYPES = [
+    ['text_count', 'Теория'],
+    ['quiz_count', 'Тесты'],
+    ['code_count', 'Задачи'],
+    ['fill_count', 'Пропуски'],
+];
+
+function LessonStepCounts({ lesson, item }) {
+    const hasCounts = STEP_TYPES.every(([field]) => Number.isInteger(item?.[field]));
+    const total = hasCounts
+        ? STEP_TYPES.reduce((sum, [field]) => sum + item[field], 0)
+        : lesson.block_count;
+
+    return (
+        <div className="lesson-row__steps" aria-label="Состав урока">
+            {total === 0 ? (
+                <span className="lesson-row__step-count">Нет шагов</span>
+            ) : (
+                <>
+                    {Number.isInteger(total) && <span className="lesson-row__step-count">Шагов: {total}</span>}
+                    {hasCounts ? STEP_TYPES.filter(([field]) => item[field] > 0).map(([field, label]) => (
+                        <span key={field} className="lesson-row__step-count">{label}: {item[field]}</span>
+                    )) : <span className="lesson-row__hint">Состав шагов недоступен</span>}
+                </>
+            )}
+        </div>
+    );
+}
+
 // Small pie-like ring for a lesson row: the arc is the solved share.
 function ProgressRing({ percent }) {
     return (
@@ -98,8 +129,8 @@ function CoursePage() {
 
     const [course, setCourse] = useState(null);
     const [lessons, setLessons] = useState([]);
-    // Lesson id → {task_count, solved_count} from /lessons/outline/ (solved_count
-    // null for the author). Empty when it can't be loaded: no progress shown.
+    // Lesson id → step counts by type and progress from /lessons/outline/.
+    // Empty when it can't be loaded: no progress shown.
     const [outline, setOutline] = useState({});
     const [enrollments, setEnrollments] = useState([]);
     // A student enrolled in this course (not the owner): the floating chat with the author.
@@ -139,6 +170,10 @@ function CoursePage() {
     const [studentUsername, setStudentUsername] = useState('');
     const [addingStudent, setAddingStudent] = useState(false);
     const [studentError, setStudentError] = useState('');
+    const [removingStudent, setRemovingStudent] = useState(null);
+    const removingStudentRef = useRef(false);
+    const [removeStudentError, setRemoveStudentError] = useState('');
+    const [studentStatsAvailable, setStudentStatsAvailable] = useState(true);
 
     useEffect(() => {
         // Defined inside the effect so courseId is its only dependency
@@ -320,6 +355,37 @@ function CoursePage() {
         } catch (err) {
             console.error('Failed to load messages:', err);
             if (selectedStudentIdRef.current === studentId) setHistoryError(true);
+        }
+    }
+
+    async function handleRemoveStudent(enrollment) {
+        if (removingStudentRef.current) return;
+        if (!window.confirm(`Удалить учащегося «${enrollment.student_name}» из курса? Доступ ко всем урокам курса будет закрыт. Сохранённые ответы останутся.`)) return;
+        removingStudentRef.current = true;
+        setRemovingStudent(enrollment.id);
+        setRemoveStudentError('');
+        try {
+            await api.delete(`/courses/${courseId}/enrollments/${enrollment.id}/`);
+            setEnrollments(prev => prev.filter(item => item.id !== enrollment.id));
+            if (selectedStudentIdRef.current === enrollment.student) {
+                closeChat();
+                setMessages([]);
+                setNewMessage('');
+            }
+            // Hide the old cohort's statistics until the new counts arrive.
+            setStudentStatsAvailable(false);
+            try {
+                const res = await api.get('/lessons/outline/', { params: { course: courseId } });
+                setOutline(Object.fromEntries(res.data.map(item => [item.id, item])));
+                setStudentStatsAvailable(true);
+            } catch {
+                setRemoveStudentError('Учащийся удалён из курса. Не удалось обновить статистику — обновите страницу.');
+            }
+        } catch (err) {
+            setRemoveStudentError(err.response?.data?.detail || 'Не удалось удалить учащегося из курса. Попробуйте ещё раз.');
+        } finally {
+            removingStudentRef.current = false;
+            setRemovingStudent(null);
         }
     }
 
@@ -508,7 +574,7 @@ function CoursePage() {
                             {' · '}
                             {plural(studentCount, 'студент', 'студента', 'студентов')}
                         </p>
-                        {studentCount > 0 && (
+                        {studentStatsAvailable && studentCount > 0 && (
                             <TaskProgress
                                 solved={studentsSolved}
                                 total={totalTasks * studentCount}
@@ -584,9 +650,10 @@ function CoursePage() {
                                         </Link>
                                     }
                                 />
+                                {isOwner && <LessonStepCounts lesson={lesson} item={outline[lesson.id]} />}
                                 <p className="lesson-row__hint">→ Открыть урок</p>
                             </div>
-                            <LessonRowProgress item={outline[lesson.id]} studentCount={studentCount} />
+                            <LessonRowProgress item={outline[lesson.id]} studentCount={studentStatsAvailable ? studentCount : 0} />
                             {isOwner && (
                                 <div className="lesson-row__actions">
                                     <DragHandle {...lessonDrag.getHandleProps(lesson.id)}
@@ -659,6 +726,8 @@ function CoursePage() {
                         </form>
                     )}
 
+                    {removeStudentError && <p className="notice notice-danger" role="alert">{removeStudentError}</p>}
+
                     {enrollments.length === 0 ? (
                         <p className="muted">Студентов пока нет.</p>
                     ) : (
@@ -691,6 +760,14 @@ function CoursePage() {
                                                     </span>
                                                 );
                                             })()}
+                                        </button>
+                                        <button
+                                            className="btn btn-danger btn-sm"
+                                            disabled={removingStudent !== null}
+                                            aria-label={`Удалить из курса: ${enrollment.student_name}`}
+                                            onClick={() => handleRemoveStudent(enrollment)}
+                                        >
+                                            {removingStudent === enrollment.id ? 'Удаление...' : 'Удалить из курса'}
                                         </button>
                                     </div>
                                 </div>
