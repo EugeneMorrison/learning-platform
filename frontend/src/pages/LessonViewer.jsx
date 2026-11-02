@@ -373,7 +373,7 @@ function LessonViewer() {
                 {canEdit && (
                     <div className="lesson-anchor__tools">
                         <Link className="btn btn-secondary btn-sm" to={`/lesson/${lesson.id}/edit/?block=${block.id}`}>
-                            ✎ Редактировать блок
+                            ✎ Изменить
                         </Link>
                     </div>
                 )}

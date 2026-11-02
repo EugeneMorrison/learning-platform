@@ -231,10 +231,8 @@ function cleanContent(type, content) {
 function LessonEditor() {
     const { lessonId } = useParams();
     const navigate = useNavigate();
-    // ?block=<id> opens only that block; no parameter opens the full lesson.
-    const [searchParams] = useSearchParams();
-    const selectedBlockId = searchParams.get('block');
-    const singleBlockMode = selectedBlockId !== null;
+    // ?block=<id> opens the full editor and scrolls to that block.
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [lesson, setLesson] = useState(null);
     const [blocks, setBlocks] = useState([]); // the server's list, in order
@@ -314,13 +312,18 @@ function LessonEditor() {
             setBlocks(blocksRes.data);
             setDrafts(prev => mergeDrafts(prev, blocksRes.data));
 
-            if (singleBlockMode) {
-                if (blocksRes.data.some(b => b.id === selectedBlockId)) {
-                    scrollToRef.current = selectedBlockId;
-                    setFlashId(selectedBlockId);
-                } else {
-                    setError('Блок не найден в этом уроке.');
-                }
+            const blockId = searchParams.get('block');
+            if (blockId && blocksRes.data.some(b => b.id === blockId)) {
+                scrollToRef.current = blockId;
+                setFlashId(blockId);
+            }
+            // Consume the scroll target without adding a browser-history entry.
+            // Reloading then opens the full editor normally; unknown ids are ignored.
+            if (searchParams.has('block')) {
+                setSearchParams(params => {
+                    params.delete('block');
+                    return params;
+                }, { replace: true });
             }
         } catch (err) {
             console.error('Failed to load lesson editor:', err);
@@ -358,12 +361,11 @@ function LessonEditor() {
 
     // Unsaved changes are never lost without asking:
     // - leaving this page inside the app (any link or button, Back / Forward):
-    //   useBlocker, including switching between a block and the full editor;
+    //   useBlocker; consuming the scroll parameter doesn't leave the editor;
     // - tab close, reload, plain links to Django pages (the header): the
     //   browser's own dialog (beforeunload; browsers don't allow custom text).
     const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-        dirtyCount > 0 && (currentLocation.pathname !== nextLocation.pathname
-            || new URLSearchParams(currentLocation.search).get('block') !== new URLSearchParams(nextLocation.search).get('block')));
+        dirtyCount > 0 && currentLocation.pathname !== nextLocation.pathname);
 
     useEffect(() => {
         if (blocker.state !== 'blocked') return;
@@ -386,8 +388,7 @@ function LessonEditor() {
 
     // Back to the lesson at the last block saved.
     function previewPath() {
-        const blockId = lastSavedId || selectedBlockId;
-        return blockId ? `/lesson/${lessonId}/#block-${blockId}` : `/lesson/${lessonId}/`;
+        return lastSavedId ? `/lesson/${lessonId}/#block-${lastSavedId}` : `/lesson/${lessonId}/`;
     }
 
     // One block's draft, from the previous state; no-op once it's gone.
@@ -588,7 +589,7 @@ function LessonEditor() {
 
     const blockDrag = useDragReorder({
         ids: blocks.map(block => block.id),
-        disabled: busy || singleBlockMode || user?.role !== 'AUTHOR',
+        disabled: busy || user?.role !== 'AUTHOR',
         onMove: moveBlockTo,
     });
 
@@ -602,22 +603,28 @@ function LessonEditor() {
     const newDrafts = Object.values(drafts).filter(d => d.id === null).sort((a, b) => a.seq - b.seq);
     const newAbove = id => newDrafts.filter(d => d.insertBefore === id);
     const newAtEnd = newDrafts.filter(d => !d.insertBefore);
-    const visibleDrafts = singleBlockMode ? [drafts[selectedBlockId]].filter(Boolean)
-        : [...blocks.flatMap(block => [...newAbove(block.id), drafts[block.id]].filter(Boolean)), ...newAtEnd];
+    const visibleDrafts = [...blocks.flatMap(block => [...newAbove(block.id), drafts[block.id]].filter(Boolean)), ...newAtEnd];
+    // Count each task type independently, just as in the lesson viewer.
+    const typeCounts = { QUIZ: 0, CODE: 0, FILL: 0 };
+    const blockNumbers = {};
+    for (const draft of visibleDrafts) {
+        if (typeCounts[draft.type] === undefined) continue;
+        blockNumbers[draft.key] = ++typeCounts[draft.type];
+    }
     const markerBlocks = visibleDrafts.map((draft, index) => ({
         dirty: draft.dirty,
         elementId: draft.id === null ? `edit-new-${draft.key}` : `edit-block-${draft.id}`,
-        label: `Несохранённые изменения: ${TYPE_LABELS[draft.type]}, блок ${index + 1}`,
+        label: `Несохранённые изменения: ${TYPE_LABELS[draft.type]}${blockNumbers[draft.key] ? ` ${blockNumbers[draft.key]}` : ''}, блок ${index + 1}`,
     }));
     const renderCard = (draft, index = -1) => (
         <BlockCard
             key={draft.key}
             draft={draft}
+            number={blockNumbers[draft.key]}
             actions={actions}
             busy={busy}
             courseId={lesson.course}
             lessonId={lesson.id}
-            singleBlockMode={singleBlockMode}
             reorderProps={draft.id !== null ? blockDrag.getItemProps(draft.id) : undefined}
             dragHandleProps={draft.id !== null ? blockDrag.getHandleProps(draft.id) : undefined}
             canMoveUp={index > 0}
@@ -625,21 +632,6 @@ function LessonEditor() {
             flash={flashId !== null && flashId === draft.id}
         />
     );
-
-    if (singleBlockMode) {
-        const draft = drafts[selectedBlockId];
-        return (
-            <div className="page">
-                <UnsavedBlockMarkers blocks={markerBlocks} />
-                <button className="btn btn-ghost btn-sm page__back" onClick={() => navigate(previewPath())}>
-                    ← Назад к уроку
-                </button>
-                <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Редактор блока · Урок {lesson.lesson_position}</div>
-                <h2>{lesson.title}</h2>
-                {draft ? renderCard(draft) : <p role="alert">Блок не найден в этом уроке.</p>}
-            </div>
-        );
-    }
 
     return (
         <div className="page">
@@ -777,7 +769,7 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
 // One block, always open for editing. Memoized: it re-renders only when its
 // own draft (or busy / position / highlight) changes, not when another block
 // is typed in.
-const BlockCard = memo(function BlockCard({ draft, actions, busy, courseId, lessonId, canMoveUp, canMoveDown, flash, singleBlockMode = false, reorderProps, dragHandleProps }) {
+const BlockCard = memo(function BlockCard({ draft, number, actions, busy, courseId, lessonId, canMoveUp, canMoveDown, flash, reorderProps, dragHandleProps }) {
     const { key, id, type, content, dirty, saving, error } = draft;
     const isNew = id === null;
     const setContent = useCallback(updater => actions.setContent(key, updater), [actions, key]);
@@ -798,7 +790,7 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, courseId, less
             {/* Wraps on narrow screens. */}
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
-                    <span style={badge}>{isNew ? 'Новый блок: ' : ''}{TYPE_LABELS[type]}</span>
+                    <span style={badge}>{isNew ? 'Новый блок: ' : ''}{TYPE_LABELS[type]}{number ? ` ${number}` : ''}</span>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--color-ink)', fontWeight: 600 }}>
                         Тип блока
                         <select value={type} onChange={e => actions.changeType(key, e.target.value)} style={{ ...input, width: 'auto' }}>
@@ -808,9 +800,9 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, courseId, less
                 </div>
                 {!isNew && <EditHistoryButton courseId={courseId} lessonId={lessonId} blockId={id}
                     disabled={busy || saving}
-                    title={`${TYPE_LABELS[type]} · Блок ${id.slice(0, 8)}`}
+                    title={`${TYPE_LABELS[type]}${number ? ` ${number}` : ''} · Блок ${id.slice(0, 8)}`}
                     onRestore={(revisionId, side) => actions.restore(key, revisionId, side)} />}
-                {!isNew && !singleBlockMode && (
+                {!isNew && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         <DragHandle {...dragHandleProps} />
                         <button title="Вверх" disabled={busy || !canMoveUp} onClick={() => actions.move(id, -1)} style={iconBtn}>↑</button>
@@ -1344,13 +1336,11 @@ const previewBlank = {
     padding: '2px 12px', color: 'var(--color-success-on-light)', fontWeight: 600,
 };
 
-// Remount when the lesson or selected block changes so drafts stay within
-// the editor that created them. useBlocker protects unsaved changes.
+// Remount only when the lesson changes. Consuming a block scroll target must
+// preserve the editor's drafts and scroll position.
 function LessonEditorPage() {
     const { lessonId } = useParams();
-    const [searchParams] = useSearchParams();
-    const blockId = searchParams.get('block');
-    return <LessonEditor key={JSON.stringify([lessonId, blockId])} />;
+    return <LessonEditor key={lessonId} />;
 }
 
 export default LessonEditorPage;

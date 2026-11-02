@@ -28,7 +28,7 @@ const server = await createServer({
             if (id === '\0editor-router') return `
                 export const useParams = () => ({ lessonId: 'lesson' });
                 export const useNavigate = () => globalThis.__blockEditorTest.navigate;
-                export const useSearchParams = () => [new URLSearchParams(globalThis.__blockEditorTest.search)];
+                export const useSearchParams = () => [new URLSearchParams(globalThis.__blockEditorTest.search), globalThis.__blockEditorTest.setSearchParams];
                 export const useBlocker = callback => {
                     globalThis.__blockEditorTest.shouldBlock = callback;
                     return globalThis.__blockEditorTest.blocker;
@@ -53,7 +53,7 @@ let blocks;
 let patches;
 beforeEach(t => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-    globalThis.window = { scrollTo() {}, addEventListener() {}, removeEventListener() {}, innerHeight: 800, scrollY: 0 };
+    globalThis.window = { scrollTo: t.mock.fn(), addEventListener() {}, removeEventListener() {}, innerHeight: 800, scrollY: 0 };
     globalThis.ResizeObserver = class {
         constructor(callback) { fixture.resize = callback; }
         observe() {}
@@ -79,7 +79,11 @@ beforeEach(t => {
         { id: 'fill', type: 'FILL', order_index: 4, content: { prompt: 'Fill', template: 'print({{1}})' } },
     ];
     patches = [];
-    fixture.search = '?block=theory';
+    fixture.search = '';
+    fixture.setSearchParams = t.mock.fn(updater => {
+        const params = updater(new URLSearchParams(fixture.search));
+        fixture.search = params.size ? `?${params}` : '';
+    });
     fixture.blocker = { state: 'unblocked' };
     fixture.navigate = t.mock.fn();
     fixture.get = async url => {
@@ -115,29 +119,36 @@ const cards = renderer => renderer.root.findAll(node => node.type === 'div' && n
 const buttons = renderer => renderer.root.findAllByType('button');
 
 for (const blockId of ['theory', 'quiz', 'code', 'fill']) {
-    test(`block mode renders only ${blockId} and survives reopening`, async t => {
-        fixture.search = `?block=${blockId}`;
-        for (let i = 0; i < 2; i++) {
-            const renderer = await mount(t);
-            assert.deepEqual(cards(renderer).map(node => node.props.id), [`edit-block-${blockId}`]);
-            const labels = buttons(renderer).map(node => node.children.join(''));
-            assert.ok(!labels.some(label => /Копировать|Удалить|Вставить блок|Следующий урок/.test(label)));
-            assert.equal(renderer.root.findAll(node => node.props['data-editable']).length, 0);
-        }
+    test(`block link opens the full editor and scrolls to ${blockId}`, async t => {
+        fixture.search = `?block=${blockId}&keep=value`;
+        const scrollIntoView = t.mock.fn();
+        document.getElementById = id => id === `edit-block-${blockId}` ? { scrollIntoView } : null;
+        const renderer = await mount(t);
+        assert.deepEqual(cards(renderer).map(node => node.props.id), blocks.map(block => `edit-block-${block.id}`));
+        assert.deepEqual(scrollIntoView.mock.calls[0].arguments, [{ block: 'start' }]);
+        assert.equal(fixture.search, '?keep=value');
+        assert.deepEqual(fixture.setSearchParams.mock.calls[0].arguments[1], { replace: true });
+        const labels = buttons(renderer).map(node => node.children.join(''));
+        assert.ok(labels.includes('⧉ Копировать'));
+        assert.ok(labels.includes('Удалить'));
+        assert.equal(renderer.root.findAll(node => node.props['data-editable']).length, 1);
+        assert.equal(buttons(renderer).filter(node => node.props.draggable).length, 4);
     });
 }
 
 test('saving a block patches only that block and returns to its lesson anchor', async t => {
     const renderer = await mount(t);
     const untouched = structuredClone(blocks.slice(1));
-    await act(async () => renderer.root.findByType('textarea').props.onChange({ target: { value: '<p>Updated theory</p>' } }));
+    await act(async () => cards(renderer)[0].findByType('textarea').props.onChange({ target: { value: '<p>Updated theory</p>' } }));
     assert.equal(fixture.shouldBlock({ currentLocation: { pathname: '/edit/', search: '?block=theory' },
-        nextLocation: { pathname: '/edit/', search: '' } }), true);
+        nextLocation: { pathname: '/edit/', search: '' } }), false);
+    assert.equal(fixture.shouldBlock({ currentLocation: { pathname: '/edit/' },
+        nextLocation: { pathname: '/lesson/' } }), true);
     await act(async () => buttons(renderer).find(node => node.children.join('') === 'Сохранить').props.onClick());
     assert.deepEqual(patches, [{ url: '/blocks/theory/', payload: { type: 'TEXT', content: { html: '<p>Updated theory</p>' } } }]);
     assert.deepEqual(blocks.slice(1), untouched);
     assert.equal(buttons(renderer).find(node => node.children.join('') === 'Сохранить').props.disabled, true);
-    await act(async () => buttons(renderer).find(node => node.children.join('').includes('Назад к уроку')).props.onClick());
+    await act(async () => buttons(renderer).find(node => node.children.join('').includes('Предпросмотр')).props.onClick());
     assert.equal(fixture.navigate.mock.calls[0].arguments[0], '/lesson/lesson/#block-theory');
 });
 
@@ -149,21 +160,22 @@ test('full lesson editor still renders every block and lesson controls', async t
     assert.ok(buttons(renderer).some(node => node.children.join('') === 'Удалить'));
 });
 
-test('unknown block never falls back to editing the entire lesson', async t => {
+test('unknown block target is ignored and the full editor remains available', async t => {
     fixture.search = '?block=missing';
     const renderer = await mount(t);
-    assert.equal(cards(renderer).length, 0);
-    assert.ok(JSON.stringify(renderer.toJSON()).includes('Блок не найден'));
+    assert.equal(cards(renderer).length, 4);
+    assert.equal(fixture.search, '');
+    assert.ok(!JSON.stringify(renderer.toJSON()).includes('Блок не найден'));
 });
 
-test('switching block targets and full editor remounts with matching drafts', async t => {
-    const renderer = await mount(t);
+test('consuming the scroll target preserves drafts and does not restart the editor', async t => {
     fixture.search = '?block=quiz';
-    await act(async () => renderer.update(React.createElement(LessonEditor)));
-    assert.deepEqual(cards(renderer).map(node => node.props.id), ['edit-block-quiz']);
-    fixture.search = '';
+    const renderer = await mount(t);
+    await act(async () => cards(renderer)[0].findByType('textarea').props.onChange({ target: { value: 'Unsaved theory' } }));
     await act(async () => renderer.update(React.createElement(LessonEditor)));
     assert.equal(cards(renderer).length, 4);
+    assert.equal(cards(renderer)[0].findByType('textarea').props.value, 'Unsaved theory');
+    assert.equal(window.scrollTo.mock.calls.length, 1);
 });
 
 test('dirty markers jump to their block and disappear after saving', async t => {
@@ -174,7 +186,7 @@ test('dirty markers jump to their block and disappear after saving', async t => 
     const renderer = await mount(t);
     const markers = () => buttons(renderer).filter(node => node.props.className === 'unsaved-block-markers__marker');
     assert.equal(markers().length, 0);
-    await act(async () => renderer.root.findByType('textarea').props.onChange({ target: { value: '<p>Unsaved</p>' } }));
+    await act(async () => cards(renderer)[0].findByType('textarea').props.onChange({ target: { value: '<p>Unsaved</p>' } }));
     assert.equal(markers().length, 1);
     assert.equal(markers()[0].props['aria-controls'], 'edit-block-theory');
     await act(async () => markers()[0].props.onClick());
@@ -218,7 +230,7 @@ test('failed saves retain markers; reverting removes them', async t => {
     fixture.patch = async () => { throw Error('Save failed'); };
     const renderer = await mount(t);
     const markers = () => buttons(renderer).filter(node => node.props.className === 'unsaved-block-markers__marker');
-    await act(async () => renderer.root.findByType('textarea').props.onChange({ target: { value: '<p>Unsaved</p>' } }));
+    await act(async () => cards(renderer)[0].findByType('textarea').props.onChange({ target: { value: '<p>Unsaved</p>' } }));
     await act(async () => buttons(renderer).find(node => node.children.join('') === 'Сохранить').props.onClick());
     assert.equal(markers().length, 1);
     await act(async () => buttons(renderer).find(node => node.children.join('') === 'Отменить изменения').props.onClick());
@@ -293,4 +305,33 @@ test('restoring replaces only its own draft and uses the current saved revision'
     assert.equal(cards(renderer)[0].findByType('textarea').props.value, '<p>Restored</p>');
     assert.equal(cards(renderer)[0].findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.disabled, true);
     assert.equal(cards(renderer)[1].findByType('textarea').props.value, 'Unsaved quiz');
+});
+
+test('editor badges count each task type independently and update after reordering', async t => {
+    blocks.push({ ...structuredClone(blocks[1]), id: 'quiz-2', order_index: 5 });
+    blocks.push({ ...structuredClone(blocks[2]), id: 'code-2', order_index: 6 });
+    const renderer = await mount(t);
+    const labels = () => cards(renderer).map(card => card.findAllByType('span')[0].children.join(''));
+    assert.deepEqual(labels(), ['📝 Теория', '❓ Тест 1', '💻 Задача с кодом 1', '✍️ Заполнить пропуски 1', '❓ Тест 2', '💻 Задача с кодом 2']);
+    const cardComponent = renderer.root.findAll(node => node.props.draft?.id === 'quiz-2' && node.props.actions)[0];
+    await act(async () => cardComponent.props.actions.move('quiz-2', -1));
+    await act(async () => cardComponent.props.actions.move('quiz-2', -1));
+    await act(async () => cardComponent.props.actions.move('quiz-2', -1));
+    const quizCards = cards(renderer).filter(card => ['edit-block-quiz', 'edit-block-quiz-2'].includes(card.props.id));
+    assert.deepEqual(quizCards.map(card => card.props.id), ['edit-block-quiz-2', 'edit-block-quiz']);
+    assert.deepEqual(quizCards.map(card => card.findAllByType('span')[0].children.join('')), ['❓ Тест 1', '❓ Тест 2']);
+});
+
+test('numbering follows new drafts and changes of block type', async t => {
+    blocks.push({ ...structuredClone(blocks[1]), id: 'quiz-2', order_index: 5 });
+    const renderer = await mount(t);
+    await act(async () => buttons(renderer).find(node => node.children.join('') === '❓ Тест').props.onClick());
+    const newCard = renderer.root.findAll(node => node.type === 'div' && node.props.id?.startsWith('edit-new-'))[0];
+    assert.equal(newCard.findAllByType('span')[0].children.join(''), 'Новый блок: ❓ Тест 3');
+    window.confirm = () => true;
+    const cardComponent = renderer.root.findAll(node => node.props.draft?.id === 'quiz-2' && node.props.actions)[0];
+    await act(async () => cardComponent.props.actions.changeType('quiz-2', 'CODE'));
+    const changedCard = cards(renderer).find(card => card.props.id === 'edit-block-quiz-2');
+    assert.equal(changedCard.findAllByType('span')[0].children.join(''), '💻 Задача с кодом 2');
+    assert.equal(newCard.findAllByType('span')[0].children.join(''), 'Новый блок: ❓ Тест 2');
 });
