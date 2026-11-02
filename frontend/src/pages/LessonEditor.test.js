@@ -274,3 +274,23 @@ test('drag scrolls near the viewport edge and cancellation sends no request', as
     assert.equal(fixture.post.mock.calls.length, 0);
     assert.ok(cards(renderer).every(card => !card.props.className.includes('--dragging')));
 });
+
+test('restoring replaces only its own draft and uses the current saved revision', async t => {
+    fixture.search = '';
+    window.confirm = () => true;
+    blocks[0].updated_at = '2026-11-02T12:00:00Z';
+    fixture.post = t.mock.fn(async (url, payload) => {
+        assert.equal(url, '/blocks/theory/restore/');
+        assert.deepEqual(payload, { revision_id: 42, side: 'before', expected_updated_at: '2026-11-02T12:00:00Z' });
+        blocks[0].content = { html: '<p>Restored</p>' };
+        return { data: structuredClone(blocks[0]) };
+    });
+    const renderer = await mount(t);
+    await act(async () => cards(renderer)[0].findByType('textarea').props.onChange({ target: { value: 'Unsaved theory' } }));
+    await act(async () => cards(renderer)[1].findByType('textarea').props.onChange({ target: { value: 'Unsaved quiz' } }));
+    const cardComponent = renderer.root.findAll(node => node.props.draft?.id === 'theory' && node.props.actions)[0];
+    await act(async () => cardComponent.props.actions.restore('theory', 42, 'before'));
+    assert.equal(cards(renderer)[0].findByType('textarea').props.value, '<p>Restored</p>');
+    assert.equal(cards(renderer)[0].findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.disabled, true);
+    assert.equal(cards(renderer)[1].findByType('textarea').props.value, 'Unsaved quiz');
+});
