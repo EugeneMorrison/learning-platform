@@ -427,6 +427,29 @@ class Block(models.Model):
 # ENROLLMENT MODEL (Student <-> Course Relationship)
 # =============================================================================
 
+class CourseEdit(models.Model):
+    """Immutable audit snapshots. UUID references survive lesson/block deletion.
+    Only the course's owner may read them, including hidden task settings.
+    """
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='edit_history')
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    actor_name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    kind = models.CharField(max_length=16)
+    action = models.CharField(max_length=16)
+    target_id = models.UUIDField()
+    lesson_id = models.UUIDField(null=True)
+    lesson_title = models.CharField(max_length=255, blank=True)
+    before = models.JSONField(null=True)
+    after = models.JSONField(null=True)
+    source = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        ordering = ['-id']
+        indexes = [models.Index(fields=['course', 'id'], name='course_edits_course_id'),
+                   models.Index(fields=['course', 'lesson_id', 'id'], name='course_edits_lesson_id')]
+
+
 class Enrollment(models.Model):
     """
     Tracks which students are enrolled in which courses.

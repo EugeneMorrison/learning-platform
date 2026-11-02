@@ -5,6 +5,7 @@ URL routing for API endpoints
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .edit_history import CourseHistoryView
 
 # Router automatically creates URLs for ViewSets
 # Example: router.register('courses', CourseViewSet) creates:
@@ -21,6 +22,7 @@ router.register(r'lessons', views.LessonViewSet, basename='lesson')
 router.register(r'blocks', views.BlockViewSet, basename='block')
 
 urlpatterns = [
+    path('courses/<uuid:course_id>/history/', CourseHistoryView.as_view(), name='course-history'),
     # Simple test endpoints
     path('hello/', views.hello_view, name='hello'),
     path('status/', views.status_view, name='status'),

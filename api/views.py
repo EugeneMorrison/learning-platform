@@ -38,6 +38,7 @@ from .models import (Course, Lesson, Block, Enrollment, Progress, Message, Attem
                      CommentReport, DiscussionBan)
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed, message_preview, notify_user, push_message
 from .questions import MAX_DRAFT_LENGTH, build_context
+from .edit_history import EditHistoryMixin, ordered_snapshot, record_edit, snapshot
 from .discussions import (can_see_all, check_not_banned, check_post_interval, clean_text, discussion_block,
                           is_banned, is_course_author, open_reports)
 from .runner import RunnerBusy, RunnerUnavailable, run_python
@@ -355,7 +356,7 @@ class UploadImageView(APIView):
 # COURSE VIEWSET
 # =============================================================================
 
-class CourseViewSet(viewsets.ModelViewSet):
+class CourseViewSet(EditHistoryMixin, viewsets.ModelViewSet):
     """
     CRUD operations for courses.
 
@@ -479,8 +480,11 @@ class CourseViewSet(viewsets.ModelViewSet):
         - Clear intent
         """
         course = self.get_object()
-        course.is_published = not course.is_published
-        course.save()
+        with transaction.atomic():
+            before = snapshot(course)
+            course.is_published = not course.is_published
+            course.save()
+            record_edit(request.user, course, 'updated', before, snapshot(course))
 
         serializer = self.get_serializer(course)
         return Response(serializer.data)
@@ -565,7 +569,7 @@ class ParentOwnerMixin:
 # LESSON VIEWSET
 # =============================================================================
 
-class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
+class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
     """
     CRUD operations for lessons.
 
@@ -742,6 +746,7 @@ class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
                 l.pk: l for l in Lesson.objects.select_for_update().filter(course_id=lesson.course_id)
             }
             ids = course_lesson_ids_in_order(lesson.course_id)
+            before_order = ordered_snapshot([lessons[pk] for pk in ids])
             new_order = min(new_order, len(ids))
             slots = [lessons[pk].order_index for pk in ids]  # the values in use, ascending
             ids.remove(lesson.pk)
@@ -753,6 +758,8 @@ class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
                 Lesson.objects.filter(pk=pk).update(order_index=temporary + offset)
             for pk, slot in changed:
                 Lesson.objects.filter(pk=pk).update(order_index=slot)
+            record_edit(request.user, lesson, 'reordered', before_order,
+                        ordered_snapshot([lessons[pk] for pk in ids]))
 
         ordered = Lesson.objects.filter(course_id=lesson.course_id).order_by('order_index')
         return Response(self.get_serializer(ordered, many=True).data)
@@ -776,7 +783,7 @@ class LessonViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
 # BLOCK VIEWSET
 # =============================================================================
 
-class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
+class BlockViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
     """
     CRUD operations for blocks.
 
@@ -868,6 +875,7 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
             position = next(i for i, b in enumerate(siblings) if b.pk == anchor.pk)
             shift_down(siblings[position:])
             serializer.save(order_index=anchor.order_index)
+            record_edit(request.user, serializer.instance, 'created', None, snapshot(serializer.instance))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_update(self, serializer):
@@ -914,6 +922,7 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
             blocks = list(Block.objects.select_for_update().filter(lesson_id=block.lesson_id)
                           .order_by('order_index', 'id'))
             slots = [item.order_index for item in blocks]
+            before_order = ordered_snapshot(blocks)
             moved = next(item for item in blocks if item.pk == block.pk)
             blocks.remove(moved)
             blocks.insert(min(position - 1, len(blocks)), moved)
@@ -923,6 +932,7 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
                 Block.objects.filter(pk=pk).update(order_index=temporary + offset)
             for pk, slot in changed:
                 Block.objects.filter(pk=pk).update(order_index=slot)
+            record_edit(request.user, block, 'reordered', before_order, ordered_snapshot(blocks))
         ordered = Block.objects.filter(lesson_id=block.lesson_id).order_by('order_index', 'id')
         return Response(self.get_serializer(ordered, many=True).data)
 
@@ -962,7 +972,46 @@ class BlockViewSet(ParentOwnerMixin, viewsets.ModelViewSet):
             })
             serializer.is_valid(raise_exception=True)
             serializer.save()
+            record_edit(request.user, serializer.instance, 'duplicated', None, snapshot(serializer.instance))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        from .models import CourseEdit
+        block = self.get_object()
+        event_id = request.data.get('revision_id')
+        if type(event_id) is not int or not 0 < event_id <= 9223372036854775807:
+            raise ParseError('Укажите revision_id.')
+        event = CourseEdit.objects.filter(pk=event_id, course=block.lesson.course,
+                                         kind='block', target_id=block.pk).first()
+        side = request.data.get('side', 'after')
+        if event is None or side not in ('before', 'after'):
+            raise NotFound('Версия не найдена.')
+        version = getattr(event, side)
+        if not isinstance(version, dict) or 'content' not in version or 'type' not in version:
+            raise ParseError('Эта запись не содержит версии блока.')
+        with transaction.atomic():
+            block = Block.objects.select_for_update().get(pk=block.pk)
+            if request.data.get('expected_updated_at') != block.updated_at.isoformat():
+                # DRF may render UTC timestamps with Z; compare parsed instants.
+                from django.utils.dateparse import parse_datetime
+                try:
+                    matches = parse_datetime(str(request.data.get('expected_updated_at'))) == block.updated_at
+                except ValueError:
+                    matches = False
+                if not matches:
+                    return Response({'detail': 'Блок уже изменён. Обновите редактор перед восстановлением.'}, status=409)
+            if version['type'] != block.type:
+                has_answers = Progress.objects.filter(block=block).exists() or Attempt.objects.filter(block=block).exists()
+                if has_answers and request.data.get('confirm_reset') is not True:
+                    return Response({'detail': 'Смена типа блока сбросит сохранённые ответы учащихся.',
+                                     'requires_reset': True}, status=409)
+            serializer = self.get_serializer(block, data={'type': version['type'], 'content': version['content']}, partial=True)
+            serializer.is_valid(raise_exception=True)
+            before = snapshot(block)
+            self.perform_update(serializer)
+            record_edit(request.user, block, 'restored', before, snapshot(block), source=event)
+        return Response(serializer.data)
 
 
 def shift_down(blocks):

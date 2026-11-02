@@ -7,6 +7,7 @@ import RichTextEditor from '../components/RichTextEditor';
 import EditableTitle from '../components/EditableTitle';
 import UnsavedBlockMarkers from '../components/UnsavedBlockMarkers';
 import DragHandle from '../components/DragHandle';
+import EditHistoryButton from '../components/EditHistory';
 import { useDragReorder } from '../lib/useDragReorder';
 import { parseTemplate } from '../lib/fillTemplate';
 import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
@@ -257,7 +258,7 @@ function LessonEditor() {
     // state from here. Only to READ: every state change is a functional update.
     const latest = useRef(null);
     useEffect(() => {
-        latest.current = { drafts, blocks, handleSave, handleDelete, handleDuplicate, moveBlock };
+        latest.current = { drafts, blocks, handleSave, handleDelete, handleDuplicate, moveBlock, handleRestoreHistory };
     });
 
     useEffect(() => {
@@ -392,6 +393,32 @@ function LessonEditor() {
     // One block's draft, from the previous state; no-op once it's gone.
     function updateDraft(key, fn) {
         setDrafts(prev => (prev[key] ? { ...prev, [key]: fn(prev[key]) } : prev));
+    }
+
+    async function handleRestoreHistory(key, revisionId, side) {
+        const draft = drafts[key];
+        const block = blocks.find(item => item.id === draft?.id);
+        if (!block || busy) return false;
+        const warning = draft.dirty ? 'Несохранённые изменения в этом блоке будут заменены. ' : '';
+        if (!window.confirm(`${warning}Восстановить выбранную версию блока? Текущая сохранённая версия останется в истории.`)) return false;
+        const startedFrom = JSON.stringify({ type: draft.type, content: draft.content });
+        const body = { revision_id: revisionId, side, expected_updated_at: block.updated_at };
+        setBusy(true);
+        try {
+            let res;
+            try {
+                res = await api.post(`/blocks/${block.id}/restore/`, body);
+            } catch (err) {
+                if (!err.response?.data?.requires_reset) throw err;
+                if (!window.confirm('Версия имеет другой тип блока. Сохранённые ответы учащихся будут сброшены. Восстановить?')) return false;
+                res = await api.post(`/blocks/${block.id}/restore/`, { ...body, confirm_reset: true });
+            }
+            await reloadBlocks({ key, block: res.data, startedFrom });
+            setLastSavedId(block.id);
+            setFlashId(block.id);
+            setCopyStatus('Версия блока восстановлена.');
+            return true;
+        } finally { setBusy(false); }
     }
 
     // Saves one block; the others are not touched. Any error, before or after
@@ -556,6 +583,7 @@ function LessonEditor() {
         move: (id, dir) => latest.current.moveBlock(id, dir),
         duplicate: id => latest.current.handleDuplicate(latest.current.blocks.find(b => b.id === id)),
         delete: id => latest.current.handleDelete(latest.current.blocks.find(b => b.id === id)),
+        restore: (key, revisionId, side) => latest.current.handleRestoreHistory(key, revisionId, side),
     }), []);
 
     const blockDrag = useDragReorder({
@@ -587,6 +615,8 @@ function LessonEditor() {
             draft={draft}
             actions={actions}
             busy={busy}
+            courseId={lesson.course}
+            lessonId={lesson.id}
             singleBlockMode={singleBlockMode}
             reorderProps={draft.id !== null ? blockDrag.getItemProps(draft.id) : undefined}
             dragHandleProps={draft.id !== null ? blockDrag.getHandleProps(draft.id) : undefined}
@@ -638,6 +668,7 @@ function LessonEditor() {
                         <button onClick={() => navigate(previewPath())} style={ghostBtn}>
                             👁 Предпросмотр
                         </button>
+                        <EditHistoryButton courseId={lesson.course} lessonId={lesson.id} title={`Урок «${lesson.title}»`} />
                         <NextLessonButton nextLessonId={lesson.next_lesson_id} />
                     </div>
                 </div>
@@ -746,7 +777,7 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
 // One block, always open for editing. Memoized: it re-renders only when its
 // own draft (or busy / position / highlight) changes, not when another block
 // is typed in.
-const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, canMoveDown, flash, singleBlockMode = false, reorderProps, dragHandleProps }) {
+const BlockCard = memo(function BlockCard({ draft, actions, busy, courseId, lessonId, canMoveUp, canMoveDown, flash, singleBlockMode = false, reorderProps, dragHandleProps }) {
     const { key, id, type, content, dirty, saving, error } = draft;
     const isNew = id === null;
     const setContent = useCallback(updater => actions.setContent(key, updater), [actions, key]);
@@ -775,6 +806,10 @@ const BlockCard = memo(function BlockCard({ draft, actions, busy, canMoveUp, can
                         </select>
                     </label>
                 </div>
+                {!isNew && <EditHistoryButton courseId={courseId} lessonId={lessonId} blockId={id}
+                    disabled={busy || saving}
+                    title={`${TYPE_LABELS[type]} · Блок ${id.slice(0, 8)}`}
+                    onRestore={(revisionId, side) => actions.restore(key, revisionId, side)} />}
                 {!isNew && !singleBlockMode && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         <DragHandle {...dragHandleProps} />

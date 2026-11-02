@@ -5,6 +5,7 @@ import ChatPanel from '../components/ChatPanel';
 import CourseCoverEditor from '../components/CourseCoverEditor';
 import CourseDescriptionEditor from '../components/CourseDescriptionEditor';
 import DragHandle from '../components/DragHandle';
+import EditHistoryButton from '../components/EditHistory';
 import { useDragReorder } from '../lib/useDragReorder';
 import EditableTitle from '../components/EditableTitle';
 import { TaskProgress } from '../components/LessonProgress';
@@ -535,9 +536,12 @@ function CoursePage() {
                 <div className="section__header">
                     <h2 className="section__title">Уроки</h2>
                     {isOwner && (
-                        <button className="btn btn-secondary btn-sm" onClick={() => setShowLessonForm(!showLessonForm)}>
-                            {showLessonForm ? 'Отмена' : '+ Добавить урок'}
-                        </button>
+                        <div className="lesson-row__actions">
+                            <EditHistoryButton courseId={courseId} title={`Курс «${course.title}»`} />
+                            <button className="btn btn-secondary btn-sm" onClick={() => setShowLessonForm(!showLessonForm)}>
+                                {showLessonForm ? 'Отмена' : '+ Добавить урок'}
+                            </button>
+                        </div>
                     )}
                 </div>
 
