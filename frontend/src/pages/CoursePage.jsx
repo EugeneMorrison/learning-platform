@@ -24,6 +24,9 @@ const STEP_TYPES = [
     ['quiz_count', 'Тесты'],
     ['code_count', 'Задачи'],
     ['fill_count', 'Пропуски'],
+    ['sort_count', 'Сортировка'],
+    ['match_count', 'Сопоставление'],
+    ['table_count', 'Таблицы'],
 ];
 
 function LessonStepCounts({ lesson, item }) {

@@ -1,0 +1,12 @@
+.sort-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+.sort-item { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface, var(--color-soft)); }
+.sort-item__text { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sort-item__text code { white-space: pre-wrap; }
+.sort-item__arrows { display: flex; flex-shrink: 0; gap: 4px; }
+.sort-editor__item { flex: 1; min-width: 0; }
+.sort-editor__item textarea { width: 100%; box-sizing: border-box; min-height: 64px; }
+.sort-editor__preview { margin-top: 8px; }
+@media (max-width: 520px) {
+    .sort-item { gap: 6px; padding: 8px; }
+    .sort-item__arrows { flex-direction: column; }
+}

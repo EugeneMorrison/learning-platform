@@ -5,6 +5,9 @@ import { highlightPreBlocks } from '../lib/pythonHighlight';
 import { wrapImages, wrapTables } from '../lib/contentImages';
 import { renderMath } from '../lib/contentMath';
 import './Question.css';
+import SortItem from './SortItem';
+import MatchPairs, { MatchItem } from './MatchPairs';
+import TableGrid from './TableGrid';
 
 // What a «Задать вопрос» message carries (Message.context, built on the server
 // in api/questions.py): the task as the student saw it, their latest
@@ -48,6 +51,20 @@ export function CodeView({ code }) {
 }
 
 function Task({ type, task }) {
+    if (type === 'TABLE') return <>
+        <AuthorHtml html={task.prompt} />
+        <TableGrid rows={task.rows} columns={task.columns} multiple={task.multiple_answers} disabled namePrefix="question-task" />
+    </>;
+    if (type === 'MATCH') return <>
+        <AuthorHtml html={task.prompt} />
+        <div className="match-row">{['left', 'right'].map(side => <ul key={side}>
+            {task[side].map(item => <li key={item.id}><MatchItem item={item} html={task.html} /></li>)}
+        </ul>)}</div>
+    </>;
+    if (type === 'SORT') return <>
+        <AuthorHtml html={task.prompt} />
+        <ul>{task.items.map(item => <li key={item.id}><SortItem text={item.text} html={task.html} /></li>)}</ul>
+    </>;
     if (type === 'TEXT') return <AuthorHtml html={task.html} />;
     if (type === 'QUIZ') {
         return (
@@ -91,6 +108,11 @@ function Submission({ type, submission }) {
                 </p>
             )}
             {type === 'CODE' && <CodeView code={submission.code} />}
+            {type === 'TABLE' && submission.table_snapshot && <TableGrid rows={submission.table_snapshot.rows}
+                columns={submission.table_snapshot.columns} selected={submission.selected} multiple={submission.table_snapshot.multiple_answers} disabled namePrefix="question-answer" />}
+            {type === 'MATCH' && <MatchPairs rows={submission.rows} html={submission.html} />}
+            {type === 'SORT' && <ol>{submission.items.map(item =>
+                <li key={item.id}><SortItem text={item.text} html={submission.html} /></li>)}</ol>}
             {type === 'QUIZ' && (
                 submission.option === null
                     ? <p className="question-context__muted">Выбранного варианта больше нет в задании.</p>

@@ -3,7 +3,7 @@ Block content as students see it, and server-side grading.
 
 The course author gets a block's full `content`. Everyone else who can read the
 block (enrolled students) gets `student_content()`: no answers, no hidden tests.
-Grading (QUIZ, FILL here; CODE in RunTestsView) happens only on the server, and
+Grading (QUIZ, FILL here; SORT/MATCH in their modules; CODE in RunTestsView) happens only on the server, and
 `feedback()` decides what a student may learn from their own answer.
 
 Answer-bearing fields per type:
@@ -13,9 +13,14 @@ Answer-bearing fields per type:
 - QUIZ: `correct_answer` (option index), or `correct_answers` (indices) when
   `multiple_answers` is true; `explanation`.
 - FILL: the answers inside `{{a|b}}` in `template`, `explanation`.
+- SORT: the order of `items`, `feedback_correct`, `feedback_incorrect`.
+- MATCH: the associations in `pairs`, `feedback_correct`, `feedback_incorrect`.
+- TABLE: `correct_cells`, `feedback_correct`, `feedback_incorrect`.
 """
 
 import re
+from .matching import student_content as matching_student_content
+from .table_tasks import student_content as table_student_content
 
 # Gap markers in FILL templates. Same pattern as the frontend's parseTemplate():
 # non-greedy, no newlines inside a gap.
@@ -26,7 +31,7 @@ DEFAULT_VISIBLE_TESTS = 2
 
 # Blocks that are tasks: solved or not, counted in "Решено X из Y задач".
 # TEXT is theory. Same set as the lesson viewer's TASK_TYPES.
-TASK_TYPES = ('QUIZ', 'CODE', 'FILL')
+TASK_TYPES = ('QUIZ', 'CODE', 'FILL', 'SORT', 'MATCH', 'TABLE')
 
 
 # -----------------------------------------------------------------------------
@@ -70,6 +75,19 @@ def student_content(block_type, content):
     elif block_type == 'FILL':
         content['template'] = FILL_GAP_RE.sub('{{}}', content.get('template', '') or '')
         content.pop('explanation', None)
+    elif block_type == 'TABLE':
+        return table_student_content(content)
+    elif block_type == 'MATCH':
+        return matching_student_content(content)
+    elif block_type == 'SORT':
+        # Opaque UUIDs identify items; their stored order is the answer. Never
+        # send that order (even to chat snapshots or nested lesson endpoints).
+        items = content.get('items') or []
+        content = {key: content[key] for key in ('prompt', 'html') if key in content}
+        content['items'] = sorted(
+            [{'id': item['id'], 'text': item['text']} for item in items],
+            key=lambda item: item['id'],
+        )
     return content
 
 
@@ -120,6 +138,10 @@ def feedback(block_type, content, answer, is_correct):
     """What a student may see about their own answer. The explanation only after
     a correct answer; for FILL also which gaps are right (never the answers)."""
     result = {}
+    if block_type in ('SORT', 'MATCH', 'TABLE'):
+        field = 'feedback_correct' if is_correct else 'feedback_incorrect'
+        if content.get(field):
+            result['comment'] = content[field]
     if block_type == 'FILL':
         result['blanks_correct'] = fill_blank_results(content, answer)
     if block_type in ('QUIZ', 'FILL') and is_correct and content.get('explanation'):

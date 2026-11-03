@@ -4,6 +4,9 @@ import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import api from '../api';
+import SortItem from '../components/SortItem';
+import MatchPairs from '../components/MatchPairs';
+import TableGrid from '../components/TableGrid';
 
 function StudentProgressPage() {
     const { courseId, studentId } = useParams();
@@ -40,6 +43,11 @@ function StudentProgressPage() {
 
     function renderAnswerBody(answer, blockType) {
         if (!answer) return <em style={{ color: 'var(--color-muted)' }}>пусто</em>;
+        if (blockType === 'TABLE' && answer.table_snapshot) return <TableGrid rows={answer.table_snapshot.rows}
+            columns={answer.table_snapshot.columns} selected={answer.selected} multiple={answer.table_snapshot.multiple_answers} disabled namePrefix="history" />;
+        if (blockType === 'MATCH') return <MatchPairs rows={answer.rows || []} html={answer.html} />;
+        if (blockType === 'SORT') return <ol>{(answer.items || []).map(item =>
+            <li key={item.id}><SortItem text={item.text} html={answer.html} /></li>)}</ol>;
         if (blockType === 'CODE') {
             const code = typeof answer.code === 'string'
                 ? answer.code
@@ -183,7 +191,13 @@ function StudentProgressPage() {
                     let quizCount = 0;
                     let codeCount = 0;
                     let fillCount = 0;
+                    let sortCount = 0;
+                    let matchCount = 0;
+                    let tableCount = 0;
                     const typeLabels = lessonTasks.map(block => {
+                        if (block.block_type === 'TABLE') return `Таблица ${++tableCount}`;
+                        if (block.block_type === 'MATCH') return `Сопоставление ${++matchCount}`;
+                        if (block.block_type === 'SORT') return `Сортировка ${++sortCount}`;
                         if (block.block_type === 'QUIZ') {
                             quizCount += 1;
                             return `Тест ${quizCount}`;

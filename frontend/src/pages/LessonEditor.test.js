@@ -17,7 +17,7 @@ const server = await createServer({
             if (source === 'react-router-dom') return '\0editor-router';
             if (source === '../components/pycharmDarcula') return '\0editor-theme';
             if (source === '../components/EditableTitle') return '\0editor-title';
-            if (source === '../components/RichTextEditor' || source === '@uiw/react-codemirror') return '\0editor-field';
+            if (source === '../components/RichTextEditor' || source === './RichTextEditor' || source === '@uiw/react-codemirror') return '\0editor-field';
         },
         load(id) {
             if (id === '\0editor-api') return `export default {
@@ -334,4 +334,118 @@ test('numbering follows new drafts and changes of block type', async t => {
     const changedCard = cards(renderer).find(card => card.props.id === 'edit-block-quiz-2');
     assert.equal(changedCard.findAllByType('span')[0].children.join(''), '💻 Задача с кодом 2');
     assert.equal(newCard.findAllByType('span')[0].children.join(''), 'Новый блок: ❓ Тест 2');
+});
+
+test('sorting editor adds items, orders them, configures both comments and saves through the normal block API', async t => {
+    blocks.push({ id: 'sort', type: 'SORT', order_index: 5,
+        content: { prompt: '<p>Sort ascending, top to bottom</p>', items: [], html: false } });
+    const renderer = await mount(t);
+    const card = cards(renderer).find(node => node.props.id === 'edit-block-sort');
+    const button = label => card.findAllByType('button').find(node => node.children.join('') === label);
+    await act(async () => card.findAllByType('textarea')[0].props.onChange({ target: { value: '<p>Sort ascending from top to bottom</p>' } }));
+    await act(async () => button('Сохранить').props.onClick());
+    assert.equal(patches.length, 0);
+    assert.match(JSON.stringify(renderer.toJSON()), /Добавьте минимум два непустых элемента/);
+    await act(async () => button('+ Добавить элемент').props.onClick());
+    await act(async () => button('+ Добавить элемент').props.onClick());
+    await act(async () => card.findByProps({ 'aria-label': 'Элемент 1' }).props.onChange({ target: { value: 'second' } }));
+    await act(async () => card.findByProps({ 'aria-label': 'Элемент 2' }).props.onChange({ target: { value: 'first' } }));
+    await act(async () => card.findByProps({ 'aria-label': 'Элемент 2: вверх' }).props.onClick());
+    const comments = card.findAllByType('textarea').filter(node => node.props.placeholder === 'Необязательно');
+    await act(async () => comments[0].props.onChange({ target: { value: 'Well done' } }));
+    await act(async () => comments[1].props.onChange({ target: { value: 'Try again' } }));
+    await act(async () => button('Сохранить').props.onClick());
+    assert.equal(patches.length, 1);
+    assert.equal(patches[0].payload.type, 'SORT');
+    assert.deepEqual(patches[0].payload.content.items.map(item => item.text), ['first', 'second']);
+    assert.notEqual(patches[0].payload.content.items[0].id, patches[0].payload.content.items[1].id);
+    assert.equal(patches[0].payload.content.feedback_correct, 'Well done');
+    assert.equal(patches[0].payload.content.feedback_incorrect, 'Try again');
+});
+
+test('matching editor creates correct pairs, preserves blanks and first-column settings, and saves comments', async t => {
+    blocks.push({ id: 'match', type: 'MATCH', order_index: 5,
+        content: { prompt: '<p>Match countries and capitals</p>', pairs: [], html: false, keep_left_order: false } });
+    const renderer = await mount(t);
+    const card = cards(renderer).find(node => node.props.id === 'edit-block-match');
+    const button = label => card.findAllByType('button').find(node => node.children.join('') === label);
+    await act(async () => button('+ Добавить пару').props.onClick());
+    await act(async () => button('+ Добавить пару').props.onClick());
+    await act(async () => button('Сохранить').props.onClick());
+    assert.equal(patches.length, 0);
+    assert.match(JSON.stringify(renderer.toJSON()), /В каждой строке заполните хотя бы одну ячейку/);
+    const change = async (label, value) => act(async () => card.findByProps({ 'aria-label': label }).props.onChange({ target: { value } }));
+    await change('Строка 1, первый столбец', 'Bulgaria');
+    await change('Строка 1, второй столбец', 'Sofia');
+    await change('Строка 2, первый столбец', 'Unmatched country');
+    await act(async () => card.findAllByType('input').find(node => node.props.type === 'checkbox').props.onChange({ target: { checked: true } }));
+    await act(async () => card.findByProps({ 'aria-label': 'Пара 2: вверх' }).props.onClick());
+    const comments = card.findAllByType('textarea').filter(node => node.props.placeholder === 'Необязательно');
+    await act(async () => comments[0].props.onChange({ target: { value: 'Correct pairs' } }));
+    await act(async () => comments[1].props.onChange({ target: { value: 'Check the capitals' } }));
+    await act(async () => button('Сохранить').props.onClick());
+    assert.equal(patches.length, 1);
+    const { content, type } = patches[0].payload;
+    assert.equal(type, 'MATCH');
+    assert.equal(content.keep_left_order, true);
+    assert.deepEqual(content.pairs.map(row => [row.left.text, row.right.text]), [['Unmatched country', ''], ['Bulgaria', 'Sofia']]);
+    const ids = content.pairs.flatMap(row => [row.left.id, row.right.id]);
+    assert.equal(new Set(ids).size, 4);
+    assert.equal(content.feedback_correct, 'Correct pairs');
+    assert.equal(content.feedback_incorrect, 'Check the capitals');
+});
+
+test('table editor adds named axes, requires a radio answer for each row, and saves settings and comments', async t => {
+    blocks.push({ id: 'table', type: 'TABLE', order_index: 5,
+        content: { prompt: '<p>Select languages</p>', rows: [], columns: [], correct_cells: {}, multiple_answers: false,
+            shuffle_rows: false, shuffle_columns: false, any_answer_correct: false } });
+    const renderer = await mount(t);
+    const card = cards(renderer).find(node => node.props.id === 'edit-block-table');
+    const button = text => card.findAllByType('button').find(node => node.children.join('') === text);
+    for (const label of ['+ Добавить строку', '+ Добавить строку', '+ Добавить столбец', '+ Добавить столбец'])
+        await act(async () => button(label).props.onClick());
+    for (const [label, value] of [['Название строки 1', 'Australia'], ['Название строки 2', 'Austria'],
+        ['Название столбца 1', 'English'], ['Название столбца 2', 'German']]) {
+        await act(async () => card.findByProps({ 'aria-label': label }).props.onChange({ target: { value } }));
+    }
+    await act(async () => button('Сохранить').props.onClick());
+    assert.equal(patches.length, 0);
+    assert.match(JSON.stringify(renderer.toJSON()), /Отметьте один правильный вариант в каждой строке/);
+    for (const label of ['Australia — English', 'Austria — German'])
+        await act(async () => card.findByProps({ 'aria-label': label }).props.onChange({ target: { checked: true } }));
+    for (const setting of ['Перемешивать порядок строк', 'Перемешивать порядок столбцов']) {
+        const label = card.findAllByType('label').find(node => node.children.filter(child => typeof child === 'string').join('').includes(setting));
+        await act(async () => label.findByType('input').props.onChange({ target: { checked: true } }));
+    }
+    const comments = card.findAllByType('textarea').filter(node => node.props.placeholder === 'Необязательно');
+    await act(async () => comments[0].props.onChange({ target: { value: 'Correct cells' } }));
+    await act(async () => comments[1].props.onChange({ target: { value: 'Adjust the cells' } }));
+    await act(async () => button('Сохранить').props.onClick());
+    assert.equal(patches.length, 1);
+    const { type, content } = patches[0].payload;
+    assert.equal(type, 'TABLE');
+    assert.deepEqual(content.rows.map(row => row.text), ['Australia', 'Austria']);
+    assert.deepEqual(content.columns.map(column => column.text), ['English', 'German']);
+    assert.deepEqual(content.correct_cells, { [content.rows[0].id]: [content.columns[0].id], [content.rows[1].id]: [content.columns[1].id] });
+    assert.equal(content.shuffle_rows, true);
+    assert.equal(content.shuffle_columns, true);
+    assert.equal(content.feedback_correct, 'Correct cells');
+    assert.equal(content.feedback_incorrect, 'Adjust the cells');
+});
+
+test('table editor cleans deleted column references and permits surveys with no answer key', async t => {
+    blocks.push({ id: 'table', type: 'TABLE', order_index: 5, content: {
+        prompt: 'Survey', rows: [{ id: 'r1', text: 'New' }, { id: 'r2', text: 'Useful' }],
+        columns: [{ id: 'c1', text: 'Low' }, { id: 'c2', text: 'High' }], multiple_answers: true,
+        correct_cells: { r1: ['c1', 'c2'], r2: ['c1'] }, any_answer_correct: false,
+    } });
+    const renderer = await mount(t);
+    const card = cards(renderer).find(node => node.props.id === 'edit-block-table');
+    await act(async () => card.findByProps({ 'aria-label': 'Удалить столбец 1' }).props.onClick());
+    const setting = card.findAllByType('label').find(node => node.children.filter(child => typeof child === 'string').join('').includes('Любой ответ верный'));
+    await act(async () => setting.findByType('input').props.onChange({ target: { checked: true } }));
+    await act(async () => card.findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.onClick());
+    assert.deepEqual(patches[0].payload.content.correct_cells, { r1: ['c2'], r2: [] });
+    assert.equal(patches[0].payload.content.any_answer_correct, true);
+    assert.deepEqual(patches[0].payload.content.columns, [{ id: 'c2', text: 'High' }]);
 });

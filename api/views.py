@@ -44,6 +44,9 @@ from .discussions import (can_see_all, check_not_banned, check_post_interval, cl
 from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .output_comparison import outputs_match
 from .quiz_state import submit_quiz
+from .sorting import prepare_answer as prepare_sort_answer
+from .matching import prepare_answer as prepare_match_answer
+from .table_tasks import prepare_answer as prepare_table_answer
 from .block_content import TASK_TYPES, grade_fill, normalize_test, test_visibility
 from .serializers import (
     CourseSerializer,
@@ -137,7 +140,7 @@ def record_answer(user, block, answer, is_correct):
     progress.save()
 
     # Attempt history (TEXT blocks carry no meaningful answer).
-    if block.type in ('QUIZ', 'CODE', 'FILL'):
+    if block.type in TASK_TYPES:
         Attempt.objects.create(student=user, block=block, answer=answer, is_correct=is_correct)
     return progress
 
@@ -688,10 +691,10 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
         GET /api/lessons/outline/?course=<id>  (lesson viewer's lessons panel)
 
         Every lesson of the course in order, with the REQUESTING user's progress:
-        [{id, title, position, text_count, quiz_count, code_count, fill_count,
+        [{id, title, position, text_count, quiz_count, code_count, fill_count, sort_count, match_count,
         task_count, solved_count, passed_students,
         students_solved}]. Same rule as the viewer's "Решено X из Y задач":
-        tasks are QUIZ/CODE/FILL blocks, solved means is_correct. The course
+        tasks are QUIZ/CODE/FILL/SORT/MATCH blocks, solved means is_correct. The course
         author's solved_count is their own (trying out their tasks), and they also
         get the enrolled students': passed_students (solved every task of the
         lesson) and students_solved (their correct tasks, summed); null for
@@ -712,6 +715,9 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
             quiz_count=models.Count('blocks', filter=models.Q(blocks__type='QUIZ'), distinct=True),
             code_count=models.Count('blocks', filter=models.Q(blocks__type='CODE'), distinct=True),
             fill_count=models.Count('blocks', filter=models.Q(blocks__type='FILL'), distinct=True),
+            sort_count=models.Count('blocks', filter=models.Q(blocks__type='SORT'), distinct=True),
+            match_count=models.Count('blocks', filter=models.Q(blocks__type='MATCH'), distinct=True),
+            table_count=models.Count('blocks', filter=models.Q(blocks__type='TABLE'), distinct=True),
             task_count=models.Count('blocks', filter=tasks, distinct=True),
             # One Progress row per student per block, so no double counting.
             solved_count=models.Count('blocks__progress', distinct=True, filter=tasks & models.Q(
@@ -745,6 +751,9 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
                 'quiz_count': lessons[lesson_id].quiz_count,
                 'code_count': lessons[lesson_id].code_count,
                 'fill_count': lessons[lesson_id].fill_count,
+                'sort_count': lessons[lesson_id].sort_count,
+                'match_count': lessons[lesson_id].match_count,
+                'table_count': lessons[lesson_id].table_count,
                 'task_count': lessons[lesson_id].task_count,
                 'solved_count': lessons[lesson_id].solved_count,
                 'passed_students': None if passed_students is None else passed_students[lesson_id],
@@ -1176,7 +1185,7 @@ class CourseEnrollmentsView(generics.ListAPIView):
 class ProgressSubmitView(generics.CreateAPIView):
     """
     POST /api/progress/submit/   Body: {"block": "<uuid>", "answer": {...}}
-    Student submits an answer to a TEXT, QUIZ or FILL block.
+    Student submits an answer to a TEXT, QUIZ, FILL, SORT or MATCH block.
 
     Access: anonymous → 401; missing block → 400; unknown block → 404;
     not enrolled in the block's course and not its author → 403.
@@ -1185,6 +1194,8 @@ class ProgressSubmitView(generics.CreateAPIView):
     - TEXT: marks as completed (is_correct stays None).
     - QUIZ: answer {"selected": <option index>} vs correct_answer.
     - FILL: answer {"blanks": [...]} vs the template's {{answer}} gaps.
+    - SORT: answer {"order": [item UUIDs]} vs the stored item order.
+    - MATCH: answer {"left_order": [...], "right_order": [...]} vs stored pairs.
     - CODE: 400 — code is graded only by POST /api/run-tests/.
 
     Response: the progress record (ProgressSerializer, incl. is_correct and
@@ -1210,6 +1221,12 @@ class ProgressSubmitView(generics.CreateAPIView):
             data = dict(self.get_serializer(progress).data)
             data['recorded'] = recorded
             return Response(data, status=status.HTTP_200_OK)
+        elif block.type == 'SORT':
+            answer, is_correct = prepare_sort_answer(block, answer)
+        elif block.type == 'MATCH':
+            answer, is_correct = prepare_match_answer(block, answer)
+        elif block.type == 'TABLE':
+            answer, is_correct = prepare_table_answer(block, answer)
         elif block.type == 'FILL':
             is_correct = grade_fill(block.content, answer)
         else:

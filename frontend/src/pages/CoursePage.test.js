@@ -94,16 +94,16 @@ const stepCounts = row => row.findAllByProps({ className: 'lesson-row__step-coun
     .map(node => [].concat(node.props.children).join(''));
 
 test('authors see total and nonzero step types matching the syllabus', async t => {
-    outline = [{ id: '0', text_count: 1, quiz_count: 12, code_count: 7, fill_count: 1, task_count: 20, solved_count: 0 }];
+    outline = [{ id: '0', text_count: 1, quiz_count: 12, code_count: 7, fill_count: 1, sort_count: 2, match_count: 3, table_count: 2, task_count: 27, solved_count: 0 }];
     const renderer = await mount(t);
-    assert.deepEqual(stepCounts(rows(renderer)[0]), ['Шагов: 21', 'Теория: 1', 'Тесты: 12', 'Задачи: 7', 'Пропуски: 1']);
+    assert.deepEqual(stepCounts(rows(renderer)[0]), ['Шагов: 28', 'Теория: 1', 'Тесты: 12', 'Задачи: 7', 'Пропуски: 1', 'Сортировка: 2', 'Сопоставление: 3', 'Таблицы: 2']);
     assert.equal(rows(renderer)[0].findByType('a').props.href, '/lesson/0/');
 });
 
 test('theory-only and empty lessons are distinguishable, including newly created lessons', async t => {
     outline = [
-        { id: '0', text_count: 2, quiz_count: 0, code_count: 0, fill_count: 0, task_count: 0 },
-        { id: '1', text_count: 0, quiz_count: 0, code_count: 0, fill_count: 0, task_count: 0 },
+        { id: '0', text_count: 2, quiz_count: 0, code_count: 0, fill_count: 0, sort_count: 0, match_count: 0, table_count: 0, task_count: 0 },
+        { id: '1', text_count: 0, quiz_count: 0, code_count: 0, fill_count: 0, sort_count: 0, match_count: 0, table_count: 0, task_count: 0 },
     ];
     const renderer = await mount(t);
     assert.deepEqual(stepCounts(rows(renderer)[0]), ['Шагов: 2', 'Теория: 2']);
@@ -123,7 +123,7 @@ test('unavailable outline does not mislabel an existing lesson as empty', async 
 });
 
 test('author can drag the first of 50 lessons after lesson 15 in one request', async t => {
-    outline = [{ id: '0', text_count: 2, quiz_count: 0, code_count: 3, fill_count: 0, task_count: 3, solved_count: 0 }];
+    outline = [{ id: '0', text_count: 2, quiz_count: 0, code_count: 3, fill_count: 0, sort_count: 0, match_count: 0, table_count: 0, task_count: 3, solved_count: 0 }];
     const renderer = await mount(t);
     assert.equal(rows(renderer).length, 50);
     const handle = rows(renderer)[0].findAllByType('button').find(node => node.props.draggable);

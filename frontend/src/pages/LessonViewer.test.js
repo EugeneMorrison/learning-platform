@@ -4,7 +4,7 @@ import React, { act, StrictMode } from 'react';
 import { create } from 'react-test-renderer';
 import { createServer } from 'vite';
 
-// Load the real viewer, QuizBlock and quizState with JSX support. Only network,
+// Load the real viewer and the quiz/matching/table blocks with JSX support. Only network,
 // browser decoration and unrelated blocks are stubbed; React hooks are real.
 const fixture = globalThis.__quizLoadingTest = { setLessonBar() {} };
 const server = await createServer({
@@ -19,7 +19,7 @@ const server = await createServer({
             if (source === 'react-router-dom') return '\0quiz-router';
             if (source === '../lib/lessonBar') return '\0quiz-bar';
             if (source === '../lib/contentImages') return '\0quiz-images';
-            if ((source.startsWith('../components/') && !source.endsWith('/QuizBlock'))
+            if ((source.startsWith('../components/') && !['/QuizBlock', '/MatchBlock', '/TableBlock'].some(name => source.endsWith(name)))
                 || source === './DiscussionPanel') return '\0quiz-decoration';
         },
         load(id) {
@@ -116,6 +116,50 @@ async function choose(renderer, texts) {
     for (const text of texts) {
         await act(async () => options(renderer)[displayed(renderer).indexOf(text)].props.onClick());
     }
+}
+
+test('course author can open a lesson with a new matching task returned in editor format', async t => {
+    blocks = [{ id: 'matching', type: 'MATCH', updated_at: '2026-11-03T00:00:00Z', content: {
+        prompt: 'Match country and capital', keep_left_order: true, html: false,
+        pairs: [
+            { left: { id: 'country-1', text: 'Bulgaria' }, right: { id: 'capital-1', text: 'Sofia' } },
+            { left: { id: 'country-2', text: 'India' }, right: { id: 'capital-2', text: 'New Delhi' } },
+        ], feedback_correct: 'Correct', feedback_incorrect: 'Try again',
+    } }];
+    progress = [];
+    const get = fixture.get;
+    fixture.get = async url => {
+        if (url === '/auth/me/') return { data: { id: 'author', role: 'AUTHOR' } };
+        if (url === '/discussions/counts/') return { data: { counts: {} } };
+        return get(url);
+    };
+    const renderer = await mount(t);
+    assert.equal(renderer.root.findAllByProps({ className: 'match-row' }).length, 2);
+    const shown = renderer.root.findAllByProps({ className: 'sort-item__text' }).map(node => node.children.join(''));
+    for (const text of ['Bulgaria', 'Sofia', 'India', 'New Delhi']) assert.ok(shown.includes(text));
+    assert.ok(renderer.root.findAllByType('button').some(node => node.props.children === 'Проверить'));
+});
+
+for (const role of ['AUTHOR', 'STUDENT']) {
+    test(`${role} can open a lesson containing a table task with the real API content shape`, async t => {
+        const table = { prompt: 'Choose the official languages', rows: [{ id: 'r1', text: 'Australia' }, { id: 'r2', text: 'Austria' }],
+            columns: [{ id: 'c1', text: 'English' }, { id: 'c2', text: 'German' }], multiple_answers: false,
+            shuffle_rows: false, shuffle_columns: false, any_answer_correct: false };
+        if (role === 'AUTHOR') Object.assign(table, { correct_cells: { r1: ['c1'], r2: ['c2'] }, feedback_correct: 'PRIVATE-COMMENT' });
+        blocks = [{ id: 'table', type: 'TABLE', content: table, updated_at: '2026-11-03T12:00:00Z' }];
+        progress = [];
+        const get = fixture.get;
+        fixture.get = async url => {
+            if (url === '/auth/me/') return { data: { id: role === 'AUTHOR' ? 'author' : 'student', role } };
+            if (url === '/discussions/counts/') return { data: { counts: {} } };
+            return get(url);
+        };
+        const renderer = await mount(t);
+        assert.equal(renderer.root.findAllByType('table').length, 1);
+        assert.equal(renderer.root.findAllByType('input').filter(node => node.props.type === 'radio').length, 4);
+        assert.equal(renderer.root.findAllByType('input').filter(node => node.props.checked).length, 0);
+        assert.doesNotMatch(JSON.stringify(renderer.toJSON()), /PRIVATE-COMMENT/);
+    });
 }
 
 test('code drafts receive the authenticated account ID after lesson loading', async t => {

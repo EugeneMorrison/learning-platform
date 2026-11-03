@@ -1,0 +1,18 @@
+.match-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+.match-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.match-cell { display: flex; align-items: center; gap: 8px; min-width: 0; height: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--color-line); border-radius: 8px; background: var(--color-surface, var(--color-soft)); }
+.match-cell--left { justify-content: flex-end; text-align: right; }
+.match-cell--left .sort-item__text { flex: initial; }
+.match-empty { flex: 1; min-width: 0; color: var(--color-muted); font-style: italic; }
+.match-editor__row { display: flex; align-items: center; gap: 8px; }
+.match-editor__row > .match-row { flex: 1; min-width: 0; }
+.match-setting { display: block; margin-top: 16px; }
+.match-comment { display: block; width: 100%; box-sizing: border-box; }
+@media (max-width: 640px) {
+    .match-cell { padding: 8px; gap: 6px; }
+    .match-row { gap: 4px; }
+    .match-cell .sort-item__arrows { flex-direction: column; }
+    .match-editor__row { flex-wrap: wrap; }
+    .match-editor__row > .match-row { flex-basis: calc(100% - 48px); }
+    .match-editor__row > .sort-item__arrows { margin-left: auto; }
+}

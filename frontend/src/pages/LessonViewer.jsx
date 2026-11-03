@@ -7,6 +7,9 @@ import FloatingLessonNav from '../components/FloatingLessonNav';
 import QuizBlock from '../components/QuizBlock';
 import CodeBlock from '../components/CodeBlock';
 import FillBlock from '../components/FillBlock';
+import SortBlock from '../components/SortBlock';
+import MatchBlock from '../components/MatchBlock';
+import TableBlock from '../components/TableBlock';
 import LessonsPanel from '../components/LessonsPanel';
 import StudentChat from '../components/StudentChat';
 import QuestionModal from '../components/QuestionModal';
@@ -17,10 +20,10 @@ import { useSetLessonBar } from '../lib/lessonBar';
 import './LessonViewer.css';
 
 // Block types that are solvable tasks (have a pass/fail, count toward progress).
-const TASK_TYPES = new Set(['QUIZ', 'CODE', 'FILL']);
+const TASK_TYPES = new Set(['QUIZ', 'CODE', 'FILL', 'SORT', 'MATCH', 'TABLE']);
 
 // Task names as on the blocks' badges ("Задача 2"), for the discussion panel.
-const TASK_LABELS = { CODE: 'Задача', QUIZ: 'Тест', FILL: 'Пропуски' };
+const TASK_LABELS = { CODE: 'Задача', QUIZ: 'Тест', FILL: 'Пропуски', SORT: 'Сортировка', MATCH: 'Сопоставление', TABLE: 'Таблица' };
 const DISCUSSION_PANEL_ID = 'lesson-discussion';
 
 const DEV_LESSON_ID = '6f1c0c31-7be5-4434-ac25-c00f8031d15c';
@@ -280,6 +283,9 @@ function LessonViewer() {
         let quizCount = 0;
         let codeCount = 0;
         let fillCount = 0;
+        let sortCount = 0;
+        let matchCount = 0;
+        let tableCount = 0;
         blocks.forEach(b => {
             if (b.type === 'QUIZ') {
                 quizCount += 1;
@@ -290,6 +296,15 @@ function LessonViewer() {
             } else if (b.type === 'FILL') {
                 fillCount += 1;
                 map[b.id] = fillCount;
+            } else if (b.type === 'SORT') {
+                sortCount += 1;
+                map[b.id] = sortCount;
+            } else if (b.type === 'MATCH') {
+                matchCount += 1;
+                map[b.id] = matchCount;
+            } else if (b.type === 'TABLE') {
+                tableCount += 1;
+                map[b.id] = tableCount;
             }
         });
         return map;
@@ -362,6 +377,21 @@ function LessonViewer() {
                 inner = <CodeBlock key={`${user?.id}:${block.id}`} blockId={block.id} userId={user?.id} content={block.content} savedProgress={blockProgress} number={number}
                     onSubmitted={data => handleCodeSubmitted(block.id, data)} discussion={discussion}
                     onAsk={hasChat ? draft => setQuestion({ blockId: block.id, draft }) : undefined} />;
+                break;
+            case 'TABLE':
+                inner = <TableBlock blockId={block.id} tableRevision={block.updated_at} content={block.content} savedProgress={blockProgress} number={number}
+                    onSubmitted={handleAnswerSubmitted} discussion={discussion}
+                    onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
+                break;
+            case 'MATCH':
+                inner = <MatchBlock blockId={block.id} matchRevision={block.updated_at} content={block.content} savedProgress={blockProgress} number={number}
+                    onSubmitted={handleAnswerSubmitted} discussion={discussion}
+                    onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
+                break;
+            case 'SORT':
+                inner = <SortBlock blockId={block.id} sortRevision={block.updated_at} content={block.content} savedProgress={blockProgress} number={number}
+                    onSubmitted={handleAnswerSubmitted} discussion={discussion}
+                    onAsk={hasChat ? () => setQuestion({ blockId: block.id }) : undefined} />;
                 break;
             case 'FILL':
                 inner = <FillBlock blockId={block.id} content={block.content} savedProgress={blockProgress} number={number}

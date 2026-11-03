@@ -13,12 +13,18 @@ import { useDragReorder } from '../lib/useDragReorder';
 import { parseTemplate } from '../lib/fillTemplate';
 import { OUTPUT_COMPARISONS } from '../lib/outputComparison';
 import api from '../api';
+import SortFields from '../components/SortFields';
+import MatchFields from '../components/MatchFields';
+import TableFields from '../components/TableFields';
 
 const TYPE_LABELS = {
     TEXT: '📝 Теория',
     QUIZ: '❓ Тест',
     CODE: '💻 Задача с кодом',
     FILL: '✍️ Заполнить пропуски',
+    SORT: '↕️ Сортировка',
+    MATCH: '🔗 Сопоставление',
+    TABLE: '▦ Таблица',
 };
 
 function defaultContent(type) {
@@ -31,6 +37,13 @@ function defaultContent(type) {
             return { prompt: '', header: '', starter_code: '# Ваш код здесь\n', footer: '', solution: '', output_comparison: 'exact', tests: [{ input: '', expected: '', visible: true }] };
         case 'FILL':
             return { prompt: '', template: '', case_sensitive: false, explanation: '' };
+        case 'SORT':
+            return { prompt: '', items: [], html: false, feedback_correct: '', feedback_incorrect: '' };
+        case 'MATCH':
+            return { prompt: '', pairs: [], html: false, keep_left_order: false, feedback_correct: '', feedback_incorrect: '' };
+        case 'TABLE':
+            return { prompt: '', rows: [], columns: [], correct_cells: {}, multiple_answers: false,
+                shuffle_rows: false, shuffle_columns: false, any_answer_correct: false, feedback_correct: '', feedback_incorrect: '' };
         default:
             return {};
     }
@@ -62,11 +75,11 @@ function withVisibleFlags(content) {
     };
 }
 
-// The main text of each type (rich text in all four): kept on a type change.
-const MAIN_TEXT = { TEXT: 'html', QUIZ: 'question', CODE: 'prompt', FILL: 'prompt' };
+// The main text of each type: kept on a type change.
+const MAIN_TEXT = { TEXT: 'html', QUIZ: 'question', CODE: 'prompt', FILL: 'prompt', SORT: 'prompt', MATCH: 'prompt', TABLE: 'prompt' };
 
 // The «Тип блока» selector.
-const TYPE_CHOICES = [['TEXT', 'Теория'], ['QUIZ', 'Тест'], ['CODE', 'Код'], ['FILL', 'Пропуски']];
+const TYPE_CHOICES = [['TEXT', 'Теория'], ['QUIZ', 'Тест'], ['CODE', 'Код'], ['FILL', 'Пропуски'], ['SORT', 'Сортировка'], ['MATCH', 'Сопоставление'], ['TABLE', 'Таблица']];
 
 // Whether a type change would drop something the author entered (beyond the
 // main text, which is kept): options, tests, code, template, explanation.
@@ -83,6 +96,9 @@ function hasTypeSpecificContent(type, content) {
                 ? t.trim() : (t.input || '').trim() || (t.expected || '').trim()));
     }
     if (type === 'FILL') return (content.template || '').trim() !== '' || filled(content.explanation);
+    if (type === 'SORT') return (content.items || []).length > 0 || filled(content.feedback_correct) || filled(content.feedback_incorrect);
+    if (type === 'MATCH') return (content.pairs || []).length > 0 || filled(content.feedback_correct) || filled(content.feedback_incorrect);
+    if (type === 'TABLE') return (content.rows || []).length > 0 || (content.columns || []).length > 0 || filled(content.feedback_correct) || filled(content.feedback_incorrect);
     return false;
 }
 
@@ -197,6 +213,23 @@ function validate(type, content) {
     } else if (type === 'CODE') {
         if (!stripHtml(content.prompt)) return 'Опишите условие задачи.';
         if (!content.starter_code.trim()) return 'Добавьте стартовый код.';
+    } else if (type === 'TABLE') {
+        if (!stripHtml(content.prompt)) return 'Опишите, какие ячейки нужно выбрать.';
+        if (['rows', 'columns'].some(axis => !content[axis].length || content[axis].some(item => !item.text.trim())))
+            return 'Добавьте строки и столбцы с непустыми названиями.';
+        if (!content.any_answer_correct && !content.multiple_answers && content.rows.some(row => content.correct_cells[row.id]?.length !== 1))
+            return 'Отметьте один правильный вариант в каждой строке.';
+    } else if (type === 'MATCH') {
+        if (!stripHtml(content.prompt)) return 'Опишите, какие элементы нужно сопоставить.';
+        const text = item => content.html ? stripHtml(item.text) : item.text.trim();
+        if (content.pairs.length < 2 || content.pairs.some(pair => !text(pair.left) && !text(pair.right)))
+            return 'Добавьте минимум две пары. В каждой строке заполните хотя бы одну ячейку.';
+        if (['left', 'right'].some(side => !content.pairs.some(pair => text(pair[side]))))
+            return 'В каждом столбце нужен хотя бы один непустой элемент.';
+    } else if (type === 'SORT') {
+        if (!stripHtml(content.prompt)) return 'Укажите условие и требуемый порядок сортировки.';
+        if (content.items.length < 2 || content.items.some(item => !(content.html ? stripHtml(item.text) : item.text.trim())))
+            return 'Добавьте минимум два непустых элемента.';
     } else if (type === 'FILL') {
         const blanks = (content.template || '').match(/\{\{(.*?)\}\}/g) || [];
         const hasAnswer = blanks.some(b => b.replace(/\{\{|\}\}/g, '').trim());
@@ -608,7 +641,7 @@ function LessonEditor() {
     const newAtEnd = newDrafts.filter(d => !d.insertBefore);
     const visibleDrafts = [...blocks.flatMap(block => [...newAbove(block.id), drafts[block.id]].filter(Boolean)), ...newAtEnd];
     // Count each task type independently, just as in the lesson viewer.
-    const typeCounts = { QUIZ: 0, CODE: 0, FILL: 0 };
+    const typeCounts = { QUIZ: 0, CODE: 0, FILL: 0, SORT: 0, MATCH: 0, TABLE: 0 };
     const blockNumbers = {};
     for (const draft of visibleDrafts) {
         if (typeCounts[draft.type] === undefined) continue;
@@ -698,7 +731,7 @@ function LessonEditor() {
             <div style={{ marginTop: 24, padding: 16, border: '1px dashed var(--color-line)', borderRadius: 8, background: 'var(--color-soft)' }}>
                 <div style={{ fontWeight: 600, marginBottom: 10, color: 'var(--color-ink)' }}>Добавить блок:</div>
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                    {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
+                    {['TEXT', 'QUIZ', 'CODE', 'FILL', 'SORT', 'MATCH', 'TABLE'].map(type => (
                         <button key={type} onClick={() => startAdd(type)} style={addBtn}>
                             {TYPE_LABELS[type]}
                         </button>
@@ -749,7 +782,7 @@ function NextLessonButton({ nextLessonId }) {
 // =============================================================================
 
 // «+ Вставить блок» above a block: a slim muted line until clicked, then the
-// four type buttons right there.
+// type buttons right there.
 function InsertControl({ open, onOpen, onPick, onCancel }) {
     if (!open) {
         return (
@@ -761,7 +794,7 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
     return (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 12, padding: 12, border: '1px dashed var(--color-line)', borderRadius: 8, background: 'var(--color-soft)' }}>
             <span style={{ fontWeight: 600, color: 'var(--color-ink)' }}>Вставить здесь:</span>
-            {['TEXT', 'QUIZ', 'CODE', 'FILL'].map(type => (
+            {['TEXT', 'QUIZ', 'CODE', 'FILL', 'SORT', 'MATCH', 'TABLE'].map(type => (
                 <button key={type} onClick={() => onPick(type)} style={addBtn}>
                     {TYPE_LABELS[type]}
                 </button>
@@ -837,6 +870,9 @@ const BlockCard = memo(function BlockCard({ draft, number, actions, busy, course
             {type === 'CODE' && <CodeFields content={content} setContent={setContent} />}
 
             {type === 'FILL' && <FillFields content={content} setContent={setContent} />}
+            {type === 'SORT' && <SortFields content={content} setContent={setContent} />}
+            {type === 'MATCH' && <MatchFields content={content} setContent={setContent} />}
+            {type === 'TABLE' && <TableFields uid={key} content={content} setContent={setContent} />}
 
             {error && <p style={{ color: 'var(--color-danger)', marginTop: 8 }}>{error}</p>}
 

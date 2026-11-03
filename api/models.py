@@ -363,7 +363,7 @@ class Lesson(models.Model):
 
 class Block(models.Model):
     """
-    Content blocks within lessons (TEXT, QUIZ, or CODE).
+    Content blocks within lessons (TEXT, QUIZ, CODE, FILL, SORT, MATCH, or TABLE).
 
     WHY JSONField for content?
     - Different block types need different data structures
@@ -384,6 +384,9 @@ class Block(models.Model):
         ('QUIZ', 'Quiz Block'),
         ('CODE', 'Code Block'),
         ('FILL', 'Fill-in-the-blanks Block'),
+        ('SORT', 'Sorting Block'),
+        ('MATCH', 'Matching Block'),
+        ('TABLE', 'Table Block'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -398,7 +401,7 @@ class Block(models.Model):
     type = models.CharField(
         max_length=10,
         choices=BLOCK_TYPE_CHOICES,
-        help_text="Block type (TEXT/QUIZ/CODE)"
+        help_text="Block type (TEXT/QUIZ/CODE/FILL/SORT/MATCH/TABLE)"
     )
 
     order_index = models.IntegerField(

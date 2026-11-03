@@ -10,6 +10,9 @@ Serializers convert between:
 from django.utils.translation import gettext
 from rest_framework import serializers
 from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
+from .sorting import content_error as sorting_content_error
+from .matching import content_error as matching_content_error
+from .table_tasks import content_error as table_content_error
 from .output_comparison import comparison_error
 from .quiz_state import saved_quiz_snapshot
 from .models import User, Course, Lesson, Block, Enrollment, Progress, Message, Thread, Comment
@@ -394,6 +397,15 @@ def block_content_error(block_type, value):
         for test in value.get('tests') or []:
             if isinstance(test, dict) and 'visible' in test and not isinstance(test['visible'], bool):
                 return "CODE test 'visible' must be true or false"
+
+    elif block_type == 'SORT':
+        return sorting_content_error(value)
+
+    elif block_type == 'MATCH':
+        return matching_content_error(value)
+
+    elif block_type == 'TABLE':
+        return table_content_error(value)
 
     elif block_type == 'FILL':
         # Fill-in-the-blanks: a code/text template with {{answer}} markers.

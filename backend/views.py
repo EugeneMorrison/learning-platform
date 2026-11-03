@@ -29,6 +29,9 @@ BLOCK_COUNTS = [
     ('QUIZ', 'quiz_count'),
     ('CODE', 'code_count'),
     ('FILL', 'fill_count'),
+    ('SORT', 'sort_count'),
+    ('MATCH', 'match_count'),
+    ('TABLE', 'table_count'),
 ]
 
 

@@ -97,7 +97,7 @@ learning-platform/
 
 ## Block system
 
-A lesson is a list of blocks. There are four kinds:
+A lesson is a list of blocks. There are seven kinds:
 
 | Type | Description                | Content stored as                                                                      |
 |------|----------------------------|----------------------------------------------------------------------------------------|
@@ -105,6 +105,9 @@ A lesson is a list of blocks. There are four kinds:
 | QUIZ | Multiple choice question   | `{"question": "...", "options": [...], "correct_answer": 0, "explanation": "..."}`    |
 | CODE | Python coding exercise     | `{"prompt": "...", "starter_code": "...", "tests": [...]}`                            |
 | FILL | Fill-in-the-blanks task    | `{"prompt": "...", "template": "print({{8}})", "case_sensitive": false}`              |
+| SORT | Arrange a shuffled list in order | `{"prompt": "Sort ascending, top to bottom", "items": [{"id": "<random UUID v4>", "text": "..."}, ...], "html": false}` |
+| MATCH | Match two lists, with optional unmatched items | `{"prompt": "Match countries and capitals", "pairs": [{"left": {"id": "<UUID v4>", "text": "..."}, "right": {"id": "<different UUID v4>", "text": "..."}}, ...], "html": false, "keep_left_order": false}` |
+| TABLE | Select cells in a table | `{"prompt": "Select the correct cells", "rows": [{"id": "<UUID v4>", "text": "..."}], "columns": [{"id": "<UUID v4>", "text": "..."}], "correct_cells": {"<row UUID>": ["<column UUID>"]}, "multiple_answers": false}` |
 
 Code blocks run on CodeMirror 6 with a hand-built PyCharm Darcula theme ([frontend/src/components/pycharmDarcula.js](frontend/src/components/pycharmDarcula.js)):
 
@@ -124,7 +127,7 @@ To open it, go to a course page: every lesson row has an Edit button (authors on
 
 In the editor you can:
 
-* Add a block of any type — Theory (TEXT), Quiz (QUIZ), Code task (CODE), or Fill in the blanks (FILL)
+* Add a block of any type — Theory (TEXT), Quiz (QUIZ), Code task (CODE), Fill in the blanks (FILL), Sorting (SORT), Matching (MATCH), or Table (TABLE)
 * Edit any existing block in place
 * Delete a block, with a confirmation
 * Move blocks up and down
@@ -137,6 +140,15 @@ Each block type has its own form:
 | QUIZ | The question uses the same rich editor, with a dynamic list of options, a radio button to mark the correct one, and an explanation shown on a correct answer. Empty options are dropped on save and `correct_answer` is reindexed for you. |
 | CODE | A rich-text task description, `starter_code`, and an optional hidden solution (both in the same CodeMirror + PyCharm Darcula editor the student sees), plus a tests table (stdin → expected stdout). Blank test rows are ignored. |
 | FILL | A rich-text description plus a template where blanks are written inline as `{{answer}}` (alternatives separated by `\|`, e.g. `print({{math.factorial(8)\|factorial(8)}})`). A live preview shows the fixed text and the accepted answers. A case-sensitive toggle and an explanation are optional. |
+| SORT | A rich-text instruction that specifies the sorting direction. Add at least two items and arrange them in the correct top-to-bottom order with drag handles or arrows. Students see shuffled items and use the same controls. Optional HTML mode previews `br`, `b`, `i`, `strong`, `em`, `strike`, `h1`–`h3`, `ol`, `li`, `ul`, `blockquote`, `code`, and `abbr` with `title`; other attributes and executable content are discarded. Plain text and code indentation are preserved. Separate optional comments appear after correct or incorrect submissions. |
+| MATCH | A rich-text instruction and a two-column editor: each row defines a correct pair. Leave either side blank for unmatched items; completely empty rows are rejected. Rows can be added, deleted, and reordered. The first column can retain the author's order or be shuffled; the second is always shuffled. Students arrange the second column using drag handles or arrows. HTML mode supports the same formatting as SORT, and separate correct/incorrect comments are optional. |
+| TABLE | A rich-text instruction, editable row and column labels, and an answer grid. Choose one radio button per row or multiple checkboxes per row. Optional `shuffle_rows` and `shuffle_columns` are independent; `any_answer_correct` enables surveys without an answer key. Correct/incorrect comments are optional. Wrong answers remain editable in place: students can change selections and resubmit without resetting or reshuffling. |
+
+Sorting uses the stored `items` array as the answer order. Item IDs are unique random UUIDs, not answer positions. Student API responses order items by UUID and omit both feedback comments; the browser shuffles the list. `POST /api/progress/submit/` accepts `answer: {order: [item IDs], sort_revision: block.updated_at}` and grades it on the server. Missing, repeated, unknown items and stale revisions are rejected. Identical item texts are interchangeable. Recorded attempts retain the submitted order and item text, so history and question context survive author edits. Sorting counts toward course progress; practice after the first success preserves the saved completion.
+
+Matching keeps `pairs` private. Students receive independent `left` and `right` arrays with unrelated UUIDs, without pair links or feedback comments. Only `keep_left_order: true` preserves the author's first-column order. Submissions use `answer: {left_order: [...], right_order: [...], match_revision: block.updated_at}`; each column must include every item exactly once, including empty placeholders. Grading compares all pairs, treating identical labels and blank placeholders as interchangeable. Attempts save the displayed pairs and text for restoration, progress history, and question context. Images for tasks such as matching leaves to tree names can be uploaded in the rich-text instruction. Docker startup applies migrations `0021` (SORT) and `0022` (MATCH) after rebuilding the web image.
+
+Table tasks keep `correct_cells` and both feedback comments private. `POST /api/progress/submit/` accepts `answer: {selected: {rowId: [columnIds]}, row_order: [...], column_order: [...], table_revision: block.updated_at}`. Single-choice answers require one cell in every row; multiple-choice answers may leave rows empty. Non-surveys require the exact set of correct cells. Survey mode accepts every structurally valid response. IDs preserve selection identity through row/column shuffling; malformed selections and stale revisions are rejected. Trusted snapshots retain displayed labels, order, prompt, and selection mode for progress history and questions. Saved successes survive author edits, while unfinished work from an older revision starts with the current table. Migration `0023` adds TABLE and runs at Docker startup after a rebuild.
 
 A few implementation notes:
 

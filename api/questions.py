@@ -40,6 +40,8 @@ def task_view(block):
         return {'prompt': content.get('prompt', ''), 'starter_code': content.get('starter_code', '')}
     if block.type == 'QUIZ':
         return {'question': content.get('question', ''), 'options': list(content.get('options') or [])}
+    if block.type in ('SORT', 'MATCH', 'TABLE'):
+        return content
     return {'prompt': content.get('prompt', ''), 'template': content.get('template', '')}
 
 
@@ -71,6 +73,12 @@ def latest_submission(block, student):
             return {**base, 'option': '<br />'.join(chosen) if chosen else None}
         valid = isinstance(selected, int) and not isinstance(selected, bool) and 0 <= selected < len(options)
         return {**base, 'option': options[selected] if valid else None}
+    if block.type == 'SORT':
+        return {**base, 'items': answer.get('items') or [], 'html': answer.get('html', False)}
+    if block.type == 'MATCH':
+        return {**base, 'rows': answer.get('rows') or [], 'html': answer.get('html', False)}
+    if block.type == 'TABLE':
+        return {**base, 'selected': answer.get('selected') or {}, 'table_snapshot': answer.get('table_snapshot')}
     return {**base, 'blanks': list(answer.get('blanks') or [])}
 
 

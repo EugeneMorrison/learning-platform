@@ -519,13 +519,36 @@ class CourseDetailTests(PublicPagesTestCase):
         })
         Block.objects.create(lesson=lesson, type='TEXT', order_index=3,
                              content={'html': f'<p>{marker}-text</p>'})
+        Block.objects.create(lesson=lesson, type='SORT', order_index=4, content={
+            'prompt': f'{marker}-sort', 'items': [
+                {'id': 'ffffffff-ffff-4fff-bfff-ffffffffffff', 'text': f'{marker}-first'},
+                {'id': '11111111-1111-4111-b111-111111111111', 'text': f'{marker}-second'},
+            ], 'feedback_correct': f'{marker}-correct', 'feedback_incorrect': f'{marker}-incorrect',
+        })
+        Block.objects.create(lesson=lesson, type='MATCH', order_index=5, content={
+            'prompt': f'{marker}-match', 'pairs': [{
+                'left': {'id': 'aaaaaaaa-aaaa-4aaa-baaa-aaaaaaaaaaaa', 'text': f'{marker}-left'},
+                'right': {'id': 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb', 'text': f'{marker}-right'},
+            }], 'feedback_correct': f'{marker}-match-correct', 'feedback_incorrect': f'{marker}-match-incorrect',
+        })
+        Block.objects.create(lesson=lesson, type='TABLE', order_index=6, content={
+            'prompt': f'{marker}-table', 'rows': [{'id': 'row', 'text': f'{marker}-row'}],
+            'columns': [{'id': 'column', 'text': f'{marker}-column'}], 'correct_cells': {'row': ['column']},
+            'feedback_correct': f'{marker}-table-correct', 'feedback_incorrect': f'{marker}-table-incorrect',
+        })
 
         response = self.client.get(f'/course/{course.slug}/')
         self.assertNotContains(response, marker)
+        self.assertContains(response, 'Сортировка:')
+        self.assertEqual(response.context['totals']['sort_count'], 1)
+        self.assertContains(response, 'Сопоставление:')
+        self.assertEqual(response.context['totals']['match_count'], 1)
+        self.assertContains(response, 'Таблицы:')
+        self.assertEqual(response.context['totals']['table_count'], 1)
         # The context itself holds only titles and integer counts.
         for row in response.context['lessons']:
             self.assertEqual(
-                set(row), {'title', 'text_count', 'quiz_count', 'code_count', 'fill_count'})
+                set(row), {'title', 'text_count', 'quiz_count', 'code_count', 'fill_count', 'sort_count', 'match_count', 'table_count'})
 
     def test_description_is_escaped(self):
         course = self.make_course(
