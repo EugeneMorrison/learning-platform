@@ -85,7 +85,7 @@ learning-platform/
 │   ├── server.py             # HTTP-сервер (только стандартная библиотека), его вызывает api/runner.py
 │   ├── sandbox.py            # Один запуск: лимиты, пользователь слота, уборка
 │   ├── tests/
-│   └── Dockerfile            # Python 3.12 + 3.10
+│   └── Dockerfile            # Python 3.12 + 3.14
 ├── Dockerfile                # Многоэтапная сборка: Node → Python
 ├── docker-compose.yml        # Запуск одной командой: web, runner, nginx
 ├── .dockerignore

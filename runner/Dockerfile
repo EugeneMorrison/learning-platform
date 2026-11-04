@@ -10,15 +10,15 @@
 
 
 # =============================================================
-# Stage 1: Official Python 3.10 image (source for "Python 3.10")
+# Stage 1: Official Python 3.14 image (source for "Python 3.14")
 # =============================================================
 # Debian — the base of python:3.12-slim — has no apt package for
-# python3.10, so we pull the official 3.10 image and copy just the
+# python3.14, so we pull the official 3.14 image and copy just the
 # interpreter + standard library into the final image below. Pinned
 # to the same Debian release (bookworm) as the 3.12 base so the
 # shared system libraries (OpenSSL, sqlite, ...) are compatible.
 # =============================================================
-FROM python:3.10-slim-bookworm AS py310
+FROM python:3.14-slim-bookworm AS py314
 
 
 # =============================================================
@@ -26,15 +26,22 @@ FROM python:3.10-slim-bookworm AS py310
 # =============================================================
 FROM python:3.12-slim-bookworm
 
-# --- Python 3.10 next to the base image's 3.12 ----------------------
-# Copy only what's needed to run plain Python 3.10 scripts: the
+# --- Python 3.14 next to the base image's 3.12 ----------------------
+# Copy only what's needed to run plain Python 3.14 scripts: the
 # interpreter, its standard library, and the shared libpython. Then
 # refresh the linker cache and assert both binaries actually run (this
 # fails the build early if anything is missing).
-COPY --from=py310 /usr/local/bin/python3.10 /usr/local/bin/python3.10
-COPY --from=py310 /usr/local/lib/python3.10 /usr/local/lib/python3.10
-COPY --from=py310 /usr/local/lib/libpython3.10.so.1.0 /usr/local/lib/libpython3.10.so.1.0
-RUN ldconfig && python3.10 --version && python3.12 --version
+COPY --from=py314 /usr/local/bin/python3.14 /usr/local/bin/python3.14
+COPY --from=py314 /usr/local/lib/python3.14 /usr/local/lib/python3.14
+COPY --from=py314 /usr/local/lib/libpython3.14.so.1.0 /usr/local/lib/libpython3.14.so.1.0
+# Python 3.14 adds compression.zstd; the 3.12 image doesn't need its library.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libzstd1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && ldconfig \
+ && python3.12 -I -B -c "import sys, ssl, sqlite3, ctypes, bz2, lzma; assert sys.version_info[:2] == (3, 12)" \
+ && python3.14 -I -B -c "import sys, ssl, sqlite3, ctypes, bz2, lzma; from compression import zstd; assert sys.version_info[:2] == (3, 14); assert zstd.decompress(zstd.compress(b'runner')) == b'runner'" \
+ && python3.12 --version && python3.14 --version
 
 # --- One unprivileged user per concurrency slot ---------------------
 # Student code runs as runner<slot> (uid/gid 11000 + slot), never as

@@ -85,7 +85,7 @@ learning-platform/
 │   ├── server.py             # HTTP server (standard library only), called by api/runner.py
 │   ├── sandbox.py            # One run: limits, per-slot user, cleanup
 │   ├── tests/
-│   └── Dockerfile            # Python 3.12 + 3.10
+│   └── Dockerfile            # Python 3.12 + 3.14
 ├── Dockerfile                # Multi-stage build: Node → Python
 ├── docker-compose.yml        # One-command launch: web, runner, nginx
 ├── .dockerignore
@@ -110,6 +110,8 @@ A lesson is a list of blocks. There are seven kinds:
 | TABLE | Select cells in a table | `{"prompt": "Select the correct cells", "rows": [{"id": "<UUID v4>", "text": "..."}], "columns": [{"id": "<UUID v4>", "text": "..."}], "correct_cells": {"<row UUID>": ["<column UUID>"]}, "multiple_answers": false}` |
 
 Code blocks run on CodeMirror 6 with a hand-built PyCharm Darcula theme ([frontend/src/components/pycharmDarcula.js](frontend/src/components/pycharmDarcula.js)):
+
+The runtime picker offers Python 3.12 (default) and Python 3.14. The runner image includes both interpreters. After changing runner versions, rebuild both services with `docker compose up -d --build web runner`.
 
 * Orange keywords (`if`, `def`, `and`, `True`)
 * Green strings, blue numbers, purple built-ins (`print`, `input`, `len`, `range`, and about 60 others, picked out by a ViewPlugin that walks the syntax tree)
@@ -296,6 +298,10 @@ venv\Scripts\activate           # Windows (PowerShell/CMD)
 # source venv/bin/activate      # macOS / Linux
 pip install -r requirements.txt
 ```
+
+Without Docker, install both code-task interpreters as well. A matching Django interpreter is reused; other versions are discovered on PATH, in common Windows installation folders, or via `RUNNER_PYTHON_312` / `RUNNER_PYTHON_314` (absolute executable paths). An unavailable selection returns a runner-unavailable error instead of silently using a different version. Empty or legacy version requests use Python 3.12.
+
+On 64-bit Windows, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup_python314.ps1` downloads the official Python 3.14 embeddable runtime into the ignored `.venv/runtimes/python3.14/` folder. The runner discovers it automatically. This leaves the Django venv and system Python unchanged; `-Version 3.14.x` selects a specific patch release.
 
 2. Frontend — build the React app (this is the step people forget):
 

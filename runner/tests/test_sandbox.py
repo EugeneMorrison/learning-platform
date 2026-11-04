@@ -89,10 +89,26 @@ class RunnerBasicsTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 lines = result.stdout.splitlines()
                 self.assertEqual(lines[:2], ['5', 'Привет'])
-                # Where the image's interpreters exist, each version really runs.
-                if os.path.exists(PYTHON_BINARIES[version]):
-                    expected = tuple(int(n) for n in version.split()[1].split('.'))
-                    self.assertEqual(lines[2], str(expected))
+                # A selected version must really run, including local development.
+                expected = tuple(int(n) for n in version.split()[1].split('.'))
+                self.assertEqual(lines[2], str(expected))
+
+    def test_python314_language_and_standard_library(self):
+        result = run("""
+            from compression import zstd
+            name = 'student'
+            template = t'Hello {name}'
+            print(template.strings, template.values)
+            print(zstd.decompress(zstd.compress(b'runner')).decode())
+        """, version='Python 3.14')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "('Hello ', '') ('student',)\nrunner\n")
+
+    def test_python314_header_and_footer_use_the_selected_interpreter(self):
+        result = run("template = t'Hello {name}'", header="name = 'student'",
+                     footer='print(template.values[0])', version='Python 3.14')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'student\n')
 
     def test_errors_come_back_as_stderr(self):
         result = run('print(1 / 0)')
@@ -152,6 +168,19 @@ class RunnerBasicsTests(unittest.TestCase):
     def test_unknown_version_runs_the_default_interpreter(self):
         result = run('print("ok")', version='Python 2.7')
         self.assertEqual(result.stdout, 'ok\n')
+
+
+class InterpreterResolutionTests(unittest.TestCase):
+    def test_supported_versions_are_312_and_314(self):
+        self.assertEqual(list(PYTHON_BINARIES), ['Python 3.12', 'Python 3.14'])
+
+    def test_unavailable_python314_does_not_silently_run_python312(self):
+        with mock.patch.object(sandbox.sys, 'version_info', (3, 12, 0)), \
+                mock.patch.object(sandbox.os.path, 'exists', return_value=False), \
+                mock.patch.object(sandbox.os.path, 'isfile', return_value=False), \
+                mock.patch.object(sandbox.shutil, 'which', return_value=None), \
+                self.assertRaises(RunnerUnavailable):
+            sandbox.resolve_python('Python 3.14')
 
 
 def same_run_dir(text):

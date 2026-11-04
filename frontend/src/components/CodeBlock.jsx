@@ -10,7 +10,7 @@ import api from '../api';
 import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
 
-const PYTHON_VERSIONS = ['Python 3.10', 'Python 3.12'];
+const PYTHON_VERSIONS = ['Python 3.12', 'Python 3.14'];
 
 // Tests shown before «Показать ещё тесты»; the rest wait behind the arrow.
 // Students only receive visible tests, so hidden ones never count here.

@@ -35,7 +35,7 @@ except ImportError:   # the web image has no runner/ folder
     runner_sandbox = runner_server = None
 
 TOKEN = 'test-token-0123456789abcdef'
-VERSIONS = ['Python 3.10', 'Python 3.12']
+VERSIONS = ['Python 3.12', 'Python 3.14']
 
 
 needs_runner_folder = unittest.skipUnless(runner_server is not None, 'needs the runner/ folder')
@@ -152,13 +152,13 @@ class RunnerClientErrorTests(SimpleTestCase):
         answer = json.dumps({'returncode': 0, 'stdout': 'ok', 'stderr': '', 'timed_out': False})
         with FakeRunner(body=answer.encode()) as fake, \
                 override_settings(RUNNER_URL=fake.url, RUNNER_TOKEN=TOKEN):
-            result = run_python('code', stdin='in', version='Python 3.10', header='h', footer='f')
+            result = run_python('code', stdin='in', version='Python 3.14', header='h', footer='f')
         self.assertEqual((result.returncode, result.stdout), (0, 'ok'))
         [sent] = fake.requests
         self.assertEqual(sent['path'], '/run')
         self.assertEqual(sent['headers']['Authorization'], f'Bearer {TOKEN}')
         self.assertEqual(json.loads(sent['body']), {
-            'code': 'code', 'stdin': 'in', 'version': 'Python 3.10', 'header': 'h', 'footer': 'f'})
+            'code': 'code', 'stdin': 'in', 'version': 'Python 3.14', 'header': 'h', 'footer': 'f'})
 
     def test_timed_out_run_raises_timeout_expired(self):
         answer = json.dumps({'returncode': None, 'stdout': '', 'stderr': '', 'timed_out': True})

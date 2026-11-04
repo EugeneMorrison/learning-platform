@@ -43,9 +43,10 @@ import sys
 import tempfile
 
 PYTHON_BINARIES = {
-    'Python 3.10': '/usr/local/bin/python3.10',
     'Python 3.12': '/usr/local/bin/python3.12',
+    'Python 3.14': '/usr/local/bin/python3.14',
 }
+DEFAULT_VERSION = 'Python 3.12'
 
 # runner0, runner1, ...: one unprivileged user per concurrency slot (the
 # runner image creates them, runner/Dockerfile).
@@ -90,7 +91,7 @@ os.execv(sys.executable, [sys.executable] + {flags!r} + {target!r})
 # exception it prints the traceback itself: no launcher frames, and hidden
 # frames keep file / line / function but lose their source line. Everything
 # lives inside _launch(), the only global it adds, which it removes before
-# the parts run. Python 3.10 APIs only (the oldest interpreter offered).
+# the parts run. Python 3.12 APIs only (the oldest interpreter offered).
 LAUNCHER = """\
 def _launch():
     import importlib.machinery, json, os, sys, traceback
@@ -187,13 +188,40 @@ class RunnerUnavailable(Exception):
 
 
 def resolve_python(version_str):
-    # In the runner image the mapped binaries exist — return them. In local
-    # development (Windows/macOS) they don't, so fall back to the interpreter
-    # running this code, which is whatever's in the venv.
-    path = PYTHON_BINARIES.get(version_str)
+    # Empty/legacy version requests keep the default. A supported explicit
+    # choice must never silently run a different Python in local development.
+    version_str = version_str if version_str in PYTHON_BINARIES else DEFAULT_VERSION
+    path = PYTHON_BINARIES[version_str]
     if path and os.path.exists(path):
         return path
-    return sys.executable
+    version = version_str.split()[1]
+    expected = tuple(int(n) for n in version.split('.'))
+    if sys.version_info[:2] == expected:
+        return sys.executable
+    compact = version.replace('.', '')
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    executable = 'python.exe' if os.name == 'nt' else 'bin/python'
+    candidates = [
+        os.environ.get(f'RUNNER_PYTHON_{compact}'),
+        os.path.join(root, '.venv', 'runtimes', f'python{version}', executable),
+        os.path.join(sys.prefix, 'runtimes', f'python{version}', executable),
+        shutil.which(f'python{version}'),
+    ]
+    if os.name == 'nt':
+        candidates.append(os.path.join(os.path.dirname(sys.base_prefix), f'Python{compact}', 'python.exe'))
+    for candidate in candidates:
+        if not candidate or not os.path.isfile(candidate):
+            continue
+        try:
+            probe = subprocess.run(
+                [candidate, '-I', '-B', '-c', 'import sys; print("%s.%s" % sys.version_info[:2])'],
+                capture_output=True, text=True, timeout=5, env=CHILD_ENV,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if probe.returncode == 0 and probe.stdout.strip() == version:
+            return candidate
+    raise RunnerUnavailable(f'{version_str} is not installed; install it or set RUNNER_PYTHON_{compact}')
 
 
 def running_as_root():

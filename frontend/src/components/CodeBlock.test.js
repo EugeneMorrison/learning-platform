@@ -142,6 +142,26 @@ test('run and failed submission preserve the draft and send the restored code', 
     assert.equal(editor(await mount(t)).props.value, 'print("unfinished")');
 });
 
+test('version picker offers only 3.12 and 3.14 and sends the selected version to both endpoints', async t => {
+    const page = await mount(t);
+    const picker = () => page.root.findByProps({ className: 'version-select__btn' });
+    assert.equal(picker().findAllByType('span')[0].children.join(''), 'Python 3.12');
+    await act(async () => picker().props.onClick());
+    const options = page.root.findAll(node => node.type === 'div' && node.props.className?.split(' ').includes('version-select__item'));
+    assert.deepEqual(options.map(node => node.children.join('')), ['Python 3.12', 'Python 3.14']);
+    await act(async () => options[1].props.onClick());
+    const calls = [];
+    fixture.post = async (url, payload) => {
+        calls.push({ url, payload });
+        return { data: { stdout: 'ok', status: 'success', total: 1 } };
+    };
+    await click(page, '▶ Запустить код');
+    await click(page, '✔ Отправить');
+    assert.deepEqual(calls.map(call => [call.url, call.payload.version]), [
+        ['/run-code/', 'Python 3.14'], ['/run-tests/', 'Python 3.14'],
+    ]);
+});
+
 test('a submission response does not discard newer edits made while grading', async t => {
     const page = await mount(t);
     await edit(page, 'print("submitted")');
