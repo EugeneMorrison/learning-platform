@@ -95,11 +95,16 @@
 }
 
 .rte-content .ProseMirror code {
-    background: var(--color-soft);
+    background: var(--color-inline-code-bg);
+    color: var(--color-inline-code-text);
+    border: var(--border-width) solid var(--color-inline-code-border);
     border-radius: 4px;
     padding: 1px 5px;
     font-family: 'JetBrains Mono', Consolas, monospace;
     font-size: 0.9em;
+    font-weight: var(--weight-semibold);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
 }
 
 .rte-content .ProseMirror pre {
@@ -115,7 +120,11 @@
 
 .rte-content .ProseMirror pre code {
     background: none;
+    color: inherit;
+    border: 0;
+    border-radius: 0;
     padding: 0;
+    font-weight: inherit;
 }
 
 .rte-content .ProseMirror img {

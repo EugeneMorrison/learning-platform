@@ -10,6 +10,9 @@
   --color-ink: #14161F;        /* text, dark surfaces */
   --color-ground: #FFFFFF;     /* page background */
   --color-soft: #F3F5FF;       /* tinted sections, cards */
+  --color-inline-code-bg: #E6EBFF;
+  --color-inline-code-border: #9DADE0;
+  --color-inline-code-text: #182A75;
   --color-line: #E3E6F0;       /* borders, dividers */
   --color-muted: #4B5165;      /* secondary text */
   --color-accent: #2340D6;     /* links, primary buttons */
@@ -128,6 +131,9 @@
   --color-ink: #E8EAF2;          /* off-white text */
   --color-ground: #0F1117;       /* near-black page, not pure #000 */
   --color-soft: #1C1F2A;         /* tinted sections, footer, filters */
+  --color-inline-code-bg: #2C3657;
+  --color-inline-code-border: #7184BA;
+  --color-inline-code-text: #F0F3FF;
   --color-line: #2E3344;
   --color-muted: #A3A9BC;
   --color-accent: #8EA2FF;       /* cobalt, lightened for dark backgrounds */

@@ -399,13 +399,18 @@
 
 /* Inline code: .startswith() */
 .text-content code,
-.quiz-option code {
+.quiz-option code,
+.sort-item__text code {
     padding: 0.1em 0.4em;
+    border: var(--border-width) solid var(--color-inline-code-border);
     border-radius: var(--space-1);
-    background: var(--color-soft);
-    color: var(--color-ink);
+    background: var(--color-inline-code-bg);
+    color: var(--color-inline-code-text);
     font-family: var(--font-code);
     font-size: 0.9em;
+    font-weight: var(--weight-semibold);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
 }
 
 /* Code samples (highlight.js, atom-one-light colours) in theory text, quiz
@@ -432,8 +437,12 @@
 .code-sample code,
 .text-content pre code {
     padding: 0;
+    border: 0;
+    border-radius: 0;
     background: none;
+    color: inherit;
     font-size: inherit;
+    font-weight: inherit;
 }
 
 .code-sample code.hljs,
