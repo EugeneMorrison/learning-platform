@@ -171,6 +171,11 @@ empty editor. Drafts survive refreshes, lesson changes, browser restarts, and
 logout/login. Running or submitting code keeps the draft; Reset replaces it with
 the starter code. Drafts do not submit answers or change course progress.
 
+Fresh code editors start with at least four editable lines. The editor then
+grows or shrinks with the actual document, including its blank lines; the
+horizontal scrollbar stays directly below the last line. Saved answers and
+browser drafts keep their original text and line count.
+
 Drafts belong to this browser and site address; they do not sync across devices
 and are removed if the site's browser storage is cleared. If storage is blocked
 or full, the editor shows a warning so the student can copy their code before

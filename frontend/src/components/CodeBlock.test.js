@@ -39,6 +39,7 @@ const { default: CodeBlock } = await server.ssrLoadModule('/src/components/CodeB
 after(() => server.close());
 
 const content = { prompt: 'Write code', starter_code: '# Start here', tests: [] };
+const freshCode = '# Start here\n\n\n';
 let storage;
 
 beforeEach(t => {
@@ -87,7 +88,7 @@ test('draft survives leaving an assignment, reloads and logout/login with a new 
     });
     await act(async () => page.unmount());
     const otherLesson = await mount(t, { blockId: 'theory-next-task' });
-    assert.equal(editor(otherLesson).props.value, content.starter_code);
+    assert.equal(editor(otherLesson).props.value, freshCode);
     for (const token of [null, 'new-login-token', 'refreshed-token']) {
         if (token) localStorage.setItem('access_token', token);
         else storage.delete('access_token');
@@ -100,10 +101,10 @@ test('drafts stay separate by account and assignment', async t => {
     const first = await mount(t);
     await edit(first, 'print("first")');
     const otherAccount = await mount(t, { userId: 'student-b' });
-    assert.equal(editor(otherAccount).props.value, content.starter_code);
+    assert.equal(editor(otherAccount).props.value, freshCode);
     await edit(otherAccount, 'print("second")');
     const otherTask = await mount(t, { blockId: 'block-b' });
-    assert.equal(editor(otherTask).props.value, content.starter_code);
+    assert.equal(editor(otherTask).props.value, freshCode);
     await edit(otherTask, 'print("third")');
     assert.equal(editor(await mount(t)).props.value, 'print("first")');
     assert.equal(editor(await mount(t, { userId: 'student-b' })).props.value, 'print("second")');
@@ -185,14 +186,14 @@ test('reset saves the starter code instead of resurrecting the previous draft or
     const page = await mount(t, { savedProgress });
     await edit(page, 'print("practice")');
     await click(page, '🔄 Сбросить');
-    assert.equal(editor(page).props.value, content.starter_code);
-    assert.equal(editor(await mount(t, { savedProgress })).props.value, content.starter_code);
+    assert.equal(editor(page).props.value, freshCode);
+    assert.equal(editor(await mount(t, { savedProgress })).props.value, freshCode);
 });
 
 test('storage failures warn without blocking edits, then recover on the next successful save', async t => {
     t.mock.method(localStorage, 'getItem', () => { throw Error('Storage disabled'); });
     const page = await mount(t);
-    assert.equal(editor(page).props.value, content.starter_code);
+    assert.equal(editor(page).props.value, freshCode);
     assert.equal(page.root.findAllByProps({ role: 'alert' }).length, 1);
     const setItem = t.mock.method(localStorage, 'setItem', () => { throw Error('Quota exceeded'); });
     await edit(page, 'print("keep in memory")');
@@ -208,7 +209,7 @@ test('missing account identity never reads or writes another student draft', asy
     const owner = await mount(t);
     await edit(owner, 'private work');
     const page = await mount(t, { userId: undefined });
-    assert.equal(editor(page).props.value, content.starter_code);
+    assert.equal(editor(page).props.value, freshCode);
     await edit(page, 'temporary work');
     assert.equal(page.root.findAllByProps({ role: 'alert' }).length, 1);
     assert.equal(storage.size, 1);

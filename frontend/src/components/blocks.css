@@ -639,6 +639,14 @@
     border-radius: var(--radius-small);
 }
 
+/* Follow the document's height so the scrollbar sits directly below its last
+   line. Override the React CodeMirror wrapper's 100% scroller height. */
+.code-editor .cm-scroller {
+    height: auto !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
 /* "Тестовый ввод" */
 .code-input {
     min-height: calc(var(--space-8) + var(--space-2));

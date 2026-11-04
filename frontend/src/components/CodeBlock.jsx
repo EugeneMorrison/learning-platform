@@ -16,6 +16,13 @@ const PYTHON_VERSIONS = ['Python 3.12', 'Python 3.14'];
 // Students only receive visible tests, so hidden ones never count here.
 const SHOWN_TESTS = 2;
 
+function starterCodeForEditor(code) {
+    // Four editable lines for a fresh task. Saved answers and browser drafts
+    // retain their exact text, including intentionally empty drafts.
+    const missingLines = Math.max(0, 4 - code.split('\n').length);
+    return code + '\n'.repeat(missingLines);
+}
+
 function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitted, onAsk, discussion }) {
     const comparison = OUTPUT_COMPARISONS.find(option => option.value === content.output_comparison);
     const wasSolved = savedProgress?.is_correct === true;
@@ -31,7 +38,7 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
     const totalTestCount = (content.tests?.length || 0) + hiddenTestCount;
 
     const [userCode, setUserCode, draftStorageAvailable] = useCodeDraft(
-        userId, blockId, savedCode ?? content.starter_code ?? ''
+        userId, blockId, savedCode ?? starterCodeForEditor(content.starter_code ?? '')
     );
     const [testsOpen, setTestsOpen] = useState(true);
     const [allTestsShown, setAllTestsShown] = useState(false);
@@ -136,7 +143,7 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
     };
 
     const handleReset = () => {
-        setUserCode(content.starter_code ?? '');
+        setUserCode(starterCodeForEditor(content.starter_code ?? ''));
         setTestInput(firstTestInput || '');
         setSelectedTestIndex(hasTests ? 0 : null);
         setRunOutput(null);
@@ -298,7 +305,6 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                         tabSize: 4,
                     }}
                     indentWithTab={true}
-                    minHeight="120px"
                 />
             </div>
 
