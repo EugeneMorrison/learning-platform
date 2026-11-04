@@ -24,9 +24,16 @@ const server = await createServer({
             if (id === '\0draft-api') return `export default {
                 post: (...args) => globalThis.__codeDraftTest.post(...args),
             };`;
-            if (id === '\0draft-editor') return `import React from 'react';
-                export default function Editor({ value, onChange }) {
-                    return React.createElement('textarea', { 'aria-label': 'Code', value, onChange });
+            if (id === '\0draft-editor') return `import React, { useImperativeHandle } from 'react';
+                export default function Editor({ value, onChange, onFocus, ref }) {
+                    useImperativeHandle(ref, () => ({ view: {
+                        state: { doc: { length: value.length, toString: () => value } },
+                        dispatch(transaction) {
+                            globalThis.__codeDraftTest.editorTransaction = transaction;
+                            onChange(transaction.changes.insert);
+                        },
+                    } }));
+                    return React.createElement('textarea', { 'aria-label': 'Code', value, onChange, onFocus });
                 }`;
             if (id === '\0draft-theme') return 'export const python = () => []; export const pycharmDarcula = [];';
             if (id === '\0draft-images') return 'export const wrapImages = html => html; export const wrapTables = html => html;';
@@ -51,6 +58,7 @@ beforeEach(t => {
     };
     globalThis.document = { addEventListener() {}, removeEventListener() {} };
     fixture.post = async () => ({ data: { status: 'success', total: 1 } });
+    fixture.editorTransaction = null;
     t.mock.method(console, 'error', () => {});
 });
 
@@ -77,6 +85,34 @@ async function click(renderer, text) {
     assert.ok(button, `Expected action: ${text}`);
     await act(async () => button.props.onClick());
 }
+
+test('focusing the default hint clears it, keeps four lines and remembers the cleared draft', async t => {
+    const props = { content: { ...content, starter_code: '# Ваш код здесь\n' } };
+    const page = await mount(t, props);
+    assert.equal(editor(page).props.value, '# Ваш код здесь\n\n\n');
+    await act(async () => editor(page).props.onFocus());
+    assert.equal(editor(page).props.value, '\n\n\n');
+    assert.deepEqual(fixture.editorTransaction.selection, { anchor: 0 });
+    assert.equal(editor(await mount(t, props)).props.value, '\n\n\n');
+});
+
+test('focusing preserves real starter code, saved answers and edited drafts', async t => {
+    for (const props of [
+        { content: { ...content, starter_code: '# Ваш код здесь\nprint("template")' } },
+        { savedProgress: { answer: { code: 'print("submitted")' } } },
+        {},
+    ]) {
+        const page = await mount(t, props);
+        const previousCode = editor(page).props.value;
+        await act(async () => editor(page).props.onFocus());
+        assert.equal(editor(page).props.value, previousCode);
+        await edit(page, '# Ваш код здесь\nprint("my work")');
+        await act(async () => editor(page).props.onFocus());
+        assert.equal(editor(page).props.value, '# Ваш код здесь\nprint("my work")');
+        storage.clear();
+    }
+    assert.equal(fixture.editorTransaction, null);
+});
 
 test('draft survives leaving an assignment, reloads and logout/login with a new token', async t => {
     const page = await mount(t);

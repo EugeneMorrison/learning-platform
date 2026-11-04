@@ -14,7 +14,7 @@ const PYTHON_VERSIONS = ['Python 3.12', 'Python 3.14'];
 
 // Tests shown before «Показать ещё тесты»; the rest wait behind the arrow.
 // Students only receive visible tests, so hidden ones never count here.
-const SHOWN_TESTS = 2;
+const SHOWN_TESTS = 1;
 
 function starterCodeForEditor(code) {
     // Four editable lines for a fresh task. Saved answers and browser drafts
@@ -59,6 +59,18 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
     const [versionOpen, setVersionOpen] = useState(false);
     const versionRef = useRef(null);
     const testInputRef = useRef(null);
+    const codeEditorRef = useRef(null);
+
+    function handleCodeFocus() {
+        const view = codeEditorRef.current?.view;
+        // Only the default hint is disposable; never remove a student's code
+        // or an author's template that includes other lines.
+        if (view?.state.doc.toString().trim() !== '# Ваш код здесь') return;
+        view.dispatch({
+            changes: { from: 0, to: view.state.doc.length, insert: starterCodeForEditor('') },
+            selection: { anchor: 0 },
+        });
+    }
 
     // "Тестовый ввод" grows with its lines (also for the prefilled example);
     // past the CSS max-height (~15 lines) it scrolls.
@@ -289,8 +301,10 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
             </div>
             <div className="code-editor">
                 <CodeMirror
+                    ref={codeEditorRef}
                     value={userCode}
                     onChange={setUserCode}
+                    onFocus={handleCodeFocus}
                     extensions={[python(), pycharmDarcula]}
                     theme="none"
                     basicSetup={{
