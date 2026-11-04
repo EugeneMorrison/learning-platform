@@ -1,4 +1,4 @@
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useBlocker } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
@@ -34,7 +34,7 @@ function defaultContent(type) {
         case 'QUIZ':
             return { question: '', options: ['', ''], correct_answer: 0, explanation: '' };
         case 'CODE':
-            return { prompt: '', header: '', starter_code: '# Ваш код здесь\n', footer: '', solution: '', output_comparison: 'exact', tests: [{ input: '', expected: '', visible: true }] };
+            return { prompt: '', header: '', starter_code: '# Ваш код здесь\n', footer: '', output_comparison: 'exact', tests: [{ input: '', expected: '', visible: true }] };
         case 'FILL':
             return { prompt: '', template: '', case_sensitive: false, explanation: '' };
         case 'SORT':
@@ -1111,10 +1111,6 @@ function CodeFields({ content, setContent }) {
                 <CodeField field="footer" value={content.footer || ''} setContent={setContent} />
             </Field>
 
-            <Field label="Решение (необязательно, студентам не показывается)">
-                <CodeField field="solution" value={content.solution || ''} setContent={setContent} />
-            </Field>
-
             <Field label="Проверка вывода" hint={comparison?.hint}>
                 <select
                     aria-label="Проверка вывода"
@@ -1134,24 +1130,22 @@ function CodeFields({ content, setContent }) {
             <Field label="Тесты" hint="Ввод подаётся в stdin, ожидаемый вывод сравнивается со stdout. Пустые тесты игнорируются. Решение проверяется на всех тестах; ученик видит только отмеченные «Показывать ученику», об остальных — лишь «пройден / не пройден».">
                 {(content.tests || []).map((test, i) => (
                     <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'flex-start' }}>
-                        <textarea
+                        <TestDataField
                             value={test.input}
                             onChange={e => setContent(c => {
                                 const tests = [...c.tests];
                                 tests[i] = { ...tests[i], input: e.target.value };
                                 return { ...c, tests };
                             })}
-                            style={{ ...input, flex: 1, minHeight: 48, fontFamily: "'JetBrains Mono', Consolas, monospace" }}
                             placeholder="Ввод (stdin)"
                         />
-                        <textarea
+                        <TestDataField
                             value={test.expected}
                             onChange={e => setContent(c => {
                                 const tests = [...c.tests];
                                 tests[i] = { ...tests[i], expected: e.target.value };
                                 return { ...c, tests };
                             })}
-                            style={{ ...input, flex: 1, minHeight: 48, fontFamily: "'JetBrains Mono', Consolas, monospace" }}
                             placeholder="Ожидаемый вывод (stdout)"
                         />
                         <label
@@ -1274,10 +1268,37 @@ const CodeField = memo(function CodeField({ field, value, setContent }) {
     const onChange = useCallback(val => setContent(c => ({ ...c, [field]: val })), [field, setContent]);
     return (
         <div style={cmWrap}>
-            <CodeMirror value={value} height="120px" theme="none" extensions={PY_EXTENSIONS} onChange={onChange} />
+            <CodeMirror value={value} minHeight="120px" theme="none" extensions={PY_EXTENSIONS} onChange={onChange} />
         </div>
     );
 });
+
+function TestDataField({ value, ...props }) {
+    const ref = useRef(null);
+    useLayoutEffect(() => {
+        const field = ref.current;
+        if (!field) return undefined;
+        const resize = () => {
+            // Measure from the one-line minimum so deleting text also shrinks
+            // the field. Include borders because inputs use border-box sizing.
+            field.style.height = 'auto';
+            field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+        };
+        resize();
+        let width = field.getBoundingClientRect().width;
+        const observer = new ResizeObserver(() => {
+            const nextWidth = field.getBoundingClientRect().width;
+            if (nextWidth === width) return;
+            width = nextWidth;
+            resize();
+        });
+        observer.observe(field);
+        return () => observer.disconnect();
+    }, [value]);
+    return <textarea {...props} ref={ref} value={value} rows={1}
+        style={{ ...input, flex: 1, minWidth: 0, resize: 'none', overflowY: 'hidden', lineHeight: '1.5',
+            fontFamily: "'JetBrains Mono', Consolas, monospace" }} />;
+}
 
 function Field({ label, hint, children }) {
     return (

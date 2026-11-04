@@ -192,6 +192,12 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                         </div>
                         <div className="tests-table-wrap">
                             <table className="tests-table">
+                                <colgroup>
+                                    <col className="tests-table__meta-column" />
+                                    <col className="tests-table__meta-column" />
+                                    <col />
+                                    <col />
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <th className="tests-table__check"></th>
@@ -215,8 +221,12 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                                                 />
                                             </td>
                                             <td>{index + 1}</td>
-                                            <td className="tests-table__io">{typeof test === 'object' ? test.input : test}</td>
-                                            <td className="tests-table__io">{typeof test === 'object' ? test.expected : '—'}</td>
+                                            <td><pre className="tests-table__io" tabIndex={0} aria-label={`Входные данные теста ${index + 1}`}>
+                                                {typeof test === 'object' ? test.input : test}
+                                            </pre></td>
+                                            <td><pre className="tests-table__io" tabIndex={0} aria-label={`Выходные данные теста ${index + 1}`}>
+                                                {typeof test === 'object' ? test.expected : '—'}
+                                            </pre></td>
                                         </tr>
                                     ))}
                                 </tbody>

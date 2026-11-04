@@ -831,8 +831,14 @@
 
 .tests-table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: var(--text-sm);
+}
+
+/* Keep controls compact; input and output share the remaining width equally. */
+.tests-table__meta-column {
+    width: var(--space-7);
 }
 
 .tests-table th,
@@ -853,10 +859,14 @@
     vertical-align: top;
 }
 
-/* Input / output: line breaks as stored; long lines still wrap. */
+/* Preserve real input/output lines. Scroll long lines inside each equal column. */
 .tests-table__io {
-    white-space: pre-wrap;
-    overflow-wrap: break-word;
+    margin: 0;
+    font: inherit;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-break: normal;
+    overflow-x: auto;
 }
 
 .tests-table tbody tr:nth-child(even) {
