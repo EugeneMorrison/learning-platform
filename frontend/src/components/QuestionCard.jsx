@@ -20,7 +20,7 @@ function QuestionCard({ message, own }) {
             <p className="question-card__where">{context.course.title} › {context.lesson.title}</p>
             <p className="question-card__text">{message.text}</p>
             <QuestionContext context={context} collapsible />
-            <Link className="question-card__open" to={`/lesson/${context.lesson.id}/#block-${context.block.id}`}>
+            <Link className="question-card__open" to={`/lesson/${message.block_lesson || context.lesson.id}/#block-${context.block.id}`}>
                 {context.block.type === 'TEXT' ? 'Открыть теорию →' : 'Открыть задание →'}
             </Link>
         </article>

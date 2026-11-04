@@ -5,6 +5,7 @@ import copy
 import uuid
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils.html import strip_tags
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
@@ -169,7 +170,7 @@ class CourseHistoryView(APIView):
             raise NotFound('Курс не найден.')
         events = CourseEdit.objects.filter(course_id=course_id)
         for field, choices in (('kind', {'course', 'lesson', 'block'}),
-                               ('action', {'created', 'updated', 'deleted', 'duplicated', 'reordered', 'restored'})):
+                               ('action', {'created', 'updated', 'deleted', 'duplicated', 'reordered', 'restored', 'moved'})):
             value = request.query_params.get(field)
             if value:
                 if value not in choices:
@@ -182,7 +183,12 @@ class CourseHistoryView(APIView):
                     value = uuid.UUID(value)
                 except (ValueError, TypeError):
                     raise ParseError('Некорректный идентификатор.')
-                events = events.filter(**{field: value})
+                if key == 'lesson':
+                    # A block's full history follows its ID across lessons.
+                    if not request.query_params.get('block'):
+                        events = events.filter(Q(lesson_id=value) | Q(action='moved', before__lesson_id=str(value)))
+                else:
+                    events = events.filter(**{field: value})
                 if key == 'block':
                     events = events.filter(kind='block')
         event_id = request.query_params.get('event')

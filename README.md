@@ -131,6 +131,7 @@ In the editor you can:
 
 * Add a block of any type — Theory (TEXT), Quiz (QUIZ), Code task (CODE), Fill in the blanks (FILL), Sorting (SORT), Matching (MATCH), or Table (TABLE)
 * Edit any existing block in place
+* Move a saved block to another lesson in the same course using **↗ В другой урок**: choose the destination and click **Переместить**. It is appended to the destination; the original disappears from the source. Save that block's edits first. Other blocks' unsaved drafts stay in the source editor, and **Открыть блок** opens the moved step in its new lesson.
 * Delete a block, with a confirmation
 * Move blocks up and down
 
@@ -153,6 +154,8 @@ Matching keeps `pairs` private. Students receive independent `left` and `right` 
 Table tasks keep `correct_cells` and both feedback comments private. `POST /api/progress/submit/` accepts `answer: {selected: {rowId: [columnIds]}, row_order: [...], column_order: [...], table_revision: block.updated_at}`. Single-choice answers require one cell in every row; multiple-choice answers may leave rows empty. Non-surveys require the exact set of correct cells. Survey mode accepts every structurally valid response. IDs preserve selection identity through row/column shuffling; malformed selections and stale revisions are rejected. Trusted snapshots retain displayed labels, order, prompt, and selection mode for progress history and questions. Saved successes survive author edits, while unfinished work from an older revision starts with the current table. Migration `0023` adds TABLE and runs at Docker startup after a rebuild.
 
 A few implementation notes:
+
+* Moving uses `POST /api/blocks/<id>/move/` with `{lesson: destination_id, expected_lesson: source_id, expected_updated_at: revision}`. Only the course author can move a block, and both lessons must belong to that course. The transaction preserves the block ID, content revision, attempts, discussions, and saved answers, and updates `Progress.lesson`. A submission finishing after a move saves progress against the current location. Stale source/revision requests return 409. Both lessons show the move in history; the block's complete history follows its ID. Existing chat question snapshots keep their original lesson labels, while their links follow `MessageSerializer.block_lesson` to the current lesson.
 
 * Files: [frontend/src/pages/LessonEditor.jsx](frontend/src/pages/LessonEditor.jsx), [frontend/src/components/RichTextEditor.jsx](frontend/src/components/RichTextEditor.jsx) (+ `.css`), [frontend/src/components/FillBlock.jsx](frontend/src/components/FillBlock.jsx), [frontend/src/lib/fillTemplate.js](frontend/src/lib/fillTemplate.js), [frontend/src/lib/pythonHighlight.js](frontend/src/lib/pythonHighlight.js).
 * The editor talks to the existing DRF `BlockViewSet` (`POST` / `PUT` / `PATCH` / `DELETE /api/blocks/`). `BlockSerializer` checks the required fields for each block type and returns `400` on bad content. Access is author-only through the existing `IsAuthor` / `IsOwnerOrReadOnly` permissions.

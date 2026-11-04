@@ -16,6 +16,7 @@ import api from '../api';
 import SortFields from '../components/SortFields';
 import MatchFields from '../components/MatchFields';
 import TableFields from '../components/TableFields';
+import MoveBlockControl from '../components/MoveBlockControl';
 
 const TYPE_LABELS = {
     TEXT: '📝 Теория',
@@ -280,6 +281,9 @@ function LessonEditor() {
     const [busy, setBusy] = useState(false); // reorder/delete/copy in flight
     const [flashId, setFlashId] = useState(null); // a new copy or a ?block= target, briefly highlighted
     const [copyStatus, setCopyStatus] = useState(''); // for screen readers
+    const [movingBlockId, setMovingBlockId] = useState(null);
+    const [movedBlock, setMovedBlock] = useState(null);
+    const transferRef = useRef(false);
     const scrollToRef = useRef(null); // ?block= target, scrolled to once rendered
     const copyingRef = useRef(false); // a double click must not make two copies
     const newSeqRef = useRef(0); // numbers new blocks: keys "new-1", "new-2", …
@@ -292,7 +296,7 @@ function LessonEditor() {
     // state from here. Only to READ: every state change is a functional update.
     const latest = useRef(null);
     useEffect(() => {
-        latest.current = { drafts, blocks, handleSave, handleDelete, handleDuplicate, moveBlock, handleRestoreHistory };
+        latest.current = { drafts, blocks, handleSave, handleDelete, handleDuplicate, moveBlock, handleRestoreHistory, handleMoveToLesson };
     });
 
     useEffect(() => {
@@ -550,6 +554,33 @@ function LessonEditor() {
         }
     }
 
+    async function handleMoveToLesson(id, destination) {
+        if (busy || transferRef.current || latest.current.drafts[id]?.dirty || latest.current.drafts[id]?.saving)
+            throw new Error('Сначала сохраните изменения блока и дождитесь завершения операции.');
+        transferRef.current = true;
+        setBusy(true);
+        setMovingBlockId(id);
+        setCopyStatus('Перенос блока…');
+        try {
+            const block = latest.current.blocks.find(row => row.id === id);
+            const { data } = await api.post(`/blocks/${id}/move/`, {
+                lesson: destination.id, expected_lesson: lessonId,
+                ...(block?.updated_at ? { expected_updated_at: block.updated_at } : {}),
+            });
+            ++reloadSeqRef.current;
+            setBlocks(current => current.filter(row => row.id !== id));
+            setDrafts(current => Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)
+                .map(([key, draft]) => [key, draft.insertBefore === id ? { ...draft, insertBefore: null } : draft])));
+            setLastSavedId(current => current === id ? null : current);
+            setMovedBlock({ id, lessonId: data.lesson, title: data.lesson_title || destination.title });
+            setCopyStatus('Блок перенесён в другой урок.');
+        } finally {
+            transferRef.current = false;
+            setMovingBlockId(null);
+            setBusy(false);
+        }
+    }
+
     async function moveBlock(id, dir) {
         const index = blocks.findIndex(b => b.id === id);
         const target = index + dir;
@@ -621,6 +652,7 @@ function LessonEditor() {
         duplicate: id => latest.current.handleDuplicate(latest.current.blocks.find(b => b.id === id)),
         delete: id => latest.current.handleDelete(latest.current.blocks.find(b => b.id === id)),
         restore: (key, revisionId, side) => latest.current.handleRestoreHistory(key, revisionId, side),
+        moveToLesson: (id, destination) => latest.current.handleMoveToLesson(id, destination),
     }), []);
 
     const blockDrag = useDragReorder({
@@ -659,6 +691,7 @@ function LessonEditor() {
             number={blockNumbers[draft.key]}
             actions={actions}
             busy={busy}
+            moving={movingBlockId !== null && movingBlockId === draft.id}
             courseId={lesson.course}
             lessonId={lesson.id}
             reorderProps={draft.id !== null ? blockDrag.getItemProps(draft.id) : undefined}
@@ -705,6 +738,11 @@ function LessonEditor() {
             </div>
             <hr style={{ margin: '20px 0' }} />
             <p className="visually-hidden" role="status">{copyStatus}</p>
+            {movedBlock && <p className="notice notice-success" role="status">
+                Блок перенесён в урок «{movedBlock.title}».{' '}
+                <button type="button" className="btn btn-secondary btn-sm"
+                    onClick={() => navigate(`/lesson/${movedBlock.lessonId}/edit/?block=${movedBlock.id}`)}>Открыть блок</button>
+            </p>}
 
             {blocks.length === 0 && newDrafts.length === 0 && (
                 <p style={{ color: 'var(--color-muted)' }}>В этом уроке пока нет блоков. Добавьте первый блок ниже.</p>
@@ -807,7 +845,7 @@ function InsertControl({ open, onOpen, onPick, onCancel }) {
 // One block, always open for editing. Memoized: it re-renders only when its
 // own draft (or busy / position / highlight) changes, not when another block
 // is typed in.
-const BlockCard = memo(function BlockCard({ draft, number, actions, busy, courseId, lessonId, canMoveUp, canMoveDown, flash, reorderProps, dragHandleProps }) {
+const BlockCard = memo(function BlockCard({ draft, number, actions, busy, moving, courseId, lessonId, canMoveUp, canMoveDown, flash, reorderProps, dragHandleProps }) {
     const { key, id, type, content, dirty, saving, error } = draft;
     const isNew = id === null;
     const setContent = useCallback(updater => actions.setContent(key, updater), [actions, key]);
@@ -817,6 +855,8 @@ const BlockCard = memo(function BlockCard({ draft, number, actions, busy, course
         <div
             {...reorderProps}
             id={isNew ? `edit-new-${key}` : `edit-block-${id}`}
+            inert={moving || undefined}
+            aria-busy={moving || undefined}
             tabIndex={-1}
             style={{
                 ...blockCard,
@@ -853,6 +893,8 @@ const BlockCard = memo(function BlockCard({ draft, number, actions, busy, course
                                 ? 'Копируется сохранённая версия блока, без несохранённых изменений. Копия появится ниже.'
                                 : 'Копируется сохранённая версия блока. Копия появится ниже.'}
                         >⧉ Копировать</button>
+                        <MoveBlockControl courseId={courseId} lessonId={lessonId} disabled={busy || saving || dirty}
+                            onMove={destination => actions.moveToLesson(id, destination)} />
                         <button disabled={busy} onClick={() => actions.delete(id)} style={deleteBtn}>Удалить</button>
                     </div>
                 )}

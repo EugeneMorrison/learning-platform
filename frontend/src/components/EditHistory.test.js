@@ -60,6 +60,19 @@ test('before and after previews restore exactly the selected side', async t => {
     assert.equal(onClose.mock.calls.length, 1);
 });
 
+test('move history identifies both lessons and offers a return move instead of content restore', async t => {
+    fixture.get = async (_url, options) => ({ data: options.params.event ? {
+        ...entry(2), action: 'moved', lesson_title: 'Variables',
+        before: { type: 'TEXT', lesson_title: 'Data Input', lesson_number: 1, content: { html: 'Step' } },
+        after: { type: 'TEXT', lesson_title: 'Variables', lesson_number: 2, content: { html: 'Step' } },
+    } : { results: [{ ...entry(2), action: 'moved' }], next_cursor: null } });
+    const { renderer } = await mount(t, { onRestore: t.mock.fn(), blockId: 'block' });
+    assert.match(preview(renderer).findByProps({ className: 'edit-history__location' }).children.join(''), /Variables/);
+    assert.equal(button(renderer, 'Восстановить эту версию'), undefined);
+    await act(async () => button(renderer, 'До изменения').props.onClick());
+    assert.match(preview(renderer).findByProps({ className: 'edit-history__location' }).children.join(''), /Data Input/);
+});
+
 test('failed or cancelled restoration keeps the history open', async t => {
     let fail = true;
     const { renderer, onClose } = await mount(t, { onRestore: async () => {

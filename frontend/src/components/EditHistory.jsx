@@ -6,7 +6,7 @@ import { renderMath } from '../lib/contentMath';
 import './EditHistory.css';
 
 const ACTIONS = { created: 'Добавлено', updated: 'Изменено', deleted: 'Удалено', reordered: 'Изменён порядок',
-    duplicated: 'Скопировано', restored: 'Восстановлена версия' };
+    duplicated: 'Скопировано', restored: 'Восстановлена версия', moved: 'Перенесено в другой урок' };
 const KINDS = { course: 'Курс', lesson: 'Урок', block: 'Блок' };
 const TYPES = { TEXT: 'Теория', QUIZ: 'Тест', CODE: 'Задача с кодом', FILL: 'Пропуски', SORT: 'Сортировка', MATCH: 'Сопоставление', TABLE: 'Таблица' };
 const FIELDS = { title: 'Название', description: 'Описание', level: 'Уровень', is_published: 'Опубликован',
@@ -21,10 +21,11 @@ function blockLabel(value) {
 }
 
 function lessonLabel(entry, version) {
-    if (!entry.lesson_title) return null;
+    const title = version?.lesson_title || entry.lesson_title;
+    if (!title) return null;
     const number = version?.lesson_number ?? entry.lesson_number;
     const current = version?.lesson_number_is_current ?? entry.lesson_number_is_current;
-    return `Урок${number ? ` ${number}` : ''}: «${entry.lesson_title}»${current ? ' (номер сейчас)' : ''}`;
+    return `Урок${number ? ` ${number}` : ''}: «${title}»${current ? ' (номер сейчас)' : ''}`;
 }
 
 function Snapshot({ value, targetId }) {
@@ -200,8 +201,9 @@ export function EditHistoryDialog({ courseId, lessonId, blockId, title, onClose,
                                 <button className="btn btn-secondary btn-sm" aria-pressed={side === 'after'} onClick={() => setSide('after')} disabled={restoring}>После изменения</button>
                             </div>
                             <Snapshot value={version} targetId={detail.target_id} />
-                            {onRestore && version?.content && <button className="btn btn-primary edit-history__restore" disabled={restoring}
+                            {onRestore && version?.content && detail.action !== 'moved' && <button className="btn btn-primary edit-history__restore" disabled={restoring}
                                 onClick={restore}>{restoring ? 'Восстановление…' : 'Восстановить эту версию'}</button>}
+                            {detail.action === 'moved' && <p className="muted">Чтобы вернуть блок, перенесите его обратно в нужный урок.</p>}
                             {detail.source_id && <p className="muted">Восстановлено из записи №{detail.source_id}.</p>}
                         </>}
                         {detailError && <p className="notice notice-danger" role="alert">{detailError}

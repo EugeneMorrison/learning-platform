@@ -115,6 +115,7 @@ def count_subquery(queryset, group_by):
     return Coalesce(models.Subquery(counted), 0)
 
 
+@transaction.atomic
 def record_answer(user, block, answer, is_correct):
     """
     Save a server-graded submission: Progress (attempts +1) and, for task
@@ -122,6 +123,9 @@ def record_answer(user, block, answer, is_correct):
     already solved: a solved block stays solved, and re-solving it is practice
     that is graded but not recorded (as before, when such submissions got 400).
     """
+    # A code run can finish after its block was moved to another lesson.
+    # Share the move's block lock and read its current location before saving.
+    block = Block.objects.select_for_update().get(pk=block.pk)
     existing = Progress.objects.filter(student=user, block=block).first()
     if existing and existing.is_correct:
         return None
@@ -985,6 +989,49 @@ class BlockViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
         return Response(self.get_serializer(ordered, many=True).data)
 
     @action(detail=True, methods=['post'])
+    def move(self, request, pk=None):
+        """Move the existing block to the end of another lesson in its course."""
+        original = self.get_object()
+        try:
+            destination_id = uuid.UUID(str(request.data.get('lesson', '')))
+            expected_source = uuid.UUID(str(request.data.get('expected_lesson', original.lesson_id)))
+        except ValueError:
+            raise ParseError('Укажите урок назначения: lesson.')
+        with transaction.atomic():
+            # Serialize moves, including two moves into an empty destination.
+            Course.objects.select_for_update().get(pk=original.lesson.course_id)
+            block = get_object_or_404(Block.objects.select_for_update().select_related('lesson__course')
+                                      .filter(lesson__course__author=request.user), pk=original.pk)
+            if block.lesson_id != expected_source:
+                return Response({'detail': 'Блок уже перенесён. Обновите редактор.'}, status=409)
+            if 'expected_updated_at' in request.data:
+                from django.utils.dateparse import parse_datetime
+                try:
+                    matches = parse_datetime(str(request.data['expected_updated_at'])) == block.updated_at
+                except ValueError:
+                    matches = False
+                if not matches:
+                    return Response({'detail': 'Блок уже изменён. Обновите редактор перед переносом.'}, status=409)
+            destination = get_object_or_404(Lesson.objects.select_for_update()
+                                           .filter(course__author=request.user), pk=destination_id)
+            if destination.course_id != block.lesson.course_id:
+                raise ParseError('Переносить блоки можно между уроками одного курса.')
+            if destination.pk == block.lesson_id:
+                raise ParseError('Выберите другой урок.')
+            before = {**snapshot(block), 'lesson_title': block.lesson.title}
+            last = Block.objects.filter(lesson=destination).aggregate(last=models.Max('order_index'))['last']
+            position = 1 if last is None else last + 1
+            # Keep the content revision: moving a quiz doesn't change its answer
+            # key or invalidate saved quiz/table snapshots and open submissions.
+            Block.objects.filter(pk=block.pk).update(lesson=destination, order_index=position)
+            Progress.objects.filter(block=block).update(lesson=destination)
+            block.lesson = destination
+            block.order_index = position
+            after = {**snapshot(block), 'lesson_title': destination.title}
+            record_edit(request.user, block, 'moved', before, after)
+        return Response(self.get_serializer(block).data)
+
+    @action(detail=True, methods=['post'])
     def duplicate(self, request, pk=None):
         """
         POST /api/blocks/{id}/duplicate/  (lesson editor's "Копировать")
@@ -1038,6 +1085,8 @@ class BlockViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
         version = getattr(event, side)
         if not isinstance(version, dict) or 'content' not in version or 'type' not in version:
             raise ParseError('Эта запись не содержит версии блока.')
+        if event.action == 'moved':
+            raise ParseError('Для отмены переноса переместите блок обратно в нужный урок.')
         with transaction.atomic():
             block = Block.objects.select_for_update().get(pk=block.pk)
             if request.data.get('expected_updated_at') != block.updated_at.isoformat():
@@ -1451,7 +1500,7 @@ class MessageView(APIView):
             course_id=course_id
         ).filter(
             models.Q(sender=request.user) | models.Q(receiver=request.user)
-        ).order_by('created_at', 'id')
+        ).select_related('sender', 'receiver', 'block').order_by('created_at', 'id')
 
         serializer = MessageSerializer(messages, many=True)
         return Response(serializer.data)

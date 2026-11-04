@@ -580,6 +580,7 @@ class MessageSerializer(serializers.ModelSerializer):
     # Full name when the user has one, else the username (question cards).
     sender_name = serializers.SerializerMethodField()
     receiver_username = serializers.CharField(source='receiver.username', read_only=True)
+    block_lesson = serializers.UUIDField(source='block.lesson_id', read_only=True, allow_null=True)
 
     def get_sender_name(self, obj):
         return obj.sender.get_full_name() or obj.sender.username
@@ -598,6 +599,7 @@ class MessageSerializer(serializers.ModelSerializer):
             'is_read',
             'created_at',
             'block',    # «Задать вопрос» only (else null): the task asked about
+            'block_lesson',  # Current location; the snapshot remains historical.
             'context',  # its snapshot (api/questions.py)
         ]
         read_only_fields = ['id', 'created_at', 'sender', 'block', 'context']

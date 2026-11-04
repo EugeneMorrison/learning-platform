@@ -88,7 +88,10 @@ beforeEach(t => {
     fixture.navigate = t.mock.fn();
     fixture.get = async url => {
         if (url === '/auth/me/') return { data: { role: 'AUTHOR' } };
-        if (url.startsWith('/lessons/')) return { data: { id: 'lesson', title: 'Lesson', lesson_position: 2 } };
+        if (url === '/lessons/outline/') return { data: [
+            { id: 'lesson', title: 'Data Input', position: 1 }, { id: 'variables', title: 'Variables', position: 2 },
+        ] };
+        if (url.startsWith('/lessons/')) return { data: { id: 'lesson', course: 'course', title: 'Lesson', lesson_position: 2 } };
         if (url.startsWith('/blocks/')) return { data: structuredClone(blocks) };
         throw Error(`Unexpected request: ${url}`);
     };
@@ -448,4 +451,102 @@ test('table editor cleans deleted column references and permits surveys with no 
     assert.deepEqual(patches[0].payload.content.correct_cells, { r1: ['c2'], r2: [] });
     assert.equal(patches[0].payload.content.any_answer_correct, true);
     assert.deepEqual(patches[0].payload.content.columns, [{ id: 'c2', text: 'High' }]);
+});
+
+const moveButton = card => card.findAllByType('button').find(node => node.children.join('') === '↗ В другой урок');
+const moveForm = card => card.findByProps({ 'aria-label': 'Перенос блока в другой урок' });
+const chooseDestination = async card => act(async () => card.findByProps({ 'aria-label': 'Урок назначения' }).props.onChange({ target: { value: 'variables' } }));
+
+test('moving an existing block removes it from the source, preserves other drafts and links to the destination', async t => {
+    const renderer = await mount(t);
+    const theory = cards(renderer)[0];
+    await act(async () => cards(renderer)[1].findByType('textarea').props.onChange({ target: { value: 'Unsaved quiz' } }));
+    const insertion = renderer.root.findAll(node => node.props.onPick && node.props.onCancel)[0];
+    await act(async () => insertion.props.onPick('TEXT'));
+    const newCard = renderer.root.findAll(node => node.type === 'div' && node.props.id?.startsWith('edit-new-'))[0];
+    assert.equal(newCard.props.inert, undefined);
+    await act(async () => newCard.findByType('textarea').props.onChange({ target: { value: 'New draft' } }));
+    await act(async () => moveButton(theory).props.onClick());
+    const options = theory.findByProps({ 'aria-label': 'Урок назначения' }).findAllByType('option');
+    assert.deepEqual(options.map(node => node.props.value), ['', 'variables']);
+    await chooseDestination(theory);
+    fixture.post = t.mock.fn(async (url, payload) => {
+        assert.equal(url, '/blocks/theory/move/');
+        assert.deepEqual(payload, { lesson: 'variables', expected_lesson: 'lesson' });
+        const index = blocks.findIndex(block => block.id === 'theory');
+        const [block] = blocks.splice(index, 1);
+        return { data: { ...block, lesson: 'variables', lesson_title: 'Variables', order_index: 9 } };
+    });
+    await act(async () => moveForm(theory).props.onSubmit({ preventDefault() {} }));
+    assert.deepEqual(cards(renderer).map(card => card.props.id), ['edit-block-quiz', 'edit-block-code', 'edit-block-fill']);
+    assert.equal(cards(renderer)[0].findByType('textarea').props.value, 'Unsaved quiz');
+    const remaining = renderer.root.findAll(node => node.type === 'div' && node.props.id?.startsWith('edit-new-'))[0];
+    assert.equal(remaining.findByType('textarea').props.value, 'New draft');
+    const newDraft = renderer.root.findAll(node => node.props.draft?.id === null && node.props.actions)[0].props.draft;
+    assert.equal(newDraft.insertBefore, null);
+    await act(async () => buttons(renderer).find(node => node.children.join('') === 'Открыть блок').props.onClick());
+    assert.deepEqual(fixture.navigate.mock.calls[0].arguments, ['/lesson/variables/edit/?block=theory']);
+});
+
+test('moving requires the block draft to be saved first', async t => {
+    const renderer = await mount(t);
+    const card = cards(renderer)[0];
+    await act(async () => card.findByType('textarea').props.onChange({ target: { value: 'Unsaved theory' } }));
+    assert.equal(moveButton(card).props.disabled, true);
+    assert.match(moveButton(card).props.title, /Сохраните/);
+    await act(async () => card.findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.onClick());
+    assert.equal(moveButton(card).props.disabled, false);
+});
+
+test('move failure keeps the block and destination selection and allows a retry', async t => {
+    const renderer = await mount(t);
+    const card = cards(renderer)[0];
+    await act(async () => moveButton(card).props.onClick());
+    await chooseDestination(card);
+    fixture.post = async () => { throw { response: { data: { detail: 'Block changed. Reload.' } } }; };
+    await act(async () => moveForm(card).props.onSubmit({ preventDefault() {} }));
+    assert.equal(cards(renderer).length, 4);
+    assert.match(JSON.stringify(renderer.toJSON()), /Block changed. Reload./);
+    assert.equal(card.findByProps({ 'aria-label': 'Урок назначения' }).props.value, 'variables');
+    assert.equal(moveForm(card).findAllByType('button').find(node => node.props.type === 'submit').props.disabled, false);
+    assert.equal(card.props.inert, undefined);
+});
+
+test('lesson loading errors can retry and a course with no destination explains why', async t => {
+    const renderer = await mount(t);
+    const card = cards(renderer)[0];
+    const get = fixture.get;
+    fixture.get = async url => {
+        if (url === '/lessons/outline/') throw Error('Offline');
+        return get(url);
+    };
+    await act(async () => moveButton(card).props.onClick());
+    assert.match(JSON.stringify(renderer.toJSON()), /Не удалось загрузить уроки/);
+    fixture.get = async url => url === '/lessons/outline/' ? { data: [{ id: 'lesson', title: 'Current', position: 1 }] } : get(url);
+    await act(async () => moveForm(card).findAllByType('button').find(node => node.children.join('') === 'Повторить загрузку').props.onClick());
+    assert.match(JSON.stringify(renderer.toJSON()), /В этом курсе пока нет других уроков/);
+    await act(async () => moveForm(card).findAllByType('button').find(node => node.children.join('') === 'Отмена').props.onClick());
+    assert.equal(moveButton(card).props.disabled, false);
+    assert.equal(fixture.post.mock.calls.length, 0);
+});
+
+test('pending moves freeze the moved editor and prevent duplicate submissions', async t => {
+    const renderer = await mount(t);
+    const card = cards(renderer)[0];
+    await act(async () => moveButton(card).props.onClick());
+    await chooseDestination(card);
+    let finish;
+    fixture.post = t.mock.fn(() => new Promise(resolve => { finish = resolve; }));
+    let pending;
+    await act(async () => { pending = moveForm(card).props.onSubmit({ preventDefault() {} }); });
+    assert.equal(card.props.inert, true);
+    assert.equal(card.props['aria-busy'], true);
+    assert.equal(moveForm(card).findAllByType('button').find(node => node.props.type === 'submit').props.disabled, true);
+    await act(async () => { await moveForm(card).props.onSubmit({ preventDefault() {} }); });
+    assert.equal(fixture.post.mock.calls.length, 1);
+    await act(async () => {
+        finish({ data: { id: 'theory', lesson: 'variables', lesson_title: 'Variables' } });
+        await pending;
+    });
+    assert.equal(cards(renderer).length, 3);
 });
