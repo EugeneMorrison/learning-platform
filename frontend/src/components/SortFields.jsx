@@ -1,4 +1,5 @@
 import RichTextEditor from './RichTextEditor';
+import AutoResizeTextarea from './AutoResizeTextarea';
 import DragHandle from './DragHandle';
 import SortItem from './SortItem';
 import { useDragReorder } from '../lib/useDragReorder';
@@ -20,7 +21,7 @@ export default function SortFields({ content, setContent }) {
                 <div className="sort-item">
                     <DragHandle {...drag.getHandleProps(item.id)} />
                     <div className="sort-editor__item">
-                        <textarea aria-label={`Элемент ${index + 1}`} value={item.text}
+                        <AutoResizeTextarea aria-label={`Элемент ${index + 1}`} value={item.text}
                             onChange={event => setContent(c => ({ ...c, items: c.items.map(row => row.id === item.id ? { ...row, text: event.target.value } : row) }))} />
                         {content.html && <div className="sort-editor__preview"><SortItem text={item.text} html /></div>}
                     </div>
@@ -41,7 +42,7 @@ export default function SortFields({ content, setContent }) {
         {content.html && <p>Доступны: br, b, i, strong, em, strike, h1–h3, ol, li, ul, blockquote, code, abbr (title).</p>}
         {[['feedback_correct', 'Комментарий при верном ответе'], ['feedback_incorrect', 'Комментарий при неверном ответе']].map(([field, label]) =>
             <label key={field} style={{ display: 'block', marginTop: 12 }}>{label}
-                <textarea style={{ display: 'block', width: '100%', boxSizing: 'border-box' }} value={content[field] || ''}
+                <AutoResizeTextarea style={{ display: 'block', width: '100%' }} value={content[field] || ''}
                     onChange={event => setContent(c => ({ ...c, [field]: event.target.value }))} placeholder="Необязательно" />
             </label>)}
     </>;

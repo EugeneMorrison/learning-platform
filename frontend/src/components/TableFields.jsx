@@ -1,4 +1,5 @@
 import RichTextEditor from './RichTextEditor';
+import AutoResizeTextarea from './AutoResizeTextarea';
 import TableGrid from './TableGrid';
 import { changeCell } from '../lib/tableTask';
 import { moveItem } from '../lib/sorting';
@@ -54,7 +55,7 @@ export default function TableFields({ uid, content, setContent }) {
             label="Правильные ячейки таблицы" />
         {[['feedback_correct', 'Комментарий при верном ответе'], ['feedback_incorrect', 'Комментарий при неверном ответе']].map(([field, label]) =>
             <label key={field} className="table-fields__setting">{label}
-                <textarea className="table-fields__comment" value={content[field] || ''} placeholder="Необязательно"
+                <AutoResizeTextarea className="table-fields__comment" value={content[field] || ''} placeholder="Необязательно"
                     onChange={event => setContent(c => ({ ...c, [field]: event.target.value }))} />
             </label>)}
     </>;

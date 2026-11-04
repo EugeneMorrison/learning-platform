@@ -94,7 +94,6 @@
 }
 
 .formula-dialog__field {
-    resize: vertical;
     font-family: var(--font-code);
     font-size: var(--text-sm);
 }

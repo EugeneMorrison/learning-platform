@@ -1,4 +1,5 @@
 import RichTextEditor from './RichTextEditor';
+import AutoResizeTextarea from './AutoResizeTextarea';
 import DragHandle from './DragHandle';
 import SortItem from './SortItem';
 import { useDragReorder } from '../lib/useDragReorder';
@@ -31,7 +32,7 @@ export default function MatchFields({ content, setContent }) {
                         {['left', 'right'].map(side => <div className="match-cell" key={side}>
                             <div className="sort-editor__item">
                                 <label htmlFor={`match-${pair[side].id}`}>{side === 'left' ? 'Первый' : 'Второй'} столбец · {index + 1}</label>
-                                <textarea id={`match-${pair[side].id}`} aria-label={`Строка ${index + 1}, ${side === 'left' ? 'первый' : 'второй'} столбец`}
+                                <AutoResizeTextarea id={`match-${pair[side].id}`} aria-label={`Строка ${index + 1}, ${side === 'left' ? 'первый' : 'второй'} столбец`}
                                     value={pair[side].text} placeholder="Пусто — без пары"
                                     onChange={event => setContent(c => ({ ...c, pairs: c.pairs.map(row => row.left.id === pair.left.id
                                         ? { ...row, [side]: { ...row[side], text: event.target.value } } : row) }))} />
@@ -58,7 +59,7 @@ export default function MatchFields({ content, setContent }) {
         {content.html && <p>Доступны: br, b, i, strong, em, strike, h1–h3, ol, li, ul, blockquote, code, abbr (title).</p>}
         {[['feedback_correct', 'Комментарий при верном ответе'], ['feedback_incorrect', 'Комментарий при неверном ответе']].map(([field, label]) =>
             <label key={field} className="match-setting">{label}
-                <textarea className="match-comment" value={content[field] || ''}
+                <AutoResizeTextarea className="match-comment" value={content[field] || ''}
                     onChange={event => setContent(c => ({ ...c, [field]: event.target.value }))} placeholder="Необязательно" />
             </label>)}
     </>;

@@ -1,9 +1,10 @@
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams, useBlocker } from 'react-router-dom';
 import CodeMirror from '@uiw/react-codemirror';
 import { python } from '@codemirror/lang-python';
 import { pycharmDarcula } from '../components/pycharmDarcula';
 import RichTextEditor from '../components/RichTextEditor';
+import AutoResizeTextarea from '../components/AutoResizeTextarea';
 import EditableTitle from '../components/EditableTitle';
 import UnsavedBlockMarkers from '../components/UnsavedBlockMarkers';
 import DragHandle from '../components/DragHandle';
@@ -1103,13 +1104,12 @@ function BulkOptions({ setContent }) {
                 Каждый вариант — с новой строки. Пустые строки пропускаются.
                 Начните строку с <b>*&nbsp;</b> (звёздочка и пробел), чтобы сразу отметить правильный ответ.
             </div>
-            <textarea
+            <AutoResizeTextarea
                 value={text}
                 onChange={e => setText(e.target.value)}
-                rows={6}
                 autoFocus
                 placeholder={'True\n* False\nNone\nTypeError'}
-                style={{ ...input, fontFamily: "'JetBrains Mono', Consolas, monospace", resize: 'vertical' }}
+                style={{ ...input, fontFamily: "'JetBrains Mono', Consolas, monospace" }}
             />
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 8 }}>
                 <button type="button" onClick={() => apply('replace')} disabled={!options.length} style={{ ...saveBtn, padding: '6px 14px' }}>
@@ -1246,7 +1246,7 @@ function FillFields({ content, setContent }) {
                 label="Шаблон с пропусками"
                 hint="Отметьте пропуски как {{ответ}}. Несколько верных ответов — через | , например: print({{math.factorial(8)|factorial(8)}})"
             >
-                <textarea
+                <AutoResizeTextarea
                     value={content.template}
                     onChange={e => setContent(c => ({ ...c, template: e.target.value }))}
                     style={{ ...input, minHeight: 70, fontFamily: "'JetBrains Mono', Consolas, monospace", fontVariantLigatures: 'none', fontFeatureSettings: '"liga" 0, "calt" 0' }}
@@ -1316,29 +1316,8 @@ const CodeField = memo(function CodeField({ field, value, setContent }) {
 });
 
 function TestDataField({ value, ...props }) {
-    const ref = useRef(null);
-    useLayoutEffect(() => {
-        const field = ref.current;
-        if (!field) return undefined;
-        const resize = () => {
-            // Measure from the one-line minimum so deleting text also shrinks
-            // the field. Include borders because inputs use border-box sizing.
-            field.style.height = 'auto';
-            field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
-        };
-        resize();
-        let width = field.getBoundingClientRect().width;
-        const observer = new ResizeObserver(() => {
-            const nextWidth = field.getBoundingClientRect().width;
-            if (nextWidth === width) return;
-            width = nextWidth;
-            resize();
-        });
-        observer.observe(field);
-        return () => observer.disconnect();
-    }, [value]);
-    return <textarea {...props} ref={ref} value={value} rows={1}
-        style={{ ...input, flex: 1, minWidth: 0, resize: 'none', overflowY: 'hidden', lineHeight: '1.5',
+    return <AutoResizeTextarea {...props} value={value}
+        style={{ ...input, flex: 1, minWidth: 0, lineHeight: '1.5',
             fontFamily: "'JetBrains Mono', Consolas, monospace" }} />;
 }
 

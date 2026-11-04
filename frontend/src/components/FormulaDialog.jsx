@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import { CloseIcon } from './ChatPanel';
+import AutoResizeTextarea from './AutoResizeTextarea';
 import './FormulaDialog.css';
 
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, [tabindex]:not([tabindex="-1"])';
@@ -137,7 +138,7 @@ function FormulaDialog({ initial, onSubmit, onDelete, onClose }) {
                     </div>
 
                     <label className="formula-dialog__label" htmlFor="formula-dialog-latex">Формула в LaTeX</label>
-                    <textarea
+                    <AutoResizeTextarea
                         ref={fieldRef}
                         id="formula-dialog-latex"
                         className="input formula-dialog__field"
