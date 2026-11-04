@@ -23,6 +23,7 @@ const server = await createServer({
         load(id) {
             if (id === '\0draft-api') return `export default {
                 post: (...args) => globalThis.__codeDraftTest.post(...args),
+                get: (...args) => globalThis.__codeDraftTest.get(...args),
             };`;
             if (id === '\0draft-editor') return `import React, { useImperativeHandle } from 'react';
                 export default function Editor({ value, onChange, onFocus, ref }) {
@@ -58,6 +59,7 @@ beforeEach(t => {
     };
     globalThis.document = { addEventListener() {}, removeEventListener() {} };
     fixture.post = async () => ({ data: { status: 'success', total: 1 } });
+    fixture.get = t.mock.fn(async () => ({ data: { official_solution: null, results: [], next_offset: null } }));
     fixture.editorTransaction = null;
     t.mock.method(console, 'error', () => {});
 });
@@ -85,6 +87,40 @@ async function click(renderer, text) {
     assert.ok(button, `Expected action: ${text}`);
     await act(async () => button.props.onClick());
 }
+
+test('other solutions unlock only after grading success and remain available during practice', async t => {
+    const page = await mount(t);
+    const solutionsButton = () => page.root.findAllByType('button').find(node =>
+        node.props.children === 'Посмотреть другие решения');
+    assert.equal(solutionsButton().props.disabled, true);
+    assert.equal(fixture.get.mock.calls.length, 0);
+    await click(page, '▶ Запустить код');
+    assert.equal(solutionsButton().props.disabled, true);
+    fixture.post = async () => ({ data: { status: 'wrong_answer', total: 1 } });
+    await click(page, '✔ Отправить');
+    assert.equal(solutionsButton().props.disabled, true);
+    fixture.post = async () => ({ data: { status: 'success', total: 1 } });
+    await click(page, '✔ Отправить');
+    assert.equal(solutionsButton().props.disabled, false);
+    assert.equal(fixture.get.mock.calls.length, 0);
+    await click(page, '🔄 Сбросить');
+    assert.equal(solutionsButton().props.disabled, false);
+    fixture.post = async () => ({ data: { status: 'wrong_answer', total: 1 } });
+    await click(page, '✔ Отправить');
+    assert.equal(solutionsButton().props.disabled, false);
+    await click(page, 'Посмотреть другие решения');
+    assert.deepEqual(fixture.get.mock.calls[0].arguments, ['/blocks/block-a/solutions/', { params: { offset: 0 } }]);
+});
+
+test('saved successful progress unlocks solutions after reloading without changing the draft', async t => {
+    const page = await mount(t, { savedProgress: { is_correct: true, answer: { code: 'print("saved")' } } });
+    await edit(page, 'print("practice")');
+    assert.equal(page.root.findAllByType('button').find(node =>
+        node.props.children === 'Посмотреть другие решения').props.disabled, false);
+    await click(page, 'Посмотреть другие решения');
+    assert.equal(editor(page).props.value, 'print("practice")');
+    assert.equal(fixture.get.mock.calls.length, 1);
+});
 
 test('focusing the default hint clears it, keeps four lines and remembers the cleared draft', async t => {
     const props = { content: { ...content, starter_code: '# Ваш код здесь\n' } };

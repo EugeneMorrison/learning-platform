@@ -1153,6 +1153,13 @@ function CodeFields({ content, setContent }) {
                 <CodeField field="footer" value={content.footer || ''} setContent={setContent} />
             </Field>
 
+            <details style={{ marginBottom: 16 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Официальное решение (необязательно)</summary>
+                <Field label="Код официального решения" hint="Будет показан в других решениях только после того, как ученик решит задачу.">
+                    <CodeField field="solution" value={typeof content.solution === 'string' ? content.solution : ''} setContent={setContent} />
+                </Field>
+            </details>
+
             <Field label="Проверка вывода" hint={comparison?.hint}>
                 <select
                     aria-label="Проверка вывода"

@@ -9,6 +9,7 @@ import useCodeDraft from '../lib/useCodeDraft';
 import api from '../api';
 import './blocks.css';
 import { DiscussionBadge } from './DiscussionPanel';
+import CodeSolutions from './CodeSolutions';
 
 const PYTHON_VERSIONS = ['Python 3.12', 'Python 3.14'];
 
@@ -55,6 +56,7 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
     const [isRunning, setIsRunning] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [hasSubmitted, setHasSubmitted] = useState(wasSolved);
+    const [hasSolved, setHasSolved] = useState(wasSolved);
     const [pythonVersion, setPythonVersion] = useState('Python 3.12');
     const [versionOpen, setVersionOpen] = useState(false);
     const versionRef = useRef(null);
@@ -142,6 +144,7 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                 version: pythonVersion,
             });
             setSubmitResults(res.data);
+            if (res.data.status === 'success') setHasSolved(true);
             onSubmitted?.(res.data); // the lesson's progress (app header, "next task")
         } catch (err) {
             setSubmitResults({
@@ -423,6 +426,8 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                     )}
                 </div>
             )}
+
+            <CodeSolutions key={blockId} blockId={blockId} unlocked={wasSolved || hasSolved} />
 
             {hiddenTestCount > 0 && (
                 <div className="lesson-block__note">

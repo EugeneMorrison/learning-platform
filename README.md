@@ -33,10 +33,15 @@ A student can:
 * Read theory with syntax-highlighted code samples
 * Answer quizzes, get immediate feedback, and retry after a wrong answer
 * Write and run Python in a PyCharm-style editor (CodeMirror 6 with the Darcula theme: keyword coloring, bracket matching, highlighted built-ins)
+* After solving a coding task, use **Посмотреть другие решения** to read the optional official answer and other students' first accepted submissions. Running code alone does not unlock solutions; resetting or practising after success keeps them available. Authors can provide or clear the official answer under the collapsed **Официальное решение** section in the lesson editor.
 * Follow their own progress through a course
 * Chat with the teacher in real time
 
 ---
+
+## Coding task solutions
+
+`GET /api/blocks/{id}/solutions/?offset=0` requires authentication, access to the course, and a saved successful result for that exact coding task. It returns `official_solution` (or `null`), paginated `results` (`id`, `author_name`, `code`), and `next_offset` (or `null`). Pages default to 10 entries, with an optional `limit` capped at 20. The viewer's submission, the author's test submissions, failed attempts, hidden code/tests, and private account fields are excluded. The ordinary lesson/block responses continue to omit the official solution for students, even after completion. No database migration is required.
 
 ## Project layout
 

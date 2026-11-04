@@ -6,6 +6,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from .edit_history import CourseHistoryView
+from .code_solutions import CodeSolutionsView
 
 # Router automatically creates URLs for ViewSets
 # Example: router.register('courses', CourseViewSet) creates:
@@ -35,6 +36,7 @@ urlpatterns = [
     path('questions/', views.QuestionView.as_view(), name='questions'),
     path('questions/preview/', views.QuestionPreviewView.as_view(), name='questions-preview'),
     path('blocks/<uuid:block_id>/threads/', views.BlockThreadsView.as_view(), name='block-threads'),
+    path('blocks/<uuid:block_id>/solutions/', CodeSolutionsView.as_view(), name='block-solutions'),
     path('threads/<int:thread_id>/', views.ThreadDetailView.as_view(), name='thread-detail'),
     path('threads/<int:thread_id>/comments/', views.ThreadCommentsView.as_view(), name='thread-comments'),
     path('comments/<int:comment_id>/', views.CommentDetailView.as_view(), name='comment-detail'),

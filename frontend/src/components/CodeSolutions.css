@@ -1,0 +1,18 @@
+.code-solutions { margin-top: var(--space-4); }
+.code-solutions__list { margin-top: var(--space-3); }
+.code-solutions__entry { margin-bottom: var(--space-4); }
+.code-solutions__entry h4 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+.code-solutions__code {
+    margin: 0;
+    padding: var(--space-3);
+    border: var(--border-width) solid var(--color-line);
+    border-radius: var(--radius-small);
+    background: var(--color-code-bg);
+    color: var(--color-code-text);
+    font-family: var(--font-code);
+    font-size: var(--text-sm);
+    white-space: pre;
+    overflow-x: auto;
+    font-variant-ligatures: none;
+}
+.code-solutions__code code { font: inherit; color: inherit; }

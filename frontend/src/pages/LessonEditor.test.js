@@ -155,6 +155,20 @@ test('saving a block patches only that block and returns to its lesson anchor', 
     assert.equal(fixture.navigate.mock.calls[0].arguments[0], '/lesson/lesson/#block-theory');
 });
 
+test('author can add and remove the optional official solution through normal block saving', async t => {
+    const renderer = await mount(t);
+    const card = cards(renderer).find(node => node.props.id === 'edit-block-code');
+    const solution = () => card.findByType('details').findByType('textarea');
+    assert.equal(solution().props.value, '');
+    assert.equal(card.findByType('details').props.open, undefined);
+    await act(async () => solution().props.onChange({ target: { value: 'print(1)  # official\n' } }));
+    await act(async () => card.findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.onClick());
+    assert.equal(patches.at(-1).payload.content.solution, 'print(1)  # official\n');
+    await act(async () => solution().props.onChange({ target: { value: '' } }));
+    await act(async () => card.findAllByType('button').find(node => node.children.join('') === 'Сохранить').props.onClick());
+    assert.equal(patches.at(-1).payload.content.solution, '');
+});
+
 test('full lesson editor still renders every block and lesson controls', async t => {
     fixture.search = '';
     const renderer = await mount(t);
