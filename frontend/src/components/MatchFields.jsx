@@ -32,7 +32,7 @@ export default function MatchFields({ content, setContent }) {
                         {['left', 'right'].map(side => <div className="match-cell" key={side}>
                             <div className="sort-editor__item">
                                 <label htmlFor={`match-${pair[side].id}`}>{side === 'left' ? 'Первый' : 'Второй'} столбец · {index + 1}</label>
-                                <AutoResizeTextarea id={`match-${pair[side].id}`} aria-label={`Строка ${index + 1}, ${side === 'left' ? 'первый' : 'второй'} столбец`}
+                                <AutoResizeTextarea className="input" id={`match-${pair[side].id}`} aria-label={`Строка ${index + 1}, ${side === 'left' ? 'первый' : 'второй'} столбец`}
                                     value={pair[side].text} placeholder="Пусто — без пары"
                                     onChange={event => setContent(c => ({ ...c, pairs: c.pairs.map(row => row.left.id === pair.left.id
                                         ? { ...row, [side]: { ...row[side], text: event.target.value } } : row) }))} />

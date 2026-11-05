@@ -16,12 +16,12 @@ export default function SortFields({ content, setContent }) {
         <RichTextEditor value={content.prompt || ''} onChange={prompt => setContent(c => ({ ...c, prompt }))}
             placeholder="Укажите, в каком порядке расположить элементы: например, по возрастанию сверху вниз." />
         <p>Добавьте элементы и расположите их в верном порядке сверху вниз. Укажите требуемый порядок в условии. Ученику элементы будут показаны вперемешку.</p>
-        <ol className="sort-list" aria-label="Правильный порядок элементов">
+        <ol className="sort-list sort-editor" aria-label="Правильный порядок элементов">
             {items.map((item, index) => <li key={item.id} {...drag.getItemProps(item.id)}>
                 <div className="sort-item">
                     <DragHandle {...drag.getHandleProps(item.id)} />
                     <div className="sort-editor__item">
-                        <AutoResizeTextarea aria-label={`Элемент ${index + 1}`} value={item.text}
+                        <AutoResizeTextarea className="input" aria-label={`Элемент ${index + 1}`} value={item.text}
                             onChange={event => setContent(c => ({ ...c, items: c.items.map(row => row.id === item.id ? { ...row, text: event.target.value } : row) }))} />
                         {content.html && <div className="sort-editor__preview"><SortItem text={item.text} html /></div>}
                     </div>

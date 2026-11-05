@@ -5,6 +5,12 @@
 .sort-item__arrows { display: flex; flex-shrink: 0; gap: 4px; }
 .sort-editor__item { flex: 1; min-width: 0; }
 .sort-editor__item textarea { width: 100%; box-sizing: border-box; min-height: 64px; }
+.sort-editor .sort-editor__item textarea,
+.match-editor .sort-editor__item textarea {
+    display: block;
+    min-height: 0;
+    padding: var(--space-2) var(--space-3);
+}
 .sort-editor__preview { margin-top: 8px; }
 @media (max-width: 520px) {
     .sort-item { gap: 6px; padding: 8px; }
