@@ -459,19 +459,21 @@ class DashboardCoverApiTests(APITestCase):
     def setUpTestData(cls):
         cls.author = User.objects.create_user(username='author', password='x', role='AUTHOR')
         cls.student = User.objects.create_user(username='student', password='x', role='STUDENT')
-        cls.covered = Course.objects.create(title='Covered', author=cls.author, cover='covers/c.webp')
+        cls.covered = Course.objects.create(title='Covered', author=cls.author, cover='covers/c.webp', price=Decimal('1490.50'))
         cls.plain = Course.objects.create(title='Plain', author=cls.author)
         Enrollment.objects.create(student=cls.student, course=cls.covered)
         Enrollment.objects.create(student=cls.student, course=cls.plain)
 
-    def test_student_enrollments_have_course_cover_and_nothing_else_new(self):
+    def test_student_enrollments_include_course_cover_and_current_price(self):
         self.client.force_authenticate(self.student)
         rows = {row['course_title']: row for row in self.client.get('/api/enrollments/').data}
 
         self.assertEqual(rows['Covered']['course_cover'], 'http://testserver/media/covers/c.webp')
         self.assertIsNone(rows['Plain']['course_cover'])
+        self.assertEqual(rows['Covered']['course_price'], '1490.50')
+        self.assertEqual(rows['Plain']['course_price'], '0.00')
         self.assertEqual(set(rows['Covered']), {'id', 'student', 'student_name', 'course', 'course_title',
-                                                'course_cover', 'enrolled_at', 'task_count', 'solved_count'})
+                                                'course_cover', 'course_price', 'enrolled_at', 'task_count', 'solved_count'})
 
     def test_author_my_courses_carry_progress(self):
         lesson = Lesson.objects.create(course=self.covered, title='L', order_index=1)
@@ -496,11 +498,13 @@ class DashboardCoverApiTests(APITestCase):
         self.assertEqual((plain['task_count'], plain['solved_count'], plain['student_count'],
                           plain['students_solved']), (0, 0, 1, 0))
 
-    def test_author_my_courses_have_the_cover(self):
+    def test_author_my_courses_include_cover_and_current_price(self):
         self.client.force_authenticate(self.author)
         rows = {row['title']: row for row in self.client.get('/api/courses/my_courses/').data}
         self.assertEqual(rows['Covered']['cover'], 'http://testserver/media/covers/c.webp')
         self.assertIsNone(rows['Plain']['cover'])
+        self.assertEqual(rows['Covered']['price'], '1490.50')
+        self.assertEqual(rows['Plain']['price'], '0.00')
 
     def test_enrollment_list_query_count_does_not_grow(self):
         self.client.force_authenticate(self.student)

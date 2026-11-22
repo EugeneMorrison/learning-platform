@@ -112,6 +112,7 @@ class CourseSerializer(serializers.ModelSerializer):
             'author',
             'author_name',  # Extra: author's username
             'is_published',
+            'price',
             'level',  # BEGINNER / INTERMEDIATE / ADVANCED, or null (not specified)
             'cover',  # URL, or null
             'lesson_count',  # Extra: number of lessons
@@ -120,6 +121,11 @@ class CourseSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at']
         extra_kwargs = {'title': {'error_messages': TITLE_ERRORS}}
+
+    def validate_price(self, value):
+        if value < 0:
+            raise serializers.ValidationError('Цена не может быть отрицательной.')
+        return value
 
     def validate_level(self, value):
         """«Не указан» is stored as NULL, whether the client sends null or ''."""
@@ -163,6 +169,7 @@ class LessonSerializer(serializers.ModelSerializer):
             'course',
             'course_title',  # Extra: parent course name
             'title',
+            'is_preview',
             'order_index',
             'block_count',  # Extra: number of blocks
             'created_at',
@@ -198,6 +205,10 @@ class LessonSerializer(serializers.ModelSerializer):
         """
         course = data.get('course')
         order_index = data.get('order_index')
+        if data.get('is_preview'):
+            preview_course = course or (self.instance.course if self.instance else None)
+            if preview_course and preview_course.is_free:
+                raise serializers.ValidationError({'is_preview': 'Бесплатный просмотр доступен для платных курсов.'})
 
         if course and order_index:
             # Check for existing lesson with same order in same course
@@ -433,6 +444,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.username', read_only=True)
     course_title = serializers.CharField(source='course.title', read_only=True)
     course_cover = serializers.SerializerMethodField()
+    course_price = serializers.DecimalField(source='course.price', max_digits=10, decimal_places=2, read_only=True)
     task_count = serializers.SerializerMethodField()
     solved_count = serializers.SerializerMethodField()
 
@@ -445,6 +457,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             'course',
             'course_title',  # Extra: course title
             'course_cover',  # Extra: absolute cover URL, or null (dashboard cards)
+            'course_price',
             'enrolled_at',
             'task_count',    # Extra: tasks in the course (dashboard progress), or null
             'solved_count',  # Extra: of them solved by this student, or null

@@ -338,6 +338,7 @@ class Lesson(models.Model):
         max_length=255,
         help_text="Lesson title (e.g., 'String Methods')"
     )
+    is_preview = models.BooleanField(default=False)
 
     order_index = models.IntegerField(
         help_text="Display order (1, 2, 3...)"

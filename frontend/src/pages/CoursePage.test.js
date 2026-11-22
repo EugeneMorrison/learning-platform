@@ -16,11 +16,12 @@ const server = await createServer({
             if (source === 'react-router-dom') return '\0course-router';
             if (source === '../lib/notifications') return '\0course-notifications';
             if (source === '../lib/chatSocket') return '\0course-socket';
-            if (source.startsWith('../components/') && !source.endsWith('/DragHandle')) return '\0course-decoration';
+            if (source.startsWith('../components/') && !source.endsWith('/DragHandle') && !source.endsWith('/CoursePriceFields')) return '\0course-decoration';
         },
         load(id) {
             if (id === '\0course-api') return `export default {
                 get: (...args) => globalThis.__courseReorderTest.get(...args),
+                patch: (...args) => globalThis.__courseReorderTest.patch(...args),
                 post: (...args) => globalThis.__courseReorderTest.post(...args),
                 delete: (...args) => globalThis.__courseReorderTest.delete(...args),
             };`;
@@ -92,6 +93,25 @@ async function mount(t) {
 const rows = renderer => renderer.root.findAll(node => node.type === 'div' && node.props.className?.split(' ').includes('lesson-row'));
 const stepCounts = row => row.findAllByProps({ className: 'lesson-row__step-count' })
     .map(node => [].concat(node.props.children).join(''));
+
+test('saving a paid price enables lesson previews and saving free access hides them', async t => {
+    fixture.patch = t.mock.fn(async (url, data) => ({ data }));
+    const renderer = await mount(t);
+    const access = () => renderer.root.findAllByType('select').find(node => ['free', 'paid'].includes(node.props.value));
+    const previews = () => rows(renderer)[0].findAllByProps({ type: 'checkbox' });
+    const submit = () => renderer.root.findAllByType('form').find(form => form.findAllByType('select').includes(access()))
+        .props.onSubmit({ preventDefault() {} });
+    assert.equal(previews().length, 0);
+    await act(async () => access().props.onChange({ target: { value: 'paid' } }));
+    await act(async () => renderer.root.findByProps({ type: 'number' }).props.onChange({ target: { value: '490.50' } }));
+    await act(submit);
+    assert.deepEqual(fixture.patch.mock.calls[0].arguments, ['/courses/course/', { price: '490.50' }]);
+    assert.equal(previews().length, 1);
+    await act(async () => access().props.onChange({ target: { value: 'free' } }));
+    await act(submit);
+    assert.deepEqual(fixture.patch.mock.calls[1].arguments, ['/courses/course/', { price: '0' }]);
+    assert.equal(previews().length, 0);
+});
 
 test('authors see total and nonzero step types matching the syllabus', async t => {
     outline = [{ id: '0', text_count: 1, quiz_count: 12, code_count: 7, fill_count: 1, sort_count: 2, match_count: 3, table_count: 2, task_count: 27, solved_count: 0 }];

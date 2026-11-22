@@ -27,7 +27,7 @@ def snapshot(obj):
                     is_published=obj.is_published, price=str(obj.price), cover=obj.cover.name or '')
     elif isinstance(obj, Lesson):
         data.update(title=obj.title, course_id=str(obj.course_id), order_index=obj.order_index,
-                    lesson_number=lesson_number(obj))
+                    lesson_number=lesson_number(obj), is_preview=obj.is_preview)
     else:
         ids = list(Block.objects.filter(lesson_id=obj.lesson_id, type=obj.type)
                    .order_by('order_index', 'id').values_list('pk', flat=True))

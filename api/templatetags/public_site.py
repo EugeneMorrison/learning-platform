@@ -1,12 +1,27 @@
 """Template tags for the public (Django-rendered) pages."""
 
+import nh3
+from bs4 import BeautifulSoup
 from django import template
 from django.conf import settings
 from django.utils import translation
+from django.utils.safestring import mark_safe
 
 from api.models import Review
 
 register = template.Library()
+
+
+@register.filter
+def preview_html(value):
+    """Render lesson rich text on a public page, including stored TeX formulas."""
+    value = value or ''
+    if 'data-latex' in value:
+        soup = BeautifulSoup(value, 'html.parser')
+        for formula in soup.select('[data-latex]'):
+            formula.string = formula['data-latex']
+        value = str(soup)
+    return mark_safe(nh3.clean(value))
 
 
 def get_brand_name(lang=None):

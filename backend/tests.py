@@ -499,7 +499,7 @@ class CourseDetailTests(PublicPagesTestCase):
         self.assertNotIn('Тесты:', theory)
         self.assertNotIn('Задачи:', theory)
         # Summary line: totals across lessons.
-        summary = html[html.index('syllabus-summary'):html.index('syllabus-lock-note')]
+        summary = html[html.index('syllabus-summary'):html.index('<ol class="syllabus">')]
         for label in ['Уроков: 2', 'Теория: 3', 'Тесты: 1', 'Задачи: 3']:
             self.assertIn(label, summary)
         self.assertNotIn('Пропуски:', summary)
@@ -545,10 +545,10 @@ class CourseDetailTests(PublicPagesTestCase):
         self.assertEqual(response.context['totals']['match_count'], 1)
         self.assertContains(response, 'Таблицы:')
         self.assertEqual(response.context['totals']['table_count'], 1)
-        # The context itself holds only titles and integer counts.
+        # The outline includes lesson metadata and counts only.
         for row in response.context['lessons']:
             self.assertEqual(
-                set(row), {'title', 'text_count', 'quiz_count', 'code_count', 'fill_count', 'sort_count', 'match_count', 'table_count'})
+                set(row), {'title', 'id', 'is_preview', 'text_count', 'quiz_count', 'code_count', 'fill_count', 'sort_count', 'match_count', 'table_count'})
 
     def test_description_is_escaped(self):
         course = self.make_course(
@@ -633,7 +633,7 @@ class CourseDetailTests(PublicPagesTestCase):
         ru = self.client.get(f'/course/{course.slug}/')
 
         for label in ['Программа курса', 'Уроков: 1', 'Теория: 1', 'Тесты: 1', 'Задачи: 1',
-                      'Пропуски: 1', 'Уроки откроются после записи на курс.', 'Все курсы',
+                      'Пропуски: 1', 'Все курсы',
                       'Начать бесплатно']:
             self.assertContains(ru, label)
         self.assertContains(ru, 'href="/courses/">← Все курсы<')
@@ -1293,38 +1293,66 @@ class LandingHomeTests(PublicPagesTestCase):
         self.assertNotIn('lang-switch', html)
 
 
-class CourseLoginGateTests(PublicPagesTestCase):
-    """Course pages send visitors without the React app's token to the login page,
-    with ?next= back to the course. The login state is only in localStorage, so
-    the check is an inline script in <head>, before anything is painted."""
+class PublicCourseAccessTests(PublicPagesTestCase):
+    def test_free_preview_renders_every_block_type_without_answers(self):
+        course = self.make_course('Paid', price=100)
+        lesson = Lesson.objects.create(course=course, title='Sample', order_index=1, is_preview=True)
+        content = [
+            ('TEXT', {'html': '<strong>Welcome</strong>'}),
+            ('QUIZ', {'question': 'Choose', 'options': ['First option', 'Second option'], 'explanation': 'PRIVATE'}),
+            ('FILL', {'template': 'print({{PRIVATE}})'}),
+            ('CODE', {'starter_code': 'import math', 'tests': [
+                {'expected': 'Public output', 'visible': True}, {'expected': 'PRIVATE', 'visible': False}]}),
+            ('SORT', {'items': [{'id': 'a', 'text': 'Sort item'}]}),
+            ('MATCH', {'pairs': [{'left': {'id': 'b', 'text': 'Left item'},
+                                  'right': {'id': 'c', 'text': 'Right item'}}]}),
+            ('TABLE', {'rows': [{'id': 'r', 'text': 'Row label'}],
+                       'columns': [{'id': 'c', 'text': 'Column label'}], 'feedback_correct': 'PRIVATE'}),
+        ]
+        for index, (kind, task) in enumerate(content, 1):
+            Block.objects.create(lesson=lesson, order_index=index, type=kind, content=task)
+        response = self.client.get(reverse('lesson_preview', args=[course.slug, lesson.id]))
+        for label in ['<strong>Welcome</strong>', 'First option', 'print(____)', 'import math', 'Public output',
+                      'Sort item', 'Left item', 'Right item', 'Row label', 'Column label']:
+            self.assertContains(response, label)
+        self.assertNotContains(response, 'PRIVATE')
+        course.price = 0
+        course.save()
+        url = reverse('lesson_preview', args=[course.slug, lesson.id])
+        self.assertEqual(self.client.get(url).status_code, 404)
+        page = self.client.get(f'/course/{course.slug}/')
+        self.assertNotContains(page, url)
+        self.assertContains(page, 'Sample')
+        self.assertContains(page, f'/enroll/{course.id}/')
 
-    def gate_script(self, html):
-        head = html[:html.index('</head>')]
-        scripts = [s for s in re.findall(r'<script>(.*?)</script>', head, re.S) if 'access_token' in s]
-        self.assertEqual(len(scripts), 1, 'exactly one login gate in <head>')
-        return scripts[0]
-
-    def test_gate_in_head_of_course_pages(self):
-        course = self.make_course('Gated')
-        for url in [f'/course/{course.slug}/']:
-            script = self.gate_script(self.client.get(url).content.decode())
-            with self.subTest(url=url):
-                # Same key as frontend/src/api.js; storage access guarded.
-                self.assertIn("window.localStorage.getItem('access_token')", script)
-                self.assertIn('catch (e)', script)
-                # replace(): the course page doesn't stay in history (Back won't loop).
-                self.assertIn("window.location.replace('/login/?next=' + encodeURIComponent(next))", script)
-                self.assertIn('window.location.pathname + window.location.search', script)
-
-    def test_no_gate_on_other_public_pages(self):
-        for url in ['/', '/about/']:
-            html = self.client.get(url).content.decode()
-            with self.subTest(url=url):
-                self.assertNotIn('access_token', html[:html.index('</head>')])
-                self.assertNotIn('/login/?next=', html)
+    def test_preview_access_follows_author_selection_and_publication(self):
+        course = self.make_course('Public', price=100)
+        sample = Lesson.objects.create(course=course, title='Sample', order_index=1, is_preview=True)
+        locked = Lesson.objects.create(course=course, title='Locked', order_index=2)
+        Block.objects.create(lesson=sample, type='CODE', order_index=1,
+                             content={'prompt': '<b>Try this</b><script>unsafe()</script>', 'solution': 'SECRET'})
+        page = self.client.get(f'/course/{course.slug}/')
+        url = reverse('lesson_preview', args=[course.slug, sample.id])
+        self.assertContains(page, 'Locked')
+        self.assertContains(page, url)
+        self.assertNotContains(page, '/login/?next=')
+        preview = self.client.get(url)
+        self.assertContains(preview, '<b>Try this</b>')
+        self.assertNotContains(preview, 'unsafe()')
+        self.assertNotContains(preview, 'SECRET')
+        locked_url = reverse('lesson_preview', args=[course.slug, locked.id])
+        self.assertNotContains(page, locked_url)
+        self.assertEqual(self.client.get(locked_url).status_code, 404)
+        sample.is_preview = False
+        sample.save()
+        self.assertEqual(self.client.get(url).status_code, 404)
+        sample.is_preview = True
+        sample.save()
+        course.is_published = False
+        course.save()
+        self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_cards_still_link_to_the_course_page(self):
-        # Logged-in visitors keep the course page; the gate there handles the rest.
         course = self.make_course('Card')
         self.assertContains(self.client.get('/'), f'<a class="course-card" href="/course/{course.slug}/">')
 

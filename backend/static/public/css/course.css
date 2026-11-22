@@ -89,14 +89,6 @@
   margin-bottom: var(--space-4);
 }
 
-.syllabus-lock-note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-muted);
-  font-size: var(--text-sm);
-}
-
 .lock-icon {
   flex-shrink: 0;
   width: var(--space-4);
@@ -168,6 +160,26 @@
 }
 
 /* Narrow screens */
+.lesson-preview {
+  padding-bottom: var(--space-7);
+  overflow-wrap: anywhere;
+}
+
+.lesson-preview .syllabus__body {
+  margin: var(--space-4) 0;
+  overflow-x: auto;
+}
+
+.lesson-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.preview-pairs {
+  display: flex;
+  gap: var(--space-5);
+}
+
 @media (max-width: 40rem) {
   .course-header__inner {
     gap: var(--space-5);

@@ -23,7 +23,7 @@ from django.views.static import serve
 from django.conf import settings
 from django.utils.http import url_has_allowed_host_and_scheme
 
-from .views import about_view, course_detail_view, courses_view, favicon_view, landing_view
+from .views import about_view, course_detail_view, courses_view, favicon_view, landing_view, lesson_preview_view
 
 
 @xframe_options_exempt
@@ -54,8 +54,7 @@ def spa_view(request):
 def auth_page_view(request):
     """
     /login/ and /register/: the React pages, after a server-side check of ?next=
-    (where to go after logging in; the course page sends anonymous visitors here
-    with next=<its own path>). A next that points to another host or scheme is
+    (where to go after logging in). A next that points to another host or scheme is
     an open redirect: drop it by redirecting to the bare page. React checks the
     value again (frontend/src/lib/safeNext.js).
     """
@@ -88,6 +87,7 @@ urlpatterns += [
     path('', landing_view, name='landing'),
     path('courses/', courses_view, name='courses'),
     path('course/<slug:slug>/', course_detail_view, name='course_detail'),
+    path('course/<slug:slug>/preview/<uuid:lesson_id>/', lesson_preview_view, name='lesson_preview'),
     path('about/', about_view, name='about'),
 ]
 

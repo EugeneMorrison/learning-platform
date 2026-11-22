@@ -4,6 +4,7 @@ import api from '../api';
 import ChatPanel from '../components/ChatPanel';
 import CourseCoverEditor from '../components/CourseCoverEditor';
 import CourseDescriptionEditor from '../components/CourseDescriptionEditor';
+import CoursePriceFields from '../components/CoursePriceFields';
 import DragHandle from '../components/DragHandle';
 import EditHistoryButton from '../components/EditHistory';
 import { useDragReorder } from '../lib/useDragReorder';
@@ -156,6 +157,10 @@ function CoursePage() {
     const [showLessonForm, setShowLessonForm] = useState(false);
     const [newLessonTitle, setNewLessonTitle] = useState('');
     const [creatingLesson, setCreatingLesson] = useState(false);
+    const [savingPreview, setSavingPreview] = useState(false);
+    const [priceDraft, setPriceDraft] = useState(undefined);
+    const [savingPrice, setSavingPrice] = useState(false);
+    const [priceError, setPriceError] = useState('');
 
     // Lesson ↑ / ↓: one move at a time (a double click must not move twice).
     const [movingLesson, setMovingLesson] = useState(false);
@@ -196,6 +201,8 @@ function CoursePage() {
                     }),
                 ]);
                 setCourse(courseRes.data);
+                setPriceDraft(undefined);
+                setPriceError('');
                 setLessons(lessonsRes.data);
                 setOutline(Object.fromEntries(outlineRes.data.map(item => [item.id, item])));
 
@@ -241,6 +248,35 @@ function CoursePage() {
             alert('Не удалось создать урок. Попробуйте ещё раз.');
         } finally {
             setCreatingLesson(false);
+        }
+    }
+
+    async function savePrice(event) {
+        event.preventDefault();
+        if (priceDraft === undefined || savingPrice) return;
+        setSavingPrice(true);
+        setPriceError('');
+        try {
+            const { data } = await api.patch(`/courses/${courseId}/`, { price: priceDraft ?? '0' });
+            setCourse(previous => ({ ...previous, price: data.price }));
+            setPriceDraft(undefined);
+        } catch (err) {
+            setPriceError(err.response?.data?.price?.[0] || 'Не удалось сохранить цену. Попробуйте ещё раз.');
+        } finally {
+            setSavingPrice(false);
+        }
+    }
+
+    async function togglePreview(lesson) {
+        setSavingPreview(true);
+        try {
+            const { data } = await api.patch(`/lessons/${lesson.id}/`, { is_preview: !lesson.is_preview });
+            setLessons(previous => previous.map(item =>
+                item.id === lesson.id ? { ...item, is_preview: data.is_preview } : item));
+        } catch {
+            alert('Не удалось изменить доступ к уроку.');
+        } finally {
+            setSavingPreview(false);
         }
     }
 
@@ -474,7 +510,7 @@ function CoursePage() {
 
     const lessonDrag = useDragReorder({
         ids: lessons.map(item => item.id),
-        disabled: movingLesson || !user || !course || course.author !== user.id,
+        disabled: movingLesson || savingPreview || !user || !course || course.author !== user.id,
         onMove: handleReorderLesson,
     });
 
@@ -485,6 +521,8 @@ function CoursePage() {
     // enrolment) are for the author who owns this course. Any other user,
     // another author included, sees the course like a reader.
     const isOwner = Boolean(user && course.author === user.id);
+    const isPaid = Number(course.price) > 0;
+    const savedPrice = isPaid ? course.price : null;
 
     // Course totals, over the lessons on the page (so they follow add / delete).
     const lessonsWithTasks = lessons.map(l => outline[l.id]).filter(item => item && item.task_count > 0);
@@ -538,6 +576,21 @@ function CoursePage() {
                                 {levelStatus === 'error' && 'Не удалось сохранить уровень. Попробуйте ещё раз.'}
                             </span>
                         </div>
+                    )}
+                    {isOwner && (
+                        <form className="course-level" onSubmit={savePrice}>
+                            <CoursePriceFields
+                                value={priceDraft === undefined ? savedPrice : priceDraft}
+                                onChange={value => { setPriceDraft(value); setPriceError(''); }}
+                                disabled={savingPrice}
+                            />
+                            {priceDraft !== undefined && (
+                                <button className="btn btn-secondary btn-sm" disabled={savingPrice} type="submit">
+                                    {savingPrice ? 'Сохранение…' : 'Сохранить стоимость'}
+                                </button>
+                            )}
+                            {priceError && <span role="alert" className="course-level__status--error">{priceError}</span>}
+                        </form>
                     )}
                     {isOwner && (
                         <CourseCoverEditor
@@ -659,13 +712,19 @@ function CoursePage() {
                             <LessonRowProgress item={outline[lesson.id]} studentCount={studentStatsAvailable ? studentCount : 0} />
                             {isOwner && (
                                 <div className="lesson-row__actions">
+                                    {isPaid && priceDraft !== null && <label className="btn btn-secondary btn-sm">
+                                        <input type="checkbox" checked={!!lesson.is_preview}
+                                            disabled={savingPreview || movingLesson}
+                                            onChange={() => togglePreview(lesson)} />
+                                        Бесплатный просмотр
+                                    </label>}
                                     <DragHandle {...lessonDrag.getHandleProps(lesson.id)}
                                         ref={el => { moveButtonRefs.current[`${lesson.id}:drag`] = el; }} />
                                     <button
                                         ref={el => { moveButtonRefs.current[`${lesson.id}:-1`] = el; }}
                                         className="btn btn-secondary btn-sm lesson-row__move"
                                         onClick={() => handleMoveLesson(index, -1)}
-                                        disabled={movingLesson || index === 0}
+                                        disabled={movingLesson || savingPreview || index === 0}
                                         aria-label="Переместить выше"
                                         title="Переместить выше"
                                     >
@@ -675,7 +734,7 @@ function CoursePage() {
                                         ref={el => { moveButtonRefs.current[`${lesson.id}:1`] = el; }}
                                         className="btn btn-secondary btn-sm lesson-row__move"
                                         onClick={() => handleMoveLesson(index, 1)}
-                                        disabled={movingLesson || index === lessons.length - 1}
+                                        disabled={movingLesson || savingPreview || index === lessons.length - 1}
                                         aria-label="Переместить ниже"
                                         title="Переместить ниже"
                                     >

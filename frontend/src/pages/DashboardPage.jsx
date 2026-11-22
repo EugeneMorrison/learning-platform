@@ -1,3 +1,4 @@
+import CoursePriceFields from '../components/CoursePriceFields';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import api from '../api';
@@ -69,6 +70,16 @@ function withBreakHints(name) {
     return name.split(/(?<=[_.\-@])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
 }
 
+const wholeRubles = new Intl.NumberFormat('ru-RU');
+const rublesWithKopecks = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function CoursePrice({ price }) {
+    if (price == null) return null;
+    const amount = Number(price);
+    const formatter = Number.isInteger(amount) ? wholeRubles : rublesWithKopecks;
+    return <strong className="dash-card__price">{amount === 0 ? 'Бесплатно' : `${formatter.format(amount)} ₽`}</strong>;
+}
+
 function StudentDashboard() {
     const [enrollments, setEnrollments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -121,7 +132,9 @@ function StudentDashboard() {
                                     />
                                 </div>
                             )}
-                            {/* No "Прогресс" button: it was clicked instead of the card; it's on the course page now. */}
+                            <div className="dash-card__actions">
+                                <CoursePrice price={enrollment.course_price} />
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -181,6 +194,8 @@ function AuthorDashboard() {
     const [showForm, setShowForm] = useState(false);
     const [newTitle, setNewTitle] = useState('');
     const [newDescription, setNewDescription] = useState('');
+    const [newPrice, setNewPrice] = useState(null);
+    const [createError, setCreateError] = useState('');
     const [newLevel, setNewLevel] = useState(''); // '' = «Не указан» (null)
     const [creating, setCreating] = useState(false);
 
@@ -203,19 +218,23 @@ function AuthorDashboard() {
         e.preventDefault();
         if (!newTitle.trim()) return;
         setCreating(true);
+        setCreateError('');
         try {
             await api.post('/courses/', {
                 title: newTitle,
                 description: newDescription,
                 level: newLevel || null,
+                price: newPrice ?? '0',
             });
             setNewTitle('');
             setNewDescription('');
             setNewLevel('');
+            setNewPrice(null);
             setShowForm(false);
             await fetchCourses();
         } catch (err) {
             console.error('Failed to create course:', err);
+            setCreateError(err.response?.data?.price?.[0] || 'Не удалось создать курс. Попробуйте ещё раз.');
         } finally {
             setCreating(false);
         }
@@ -265,6 +284,8 @@ function AuthorDashboard() {
                             ))}
                         </select>
                     </label>
+                    <CoursePriceFields value={newPrice} onChange={setNewPrice} disabled={creating} />
+                    {createError && <p role="alert">{createError}</p>}
                     <button type="submit" className="btn btn-primary" disabled={creating}>
                         {creating ? 'Создание...' : 'Создать'}
                     </button>
@@ -307,6 +328,7 @@ function AuthorDashboard() {
                             )}
                             <div className="dash-card__actions">
                                 <span className="pill">Уроков: {course.lesson_count}</span>
+                                <CoursePrice price={course.price} />
                             </div>
                         </div>
                     ))}

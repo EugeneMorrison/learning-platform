@@ -15,7 +15,8 @@ from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
 from django.utils import translation
 
-from api.models import Course, Enrollment, Review
+from api.block_content import normalize_test, student_content
+from api.models import Course, Enrollment, Lesson, Review
 
 from .pricing import NBSP, add_price_labels
 
@@ -140,16 +141,14 @@ def course_detail_view(request, slug):
     """Course sales page with the open syllabus. 404 for unpublished or missing courses."""
     course = add_price_labels(get_object_or_404(Course, slug=slug, is_published=True))
 
-    # One query for the whole syllabus. values() keeps the context to titles and
-    # integer counts: block content (answers, solutions, tests) never reaches the
-    # template.
+    # Fetch syllabus metadata in one query without loading block content.
     lessons = list(
         course.lessons.order_by('order_index')
         .annotate(**{
             name: Count('blocks', filter=Q(blocks__type=block_type))
             for block_type, name in BLOCK_COUNTS
         })
-        .values('title', *(name for _, name in BLOCK_COUNTS))
+        .values('id', 'title', 'is_preview', *(name for _, name in BLOCK_COUNTS))
     )
     totals = {
         name: sum(lesson[name] for lesson in lessons) for _, name in BLOCK_COUNTS
@@ -160,3 +159,19 @@ def course_detail_view(request, slug):
         'lessons': lessons,
         'totals': totals,
     })
+
+
+def lesson_preview_view(request, slug, lesson_id):
+    lesson = get_object_or_404(
+        Lesson.objects.select_related('course'), pk=lesson_id, course__slug=slug,
+        course__is_published=True, course__price__gt=0, is_preview=True,
+    )
+    blocks = []
+    for block in lesson.blocks.order_by('order_index'):
+        task = student_content(block.type, block.content)
+        if block.type == 'CODE':
+            task['examples'] = [normalize_test(test) for test in task['tests']]
+        elif block.type == 'FILL':
+            task['template'] = task['template'].replace('{{}}', '____')
+        blocks.append({'type': block.type, 'task': task})
+    return render(request, 'public/lesson_preview.html', {'lesson': lesson, 'blocks': blocks})

@@ -6,24 +6,6 @@
 
 {% block extra_head %}
   <link rel="stylesheet" href="{% static 'public/css/course.css' %}">
-  {# Course pages are for logged-in visitors. The login state is the React app's #}
-  {# token in localStorage, which only the browser sees, so this check runs here, #}
-  {# in <head>, before anything is painted.                                       #}
-  <script>
-    // No 'access_token' (frontend/src/api.js) → the login page, which comes back
-    // here after logging in (?next=, checked by auth_page_view in backend/urls.py).
-    // The token is not trusted for anything: the page holds no private data.
-    // Storage blocked → stay (logging in couldn't store a token either).
-    (function () {
-      try {
-        if (window.localStorage.getItem('access_token')) return;
-      } catch (e) {
-        return;
-      }
-      var next = window.location.pathname + window.location.search;
-      window.location.replace('/login/?next=' + encodeURIComponent(next));
-    })();
-  </script>
 {% endblock %}
 
 {% block content %}
@@ -70,7 +52,6 @@
     </section>
   {% endif %}
 
-  {# Syllabus: titles and integer counts only (see course_detail_view). #}
   <section class="course-section" aria-labelledby="syllabus-title">
     <div class="container course-section__inner">
       <h2 id="syllabus-title">{% translate "Программа курса" %}</h2>
@@ -81,10 +62,6 @@
           {% include "public/includes/block_counts.html" with counts=totals %}
         </div>
 
-        <p class="syllabus-lock-note">
-          <svg class="lock-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none"/></svg>
-          {% translate "Уроки откроются после записи на курс." %}
-        </p>
 
         <ol class="syllabus">
           {% for lesson in lessons %}
@@ -92,13 +69,18 @@
               <span class="step-badge">{{ forloop.counter|stringformat:"02d" }}</span>
               <div class="syllabus__body">
                 <h3 class="syllabus__title">{{ lesson.title }}</h3>
-                {% if lesson.text_count or lesson.quiz_count or lesson.code_count or lesson.fill_count %}
+                {% if not course.is_free and lesson.is_preview %}
+                  <a href="{% url 'lesson_preview' course.slug lesson.id %}" aria-label="Смотреть бесплатно: {{ lesson.title }}">Смотреть бесплатно</a>
+                {% endif %}
+                {% if lesson.text_count or lesson.quiz_count or lesson.code_count or lesson.fill_count or lesson.sort_count or lesson.match_count or lesson.table_count %}
                   <div class="pill-row syllabus__counts">
                     {% include "public/includes/block_counts.html" with counts=lesson %}
                   </div>
                 {% endif %}
               </div>
-              <svg class="lock-icon syllabus__lock" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none"/></svg>
+              {% if course.is_free or not lesson.is_preview %}
+                <svg class="lock-icon syllabus__lock" viewBox="0 0 16 16" role="img" aria-label="После записи" focusable="false"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none"/></svg>
+              {% endif %}
             </li>
           {% endfor %}
         </ol>

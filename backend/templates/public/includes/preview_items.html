@@ -1,0 +1,6 @@
+{% load public_site %}
+<ul>
+  {% for item in items %}
+    <li>{% if task.html %}{{ item.text|preview_html }}{% else %}{{ item.text }}{% endif %}</li>
+  {% endfor %}
+</ul>

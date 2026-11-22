@@ -41,6 +41,22 @@ class AuthorCourseActivityTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.course_ids()[0], str(self.old.pk))
 
+    def test_only_owner_can_choose_preview_lessons(self):
+        url = f'/api/lessons/{self.lesson.pk}/'
+        self.assertFalse(self.lesson.is_preview)
+        self.assertEqual(self.client.patch(url, {'is_preview': True}, format='json').status_code, 400)
+        course_url = f'/api/courses/{self.old.pk}/'
+        self.assertEqual(self.client.patch(course_url, {'price': '-1'}, format='json').status_code, 400)
+        price_response = self.client.patch(course_url, {'price': '1250.50'}, format='json')
+        self.assertEqual(price_response.data['price'], '1250.50')
+        response = self.client.patch(url, {'is_preview': True}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_preview'])
+        self.client.force_authenticate(self.other)
+        self.assertEqual(self.client.patch(url, {'is_preview': False}, format='json').status_code, 404)
+        self.lesson.refresh_from_db()
+        self.assertTrue(self.lesson.is_preview)
+
     def test_lesson_changes_are_activity_without_course_timestamp_changes(self):
         self.lesson.title = 'Changed lesson'
         self.lesson.save()
