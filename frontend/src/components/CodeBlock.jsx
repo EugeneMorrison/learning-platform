@@ -196,7 +196,7 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
             {/* Collapsible tests table, open on load. Line breaks in the data are
                 kept (pre-wrap); a wide table scrolls inside its own box. Only the
                 first SHOWN_TESTS rows show until «Показать ещё» opens the rest. */}
-            {content.tests && content.tests.length > 0 && (
+            {(hasTests || hiddenTestCount > 0) && (
                 <div className="tests-section">
                     <button
                         className="tests-toggle"
@@ -207,7 +207,7 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                         <span>🌿 Тестовые данные</span>
                     </button>
 
-                    {testsOpen && (
+                    {testsOpen && hasTests && (
                         <>
                         <div className="lesson-block__note">
                             Отметьте тест, чтобы подставить его входные данные в «Тестовый ввод».
@@ -266,6 +266,11 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
                             </button>
                         )}
                         </>
+                    )}
+                    {testsOpen && hiddenTestCount > 0 && (
+                        <div className="lesson-block__note">
+                            {hasTests ? 'Ещё скрытых тестов' : 'Скрытых тестов'}: {hiddenTestCount}. Решение проверяется на всех тестах.
+                        </div>
                     )}
                 </div>
             )}
@@ -429,11 +434,6 @@ function CodeBlock({ blockId, userId, content, savedProgress, number, onSubmitte
 
             <CodeSolutions key={blockId} blockId={blockId} unlocked={wasSolved || hasSolved} />
 
-            {hiddenTestCount > 0 && (
-                <div className="lesson-block__note">
-                    {hasTests ? 'Ещё скрытых тестов' : 'Скрытых тестов'}: {hiddenTestCount}. Решение проверяется на всех тестах.
-                </div>
-            )}
         </div>
     );
 }

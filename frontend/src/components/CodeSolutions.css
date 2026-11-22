@@ -1,5 +1,5 @@
 .code-solutions { margin-top: var(--space-4); }
-.code-solutions__list { margin-top: var(--space-3); }
+.code-solutions .tests-toggle { margin-bottom: var(--space-2); }
 .code-solutions__entry { margin-bottom: var(--space-4); }
 .code-solutions__entry h4 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
 .code-solutions__code {

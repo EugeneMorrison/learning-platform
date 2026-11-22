@@ -101,25 +101,33 @@ test('other solutions unlock only after grading success and remain available dur
     assert.equal(solutionsButton().props.disabled, true);
     fixture.post = async () => ({ data: { status: 'success', total: 1 } });
     await click(page, '✔ Отправить');
-    assert.equal(solutionsButton().props.disabled, false);
-    assert.equal(fixture.get.mock.calls.length, 0);
+    assert.equal(fixture.get.mock.calls.length, 1);
     await click(page, '🔄 Сбросить');
-    assert.equal(solutionsButton().props.disabled, false);
     fixture.post = async () => ({ data: { status: 'wrong_answer', total: 1 } });
     await click(page, '✔ Отправить');
-    assert.equal(solutionsButton().props.disabled, false);
-    await click(page, 'Посмотреть другие решения');
+    assert.equal(fixture.get.mock.calls.length, 1);
+    assert.ok(page.root.findByProps({ 'aria-label': 'Другие решения' }));
     assert.deepEqual(fixture.get.mock.calls[0].arguments, ['/blocks/block-a/solutions/', { params: { offset: 0 } }]);
 });
 
 test('saved successful progress unlocks solutions after reloading without changing the draft', async t => {
     const page = await mount(t, { savedProgress: { is_correct: true, answer: { code: 'print("saved")' } } });
     await edit(page, 'print("practice")');
-    assert.equal(page.root.findAllByType('button').find(node =>
-        node.props.children === 'Посмотреть другие решения').props.disabled, false);
-    await click(page, 'Посмотреть другие решения');
+    assert.ok(page.root.findByProps({ 'aria-label': 'Другие решения' }));
     assert.equal(editor(page).props.value, 'print("practice")');
     assert.equal(fixture.get.mock.calls.length, 1);
+});
+
+test('the hidden-test count belongs to the collapsible tests section, including hidden-only tasks', async t => {
+    for (const tests of [[], [{ input: '1', expected: '2' }]]) {
+        const page = await mount(t, { content: { ...content, tests, hidden_test_count: 10 } });
+        const section = page.root.findByProps({ className: 'tests-section' });
+        const note = section.findAllByProps({ className: 'lesson-block__note' }).at(-1);
+        assert.match(note.children.join(''), /: 10\. Решение проверяется на всех тестах\./);
+        assert.equal(section.findAllByType('table').length, tests.length);
+        await act(async () => section.findByProps({ className: 'tests-toggle' }).props.onClick());
+        assert.equal(section.findAllByProps({ className: 'lesson-block__note' }).length, 0);
+    }
 });
 
 test('focusing the default hint clears it, keeps four lines and remembers the cleared draft', async t => {

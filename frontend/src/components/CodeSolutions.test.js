@@ -32,6 +32,8 @@ async function mount(t, props = {}) {
 }
 const button = (page, label) => page.root.findAllByType('button').find(node => node.children.join('') === label);
 const click = (page, label) => act(async () => button(page, label).props.onClick());
+const peersToggle = page => page.root.findByProps({ className: 'tests-toggle' });
+const togglePeers = page => act(async () => peersToggle(page).props.onClick());
 const codes = page => page.root.findAllByType('code').map(node => node.children.join(''));
 
 test('locked tasks do not fetch or render solutions', async t => {
@@ -41,29 +43,34 @@ test('locked tasks do not fetch or render solutions', async t => {
     assert.deepEqual(codes(page), []);
 });
 
-test('loads lazily, puts the official solution first and renders code safely with exact whitespace', async t => {
+test('shows the author immediately and lets the viewer expand or collapse peer solutions', async t => {
     fixture.get = t.mock.fn(async () => ({ data: { ...empty, official_solution: official, results: [peer] } }));
     const page = await mount(t);
-    assert.equal(fixture.get.mock.calls.length, 0);
-    await click(page, 'Посмотреть другие решения');
+    assert.deepEqual(codes(page), [official.code]);
+    assert.equal(peersToggle(page).props['aria-expanded'], false);
+    await togglePeers(page);
     assert.deepEqual(fixture.get.mock.calls[0].arguments, ['/blocks/code-task/solutions/', { params: { offset: 0 } }]);
     assert.deepEqual(codes(page), [official.code, peer.code]);
     assert.deepEqual(page.root.findAllByType('h4').map(node => node.children.join('')), [
         'Решение автора · Author', 'Решение ученика · Ada',
     ]);
     assert.equal(page.root.findAll(node => node.props.dangerouslySetInnerHTML != null).length, 0);
-    assert.equal(button(page, 'Скрыть другие решения').props['aria-expanded'], true);
-    await click(page, 'Скрыть другие решения');
-    assert.deepEqual(codes(page), []);
+    assert.equal(peersToggle(page).props['aria-expanded'], true);
+    await togglePeers(page);
+    assert.deepEqual(codes(page), [official.code]);
+    assert.equal(fixture.get.mock.calls.length, 1);
 });
 
-test('handles an empty list and solutions without an official answer', async t => {
+test('handles an empty list', async t => {
     const page = await mount(t);
-    await click(page, 'Посмотреть другие решения');
     assert.ok(JSON.stringify(page.toJSON()).includes('Других решений пока нет.'));
-    await click(page, 'Скрыть другие решения');
+});
+
+test('peer solutions start collapsed even without an official answer', async t => {
     fixture.get = async () => ({ data: { ...empty, results: [peer] } });
-    await click(page, 'Посмотреть другие решения');
+    const page = await mount(t);
+    assert.deepEqual(codes(page), []);
+    await togglePeers(page);
     assert.deepEqual(codes(page), [peer.code]);
     assert.equal(button(page, 'Показать ещё решения'), undefined);
 });
@@ -71,7 +78,7 @@ test('handles an empty list and solutions without an official answer', async t =
 test('failed pagination keeps loaded code and retries the same page without duplication', async t => {
     fixture.get = t.mock.fn(async () => ({ data: { ...empty, official_solution: official, results: [peer], next_offset: 10 } }));
     const page = await mount(t);
-    await click(page, 'Посмотреть другие решения');
+    await togglePeers(page);
     fixture.get = t.mock.fn(async () => { throw Error('Offline'); });
     await click(page, 'Показать ещё решения');
     assert.deepEqual(codes(page), [official.code, peer.code]);
@@ -88,7 +95,6 @@ test('failed pagination keeps loaded code and retries the same page without dupl
 test('server access denial is shown and can be retried after access is restored', async t => {
     fixture.get = async () => { throw { response: { data: { detail: 'Сначала решите задачу.' } } }; };
     const page = await mount(t);
-    await click(page, 'Посмотреть другие решения');
     assert.ok(JSON.stringify(page.toJSON()).includes('Сначала решите задачу.'));
     assert.deepEqual(codes(page), []);
     fixture.get = async () => ({ data: { ...empty, official_solution: official } });
@@ -96,15 +102,13 @@ test('server access denial is shown and can be retried after access is restored'
     assert.deepEqual(codes(page), [official.code]);
 });
 
-test('late responses after closing cannot replace a newly opened list', async t => {
+test('late responses from another task cannot replace the current list', async t => {
     let finish;
     fixture.get = () => new Promise(resolve => { finish = resolve; });
     const page = await mount(t);
-    await click(page, 'Посмотреть другие решения');
     assert.equal(page.root.findAllByProps({ role: 'status' }).length, 1);
-    await click(page, 'Скрыть другие решения');
     fixture.get = async () => ({ data: empty });
-    await click(page, 'Посмотреть другие решения');
+    await act(async () => page.update(React.createElement(CodeSolutions, { blockId: 'next-task', unlocked: true })));
     await act(async () => finish({ data: { ...empty, official_solution: official } }));
     assert.deepEqual(codes(page), []);
     assert.ok(JSON.stringify(page.toJSON()).includes('Других решений пока нет.'));

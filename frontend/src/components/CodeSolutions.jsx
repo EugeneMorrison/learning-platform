@@ -11,7 +11,9 @@ function Solution({ solution, official = false }) {
     </article>;
 }
 
-function SolutionsList({ blockId, id }) {
+function SolutionsList({ blockId }) {
+    const [peersOpen, setPeersOpen] = useState(false);
+    const peersId = useId();
     const [data, setData] = useState(null);
     const [offset, setOffset] = useState(0);
     const [attempt, setAttempt] = useState(0);
@@ -31,34 +33,38 @@ function SolutionsList({ blockId, id }) {
         return () => { cancelled = true; };
     }, [blockId, offset, attempt]);
 
-    return <section id={id} className="code-solutions__list" aria-label="Другие решения">
+    return <section className="code-solutions" aria-label="Другие решения">
         {data?.official_solution && <Solution solution={data.official_solution} official />}
-        {data?.results.map(solution => <Solution key={solution.id} solution={solution} />)}
-        {loading && <p role="status">Загружаем решения…</p>}
-        {error && <p className="notice notice-danger" role="alert">{error}{' '}
+        {data && (data.results.length > 0 || data.next_offset != null) && (
+            <button type="button" className="tests-toggle" aria-expanded={peersOpen}
+                aria-controls={peersId} onClick={() => setPeersOpen(value => !value)}>
+                <span aria-hidden="true">{peersOpen ? '▼' : '▶'}</span>
+                <span>Решения учеников</span>
+            </button>
+        )}
+        <div id={peersId} hidden={!peersOpen}>
+            {peersOpen && data?.results.map(solution => <Solution key={solution.id} solution={solution} />)}
+            {data?.next_offset != null && <button type="button" className="btn btn-secondary btn-sm"
+                disabled={loading || !!error} onClick={() => {
+                    setLoading(true); setError(''); setOffset(data.next_offset);
+                }}>Показать ещё решения</button>}
+        </div>
+        {loading && (offset === 0 || peersOpen) && <p role="status">Загружаем решения…</p>}
+        {error && (offset === 0 || peersOpen) && <p className="notice notice-danger" role="alert">{error}{' '}
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
                 setLoading(true); setError(''); setAttempt(value => value + 1);
             }}>Повторить</button>
         </p>}
-        {!loading && !error && data && !data.official_solution && data.results.length === 0 &&
+        {!loading && !error && data && !data.official_solution && data.results.length === 0 && data.next_offset == null &&
             <p>Других решений пока нет.</p>}
-        {data?.next_offset != null && <button type="button" className="btn btn-secondary btn-sm"
-            disabled={loading || !!error} onClick={() => {
-                setLoading(true); setError(''); setOffset(data.next_offset);
-            }}>Показать ещё решения</button>}
     </section>;
 }
 
 export default function CodeSolutions({ blockId, unlocked }) {
-    const [open, setOpen] = useState(false);
-    const id = useId();
+    if (unlocked) return <SolutionsList key={blockId} blockId={blockId} />;
     return <div className="code-solutions">
-        <button type="button" className="btn btn-secondary" disabled={!unlocked}
-            title={unlocked ? undefined : 'Сначала решите задачу'}
-            aria-expanded={open && unlocked} aria-controls={open && unlocked ? id : undefined}
-            onClick={() => setOpen(value => !value)}>
-            {open && unlocked ? 'Скрыть другие решения' : 'Посмотреть другие решения'}
+        <button type="button" className="btn btn-secondary" disabled title="Сначала решите задачу">
+            Посмотреть другие решения
         </button>
-        {open && unlocked && <SolutionsList blockId={blockId} id={id} />}
     </div>;
 }
