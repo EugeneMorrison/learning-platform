@@ -1155,7 +1155,7 @@ function CodeFields({ content, setContent }) {
 
             <details style={{ marginBottom: 16 }}>
                 <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Официальное решение (необязательно)</summary>
-                <Field label="Код официального решения" hint="Будет показан в других решениях только после того, как ученик решит задачу.">
+                <Field label="Код официального решения" hint="Ученики увидят этот код после решения задачи. Если оставить поле пустым, они увидят ваше первое принятое решение, когда оно есть.">
                     <CodeField field="solution" value={typeof content.solution === 'string' ? content.solution : ''} setContent={setContent} />
                 </Field>
             </details>

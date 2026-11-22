@@ -49,7 +49,7 @@ test('loads lazily, puts the official solution first and renders code safely wit
     assert.deepEqual(fixture.get.mock.calls[0].arguments, ['/blocks/code-task/solutions/', { params: { offset: 0 } }]);
     assert.deepEqual(codes(page), [official.code, peer.code]);
     assert.deepEqual(page.root.findAllByType('h4').map(node => node.children.join('')), [
-        'Официальное решение · Author', 'Решение ученика · Ada',
+        'Решение автора · Author', 'Решение ученика · Ada',
     ]);
     assert.equal(page.root.findAll(node => node.props.dangerouslySetInnerHTML != null).length, 0);
     assert.equal(button(page, 'Скрыть другие решения').props['aria-expanded'], true);

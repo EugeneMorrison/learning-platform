@@ -30,12 +30,16 @@ class CodeSolutionsView(APIView):
 
         author = block.lesson.course.author
         official = block.content.get('solution')
+        if (not isinstance(official, str) or not official.strip()) and request.user != author:
+            answer = (Progress.objects.filter(block=block, student=author, is_correct=True)
+                      .values_list('answer', flat=True).first())
+            official = answer.get('code') if isinstance(answer, dict) else None
         official_solution = (
             {'code': official, 'author_name': display_name(author)}
             if isinstance(official, str) and official.strip() else None
         )
         # Progress retains the first accepted answer, even after failed practice
-        # attempts. Exclude the viewer and the author's own test submissions.
+        # attempts. The author's solution is displayed separately from peers.
         submissions = (Progress.objects.filter(block=block, is_correct=True, answer__code__isnull=False)
                        .exclude(student__in=[request.user, author])
                        .select_related('student').order_by('-created_at', '-id'))

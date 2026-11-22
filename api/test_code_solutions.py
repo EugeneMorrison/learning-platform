@@ -86,6 +86,21 @@ class CodeSolutionsTests(APITestCase):
                        'private@example.com', 'UNRECORDED PRACTICE', 'ANOTHER ATTEMPT', '# mine'):
             self.assertNotIn(secret, body)
 
+    def test_author_submission_fills_empty_official_solution_after_student_solves(self):
+        self.block.content['solution'] = '  '
+        self.block.save()
+        record_answer(self.author, self.block, {'code': 'wrong'}, False)
+        self.solve()
+        self.assertIsNone(self.get_solutions().data['official_solution'])
+        code = 'print(1)  # author submission\n'
+        record_answer(self.author, self.block, {'code': code}, True)
+        response = self.get_solutions()
+        self.assertEqual(response.data['official_solution'], {'code': code, 'author_name': 'author'})
+        self.assertEqual([row['author_name'] for row in response.data['results']], ['Ada Lovelace'])
+        self.client.force_authenticate(self.peer)
+        Progress.objects.filter(student=self.peer).delete()
+        self.assertEqual(self.get_solutions().status_code, 403)
+
     def test_author_must_also_solve_before_viewing_peer_submissions(self):
         self.client.force_authenticate(self.author)
         self.assertEqual(self.get_solutions().status_code, 403)

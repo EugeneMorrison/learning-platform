@@ -4,7 +4,7 @@ import './CodeSolutions.css';
 
 function Solution({ solution, official = false }) {
     return <article className="code-solutions__entry">
-        <h4>{official ? 'Официальное решение' : 'Решение ученика'} · {solution.author_name}</h4>
+        <h4>{official ? 'Решение автора' : 'Решение ученика'} · {solution.author_name}</h4>
         <pre className="code-solutions__code" tabIndex={0} aria-label={official ? 'Код автора' : `Код: ${solution.author_name}`}>
             <code>{solution.code}</code>
         </pre>
