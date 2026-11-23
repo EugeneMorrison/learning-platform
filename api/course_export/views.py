@@ -1,16 +1,18 @@
+import asyncio
 from asgiref.sync import sync_to_async
-from django.core.handlers.asgi import ASGIRequest
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
+from slugify import slugify
 
-from api.models import Course, CourseExportJob
-from . import jobs
+from api.models import Course, User
+from .access import can_export
+from . import downloads
 
 
 class ExportOptions(serializers.Serializer):
@@ -23,86 +25,85 @@ class ExportOptions(serializers.Serializer):
         return data
 
 
-class PrivateExportView(APIView):
+class ExportAuthorization(APIView):
     permission_classes = [IsAuthenticated]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'course_export'
 
-    def course(self, request, course_id):
-        course = get_object_or_404(Course.objects.only('author_id', 'slug'), pk=course_id)
-        if not jobs.can_export(request.user, course):
-            raise Http404
-        return course
-
-    def job(self, request, course_id, job_id):
-        course = self.course(request, course_id)
-        job = get_object_or_404(CourseExportJob, course=course, pk=job_id, requester=request.user)
-        job.course = course  # Reuse the metadata already read for authorization.
-        return job
-
-    def finalize_response(self, *args, **kwargs):
-        response = super().finalize_response(*args, **kwargs)
-        response['Cache-Control'] = 'private, no-store'
-        return response
-
-
-class CourseExportView(PrivateExportView):
     def post(self, request, course_id):
-        course = self.course(request, course_id)
+        course = get_object_or_404(Course.objects.only('author_id', 'slug'), pk=course_id)
+        if not can_export(request.user, course):
+            raise Http404
         options = ExportOptions(data=request.data)
         options.is_valid(raise_exception=True)
-        job = jobs.enqueue(course, request.user, options.validated_data['format'],
-                           options.validated_data['author_materials'])
-        return Response({'id': job.pk, 'state': job.state}, status=202)
+        return Response(dict(options.validated_data, user_id=request.user.pk, slug=course.slug))
 
 
-class ExportStatusView(PrivateExportView):
-    def get(self, request, course_id, job_id):
-        job = self.job(request, course_id, job_id)
-        if job.state == 'queued' and timezone.now() - job.created_at > jobs.QUEUE_TTL:
-            jobs.transition(job, 'queued', 'failed', jobs.TIME_ERROR)
-            job.refresh_from_db()
-        return Response({'state': job.state, 'error': job.error, 'filename': jobs.filename(job)})
+def reauthorize(user_id, course_id):
+    user = get_object_or_404(User, pk=user_id)
+    course = get_object_or_404(Course.objects.only('author_id'), pk=course_id)
+    if not can_export(user, course):
+        raise Http404
 
 
 class DownloadResponse(FileResponse):
     block_size = 64 * 1024
 
-    def __init__(self, stream, path, request, job):
-        self.artifact_path = path
-        super().__init__(stream, as_attachment=True, filename=jobs.filename(job),
-                         content_type='application/zip' if job.format == 'zip' else 'application/octet-stream')
-        if isinstance(request._request, ASGIRequest):
-            # Django otherwise adapts a synchronous file iterator by loading it all.
-            async def chunks():
-                read = sync_to_async(stream.read, thread_sensitive=False)
-                while chunk := await read(self.block_size):
+    def __init__(self, lease, filename, fmt):
+        super().__init__(lease.file, as_attachment=True, filename=filename,
+                         content_type='application/zip' if fmt == 'zip' else 'application/octet-stream')
+        self.lease = lease
+        self.timer = asyncio.get_running_loop().call_later(downloads.DOWNLOAD_SECONDS, self.close)
+
+        async def chunks():
+            try:
+                while not lease.file.closed:
+                    chunk = lease.file.read(self.block_size)
+                    if not chunk:
+                        break
                     yield chunk
-            self.streaming_content = chunks()
+                    await asyncio.sleep(0)
+            finally:
+                self.close()
+
+        self.streaming_content = chunks()
+        self['Cache-Control'] = 'private, no-store'
         self['X-Content-Type-Options'] = 'nosniff'
         self['X-Accel-Buffering'] = 'no'
 
     def close(self):
+        self.timer.cancel()
         super().close()
-        jobs.remove_file(self.artifact_path)
+        self.lease.close()
 
 
-class ExportDownloadView(PrivateExportView):
-    def post(self, request, course_id, job_id):
-        job = self.job(request, course_id, job_id)
-        if job.state != 'ready' or timezone.now() - job.updated_at >= jobs.READY_TTL:
-            return Response({'detail': 'Файл недоступен. Запустите экспорт ещё раз.'}, status=409)
-        path = jobs.artifact(job)
-        try:
-            stream = path.open('rb')
-        except FileNotFoundError:
-            jobs.transition(job, 'ready', 'failed', jobs.TIME_ERROR)
-            return Response({'detail': 'Файл больше недоступен.'}, status=410)
-        try:
-            if not jobs.transition(job, 'ready', 'downloaded'):
-                stream.close()
-                return Response({'detail': 'Файл уже скачан.'}, status=409)
-            return DownloadResponse(stream, path, request, job)
-        except BaseException:
-            stream.close()
-            raise
+@csrf_exempt
+async def export_course(request, course_id):
+    gate = ExportAuthorization()
+    # DRF owns JWT/session authentication, CSRF, permissions and validation.
+    response = await sync_to_async(gate.dispatch)(request, course_id=course_id)
+    if response.status_code != 200:
+        response['Cache-Control'] = 'private, no-store'
+        return await sync_to_async(response.render)()
+    options = response.data
+    lease = None
+    try:
+        lease = downloads.Lease(options['user_id'])
+        await downloads.generate(lease, course_id, options['user_id'], options['format'], options['author_materials'])
+        await sync_to_async(reauthorize)(options['user_id'], course_id)
+        stem = slugify(options['slug'], max_length=48) or 'course'
+        suffix = '-author' if options['author_materials'] else ''
+        filename = f"{stem}-{course_id}{suffix}.{options['format']}"
+        result = DownloadResponse(lease, filename, options['format'])
+        lease = None  # Response owns the file and lock through completion.
+        return result
+    except Exception as error:
+        if not isinstance(error, (downloads.ExportFailure, Http404, downloads.Throttled)):
+            error = downloads.ExportFailure()
+        response = gate.handle_exception(error)
+        response = gate.finalize_response(gate.request, response)
+        response['Cache-Control'] = 'private, no-store'
+        return await sync_to_async(response.render)()
+    finally:
+        if lease is not None:
+            lease.close()

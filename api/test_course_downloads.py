@@ -1,37 +1,31 @@
+import asyncio
 import json
 import os
 import sqlite3
 import subprocess
 import sys
-from contextlib import closing
-from datetime import timedelta
-from email import policy
-from email.parser import BytesParser
 from io import BytesIO
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 from unittest.mock import patch
 from zipfile import ZipFile
-
-from asgiref.sync import async_to_sync
+from email import policy
+from email.parser import BytesParser
+from asgiref.sync import async_to_sync, sync_to_async
 from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.db import connection
-from django.test import AsyncRequestFactory, TestCase, TransactionTestCase, override_settings
-from django.utils import timezone
-from rest_framework.test import APIClient, force_authenticate
-
-from api.course_export import jobs
-from api.course_export.assets import Assets, ExportTooLarge
-from api.course_export.views import ExportDownloadView
-from api.management.commands import course_export_worker as worker
-from api.models import Block, Course, CourseExportJob, Enrollment, Lesson, Progress, User
+from django.test import AsyncRequestFactory, TransactionTestCase, override_settings
+from rest_framework.test import force_authenticate
+from api.models import Block, Course, Enrollment, Lesson, Progress, User
+from api.course_export import downloads
+from api.course_export.build import build
+from api.course_export.views import export_course
 
 
-class DashboardExportTests(TestCase):
+class DashboardExportTests(TransactionTestCase):
     @classmethod
-    def setUpTestData(cls):
+    def create_fixtures(cls):
         cls.owner = User.objects.create(username='author', role='AUTHOR')
         cls.student = User.objects.create(username='private-student')
         cls.other = User.objects.create(username='other', role='AUTHOR')
@@ -47,240 +41,276 @@ class DashboardExportTests(TestCase):
             'html': '<p>Paid theory</p><img src="/media/picture.png">'})
         Progress.objects.create(student=cls.student, lesson=locked, block=code, answer={'code': 'STUDENT_WORK'})
 
+
     def setUp(self):
-        temp = self.enterContext(TemporaryDirectory())
-        self.root = Path(temp) / 'private'
-        media = Path(temp) / 'media'
-        media.mkdir()
-        (media / 'picture.png').write_bytes(b'image-content')
-        self.enterContext(override_settings(COURSE_EXPORT_ROOT=self.root, MEDIA_ROOT=media,
-                                            COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE=False))
-        self.client = APIClient()
-        self.client.force_authenticate(self.owner)
+        self.create_fixtures()
+        self.temp = self.enterContext(TemporaryDirectory())
+        self.root = Path(self.temp)
+        self.media = self.root / 'media'
+        self.media.mkdir()
+        (self.media / 'picture.png').write_bytes(b'image-content')
+        self.enterContext(override_settings(DB_DIR=self.root, COURSE_EXPORT_ROOT=self.root / 'private',
+                                           MEDIA_ROOT=self.media))
+        from django.core.cache import cache
+        cache.clear()
         self.base = f'/api/courses/{self.course.pk}/exports/'
 
-    def start(self, fmt='zip', private=False):
-        response = self.client.post(self.base, {'format': fmt, 'author_materials': private}, format='json')
-        self.assertEqual(response.status_code, 202, response.data)
-        return CourseExportJob.objects.get(pk=response.data['id'])
+    async def request(self, fmt='zip', private=False, user='owner'):
+        request = AsyncRequestFactory().post(self.base,
+            json.dumps({'format': fmt, 'author_materials': private}), content_type='application/json')
+        if user is not None:
+            force_authenticate(request, self.owner if user == 'owner' else user)
+        return await export_course(request, course_id=self.course.pk)
 
-    def run_job(self):
-        def child(job):
-            jobs.build(job, self.root / (job.id.hex + '.work'))
-            return 0
-        with patch.object(worker, 'run_child', side_effect=child):
-            self.assertTrue(worker.process_one())
+    async def generate(self, lease, course_id, user_id, fmt, private):
+        await sync_to_async(build)(course_id, user_id, fmt, private, lease.file)
+        lease.file.seek(0)
 
-    def download(self, job):
-        url = self.base + str(job.pk) + '/'
-        self.assertEqual(self.client.get(url).data['state'], 'ready')
-        response = self.client.post(url + 'download/')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('paid-course-', response['Content-Disposition'])
-        self.assertIn('no-store', response['Cache-Control'])
-        data = b''.join(response.streaming_content)
-        response.close()
-        self.assertFalse(jobs.artifact(job).exists())
-        self.assertEqual(self.client.post(url + 'download/').status_code, 409)
-        return data
+    def download(self, fmt='zip', private=False, user='owner'):
+        async def run():
+            with patch.object(downloads, 'generate', side_effect=self.generate):
+                response = await self.request(fmt, private, user)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('paid-course-', response['Content-Disposition'])
+                self.assertEqual(response['Cache-Control'], 'private, no-store')
+                data = b''.join([chunk async for chunk in response.streaming_content])
+                self.assertTrue(response.lease.file.closed)
+                self.assertTrue(response.lease.lock.closed)
+                response.close()
+                return data
+        return async_to_sync(run)()
 
-    def test_zip_contains_full_paid_course_and_explicit_author_materials_only(self):
-        for private in [False, True]:
-            job = self.start(private=private)
-            self.run_job()
-            with ZipFile(BytesIO(self.download(job))) as z:
-                manifest = json.loads(z.read('course.json'))
+    def test_zip_complete_paid_content_and_author_protection(self):
+        for private in (False, True):
+            with ZipFile(BytesIO(self.download(private=private))) as archive:
+                self.assertIsNone(archive.testzip())
+                manifest = json.loads(archive.read('course.json'))
                 self.assertEqual(manifest['audience'], 'author' if private else 'learner')
-                lessons = [json.loads(z.read(p)) for p in manifest['lessons']]
-                self.assertEqual([l['title'] for l in lessons], ['Preview', 'Paid lesson'])
-                paths = [PurePosixPath(manifest['lessons'][1]).parent / step for step in lessons[1]['steps']]
-                self.assertEqual([p.name for p in paths], ['01_code.step', '02_text.step'])
-                self.assertEqual(z.read(manifest['assets']['/media/picture.png']), b'image-content')
-                content = json.loads(z.read(str(paths[0])))['content']
-                self.assertEqual(content['prompt'], 'Paid exercise')
-                self.assertEqual('OFFICIAL' in str(content), private)
-                self.assertEqual('secret input' in str(content), private)
-                self.assertNotIn('STUDENT_WORK', b''.join(z.read(p) for p in z.namelist()).decode())
+                lessons = [json.loads(archive.read(name)) for name in manifest['lessons']]
+                self.assertEqual([lesson['title'] for lesson in lessons], ['Preview', 'Paid lesson'])
+                names = [name for name in archive.namelist() if name.endswith('.step')]
+                self.assertTrue(names[0].endswith('01_code.step'))
+                content = b''.join(archive.read(name) for name in names).decode()
+                self.assertIn('Paid exercise', content)
+                self.assertEqual('OFFICIAL' in content, private)
+                self.assertEqual('secret input' in content, private)
+                self.assertNotIn('STUDENT_WORK', content)
+                self.assertEqual(archive.read(manifest['assets']['/media/picture.png']), b'image-content')
 
-    def test_paid_mhtml_offline_body_and_asset(self):
-        job = self.start('mhtml')
-        self.run_job()
-        _, document, image = BytesParser(policy=policy.default).parsebytes(self.download(job)).iter_parts()
+    def test_mhtml_paid_content_and_assets(self):
+        message = BytesParser(policy=policy.default).parsebytes(self.download('mhtml'))
+        _, document, image = message.iter_parts()
         self.assertEqual(image.get_payload(decode=True), b'image-content')
-        body = document.get_content()
-        for label in ['Preview', 'Paid lesson', 'Paid exercise', 'Paid theory']:
-            self.assertIn(label, body)
-        for secret in ['OFFICIAL', 'secret input', 'STUDENT_WORK', 'private-student']:
-            self.assertNotIn(secret, body)
+        for value in ('Paid exercise', 'Paid theory', 'Preview', 'Paid lesson'):
+            self.assertIn(value, document.get_content())
+        for value in ('OFFICIAL', 'secret input', 'STUDENT_WORK', 'private-student'):
+            self.assertNotIn(value, document.get_content())
 
-    def test_permissions_checked_at_all_endpoints_including_after_transfer(self):
-        job = self.start(private=True)
-        self.run_job()
-        url = self.base + str(job.pk) + '/'
-        staff = User.objects.create(username='staff', is_staff=True, role='ADMIN')
-        for user in [None, self.student, self.other, staff]:
-            self.client.force_authenticate(user=user)
-            expected = 404 if user else 401
-            self.assertEqual(self.client.post(self.base, {'format': 'zip'}).status_code, expected)
-            self.assertEqual(self.client.get(url).status_code, expected)
-            self.assertEqual(self.client.post(url + 'download/').status_code, expected)
-        self.client.force_authenticate(self.admin)
-        self.assertEqual(self.client.get(url).status_code, 404)  # Private even between authorized operators.
-        self.assertTrue(self.client.get(self.base.removesuffix('exports/')).data['can_export'])
-        admin_job = self.start()
-        self.run_job()
-        self.download(admin_job)
-        Course.objects.filter(pk=self.course.pk).update(author=self.other)
-        self.client.force_authenticate(self.owner)
-        self.assertEqual(self.client.post(url + 'download/').status_code, 404)
+    def test_permissions_and_validation(self):
+        staff = User.objects.create(username='staff', is_staff=True)
+        for user in (None, self.student, self.other, staff):
+            response = async_to_sync(self.request)(user=user)
+            self.assertEqual(response.status_code, 401 if user is None else 404)
+        for fmt, private in (('../bad', False), ('mhtml', True)):
+            self.assertEqual(async_to_sync(self.request)(fmt, private).status_code, 400)
+        self.download(user=self.admin, private=True)
+        staff.user_permissions.add(Permission.objects.get(content_type__app_label='api', codename='export_any_course'))
+        self.download(user=User.objects.get(pk=staff.pk), private=True)
 
-    def test_pending_deduplication_and_rate_limits(self):
-        job = self.start()
-        self.assertEqual(self.start().pk, job.pk)
-        self.assertEqual(self.client.post(self.base, {'format': 'mhtml'}).status_code, 429)
-        for _ in range(3):
-            CourseExportJob.objects.filter(state='queued').update(state='failed')
-            self.start()
-        CourseExportJob.objects.filter(state='queued').update(state='failed')
-        self.assertEqual(self.client.post(self.base, {'format': 'zip'}).status_code, 429)
-        self.assertEqual(CourseExportJob.objects.count(), 4)
+    def test_revocation_before_download(self):
+        async def revoke(*args):
+            await self.generate(*args)
+            await sync_to_async(Course.objects.filter(pk=self.course.pk).update)(author=self.other)
+        with patch.object(downloads, 'generate', side_effect=revoke):
+            self.assertEqual(async_to_sync(self.request)().status_code, 404)
+        self.assertEqual(list((self.root / 'private').iterdir()), [])
 
-    def test_delegated_staff_permission_is_required_again_at_download(self):
-        operator = User.objects.create(username='export-admin', is_staff=True)
-        permission = Permission.objects.get(content_type__app_label='api', codename='export_any_course')
-        operator.user_permissions.add(permission)
-        self.client.force_authenticate(operator)
-        job = self.start(private=True)
-        self.run_job()
-        self.assertEqual(CourseExportJob.objects.get(pk=job.pk).state, 'ready')
-        operator.user_permissions.remove(permission)
-        self.client.force_authenticate(User.objects.get(pk=operator.pk))  # A fresh JWT-authenticated request.
-        self.assertEqual(self.client.post(self.base + str(job.pk) + '/download/').status_code, 404)
+    def test_single_slot_includes_download_and_cleanup(self):
+        async def run():
+            with patch.object(downloads, 'generate', side_effect=self.generate):
+                first = await self.request()
+                self.assertEqual((await self.request()).status_code, 429)
+                iterator = first.streaming_content
+                self.assertLessEqual(len(await anext(iterator)), 65536)
+                await iterator.aclose()
+                first.close()  # Django's ASGI handler closes the response on disconnect.
+                self.assertTrue(first.lease.file.closed)
+                second = await self.request()
+                self.assertEqual(second.status_code, 200)
+                second.close()
+        async_to_sync(run)()
 
-    def test_queue_capacity_and_single_worker_slot(self):
-        CourseExportJob.objects.bulk_create([
-            CourseExportJob(course=self.course, requester=self.other, format='zip', state='ready')
-            for _ in range(12)
-        ])
-        self.assertEqual(self.client.post(self.base, {'format': 'mhtml'}).status_code, 429)
-        CourseExportJob.objects.all().delete()
-        CourseExportJob.objects.create(course=self.course, requester=self.other, format='zip', state='running')
-        pending = self.start()
-        with patch.object(worker, 'run_child') as child:
-            self.assertFalse(worker.process_one())
-            child.assert_not_called()
-        pending.refresh_from_db()
-        self.assertEqual(pending.state, 'queued')
+    def test_rate_limit_survives_separate_requests(self):
+        for _ in range(4):
+            self.download()
+        self.assertEqual(async_to_sync(self.request)().status_code, 429)
 
-    def test_rejects_invalid_options_and_public_storage(self):
+    def test_generation_failure_and_disconnect_cleanup(self):
+        async def fail(lease, *args):
+            lease.file.write(b'partial')
+            raise downloads.ExportFailure()
+        with patch.object(downloads, 'generate', side_effect=fail):
+            self.assertEqual(async_to_sync(self.request)().status_code, 503)
+        async def cancel(lease, *args):
+            lease.file.write(b'partial')
+            raise asyncio.CancelledError()
+        with patch.object(downloads, 'generate', side_effect=cancel):
+            with self.assertRaises(asyncio.CancelledError):
+                async_to_sync(self.request)()
+        self.download()
+        self.assertEqual(list((self.root / 'private').iterdir()), [])
+
+    def test_download_deadline_closes_unconsumed_response(self):
+        async def run():
+            with patch.object(downloads, 'generate', side_effect=self.generate), patch.object(downloads, 'DOWNLOAD_SECONDS', .01):
+                response = await self.request()
+                await asyncio.sleep(.03)
+                self.assertTrue(response.lease.file.closed)
+                self.assertTrue(response.lease.lock.closed)
+        async_to_sync(run)()
+
+    def test_disk_and_public_storage_guards(self):
+        from types import SimpleNamespace
         from django.core.exceptions import ImproperlyConfigured
-        for options in [{'format': '../course'}, {'format': 'mhtml', 'author_materials': True}]:
-            self.assertEqual(self.client.post(self.base, options, format='json').status_code, 400)
-        with override_settings(COURSE_EXPORT_ROOT=self.root.parent / 'media' / 'exports'):
+        with patch.object(downloads.shutil, 'disk_usage', return_value=SimpleNamespace(free=1)):
+            self.assertEqual(async_to_sync(self.request)().status_code, 503)
+        with override_settings(COURSE_EXPORT_ROOT=self.media / 'exports'):
             with self.assertRaises(ImproperlyConfigured):
-                jobs.private_root()
+                downloads.check_capacity()
 
-    def test_failed_or_timed_out_child_removes_partial_files(self):
-        for code in [1, 3, 'timeout']:
-            job = self.start()
-            def fail(current):
-                (self.root / (current.id.hex + '.work') / 'download').write_bytes(b'partial')
-                if code == 'timeout':
-                    raise subprocess.TimeoutExpired('child', 180)
-                return code
-            with self.assertLogs(worker.log, level='ERROR'), patch.object(worker, 'run_child', side_effect=fail):
-                self.assertTrue(worker.process_one())
-            job.refresh_from_db()
-            self.assertEqual(job.state, 'failed')
-            self.assertNotIn('partial', job.error)
-            self.assertEqual(list(self.root.iterdir()), [])
+    def test_asgi_disconnect_cleans_generation_and_active_download(self):
+        from django.core.asgi import get_asgi_application
+        from rest_framework_simplejwt.tokens import AccessToken
+        token = str(AccessToken.for_user(self.owner))
 
-    def test_expiry_and_orphan_cleanup(self):
-        job = self.start()
-        self.run_job()
-        CourseExportJob.objects.update(updated_at=timezone.now() - timedelta(hours=1))
-        self.assertEqual(self.client.post(self.base + str(job.pk) + '/download/').status_code, 409)
-        jobs.sweep()
-        self.assertFalse(jobs.artifact(job).exists())
-        self.assertEqual(CourseExportJob.objects.get().state, 'failed')
-        job = self.start()
-        working = self.root / (job.id.hex + '.work')
-        working.mkdir()
-        job.delete()
-        jobs.sweep()
-        self.assertFalse(working.exists())
+        async def run(during_generation):
+            received = asyncio.Queue()
+            reached = asyncio.Event()
+            leases = []
 
-    def test_asgi_streams_chunks_and_closes_after_interrupted_download(self):
-        job = self.start()
-        jobs.artifact(job).write_bytes(b'x' * 200000)
-        CourseExportJob.objects.update(state='ready')
-        request = AsyncRequestFactory().post(self.base)
-        force_authenticate(request, self.owner)
-        response = ExportDownloadView.as_view()(request, course_id=self.course.pk, job_id=job.pk)
-        self.assertTrue(response.is_async)
+            async def generate(lease, *args):
+                leases.append(lease)
+                if during_generation:
+                    reached.set()
+                    await asyncio.Future()
+                lease.file.write(b'x' * 200000)
+                lease.file.seek(0)
 
-        async def first_chunk():
-            return await anext(aiter(response))
-        self.assertEqual(len(async_to_sync(first_chunk)()), 65536)
-        response.close()
-        self.assertFalse(jobs.artifact(job).exists())
+            async def send(message):
+                if message['type'] == 'http.response.body':
+                    reached.set()
+                    if not leases:
+                        raise AssertionError(message.get('body', b'')[:500])
+                    await asyncio.Future()  # Simulate backpressure from a slow browser.
 
-    def test_oversized_assets_fail_without_producing_an_incomplete_archive(self):
-        with self.assertRaises(ExportTooLarge):
-            Assets(self.fail, byte_limit=2).resolve('/media/picture.png', 'test')
+            scope = {'type': 'http', 'asgi': {'version': '3.0'}, 'http_version': '1.1',
+                'method': 'POST', 'scheme': 'http', 'path': self.base, 'query_string': b'',
+                'headers': [(b'host', b'testserver'), (b'content-type', b'application/json'), (b'content-length', b'16'),
+                            (b'authorization', ('Bearer ' + token).encode())],
+                'server': ('testserver', 80), 'client': ('127.0.0.1', 1234)}
+            await received.put({'type': 'http.request', 'body': b'{"format":"zip"}', 'more_body': False})
+            with patch.object(downloads, 'generate', side_effect=generate):
+                task = asyncio.create_task(get_asgi_application()(scope, received.get, send))
+                try:
+                    await asyncio.wait_for(reached.wait(), 10)
+                    await received.put({'type': 'http.disconnect'})
+                    await asyncio.wait_for(task, 10)
+                finally:
+                    if not task.done():
+                        task.cancel()
+                        await asyncio.gather(task, return_exceptions=True)
+            self.assertEqual(len(leases), 1)
+            self.assertTrue(leases[0].file.closed)
+            self.assertTrue(leases[0].lock.closed)
 
-    def test_production_storage_refuses_missing_and_same_device_spools(self):
-        with override_settings(COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE=True, DB_DIR=self.root.parent):
-            for exists in (False, True):
-                if exists:
-                    self.root.mkdir()
-                with self.assertLogs(jobs.log, level='ERROR'):
-                    self.assertEqual(self.client.post(self.base, {'format': 'zip'}).status_code, 503)
-                self.assertEqual(self.root.exists(), exists)
-            self.assertFalse(CourseExportJob.objects.exists())
+        for during_generation in (True, False):
+            async_to_sync(run)(during_generation)
 
-    def test_low_disk_blocks_admission_and_build_but_allows_cleanup(self):
-        enough = SimpleNamespace(free=2 * jobs.DB_RESERVE)
-        low = SimpleNamespace(free=1)
-        job = self.start()
-        for usage in ([low], [enough, low]):
-            with patch.object(jobs.shutil, 'disk_usage', side_effect=usage):
-                self.assertEqual(self.client.post(self.base, {'format': 'zip'}).status_code, 503)
-        with patch.object(jobs.shutil, 'disk_usage', return_value=low), patch.object(worker, 'run_child') as child:
-            with self.assertLogs(worker.log, level='ERROR'):
-                self.assertTrue(worker.process_one())
-            child.assert_not_called()
-            job.refresh_from_db()
-            self.assertEqual(job.state, 'failed')
-            jobs.artifact(job).write_bytes(b'orphan')
-            jobs.sweep()
-            self.assertFalse(jobs.artifact(job).exists())
+    def test_oversized_archive_and_inactive_owner_are_denied(self):
+        from api.course_export.assets import ExportTooLarge
+        with patch('api.course_export.build.MAX_DOWNLOAD', 10):
+            with BytesIO() as stream, self.assertRaises(ExportTooLarge):
+                build(self.course.pk, self.owner.pk, 'zip', False, stream)
+        User.objects.filter(pk=self.owner.pk).update(is_active=False)
+        inactive = User.objects.get(pk=self.owner.pk)
+        self.assertEqual(async_to_sync(self.request)(user=inactive).status_code, 404)
 
-    def test_cumulative_folder_limit_cleans_staging_before_zip(self):
-        job = self.start()
-        with patch.object(jobs, 'MAX_DOWNLOAD', 100), self.assertLogs(worker.log, level='ERROR'):
-            self.run_job()
-        job.refresh_from_db()
-        self.assertEqual(job.error, jobs.SIZE_ERROR)
-        self.assertEqual(list(self.root.iterdir()), [])
+    def test_actual_child_and_output_integrity(self):
+        copy_path = self.root / 'db.sqlite3'
+        with sqlite3.connect(copy_path) as copied:
+            connection.connection.backup(copied)
+        copied.close()
+        for fmt in ('zip', 'mhtml'):
+            with TemporaryDirectory() as temp, open(Path(temp) / 'download', 'w+b') as target:
+                result = subprocess.run(
+                    [sys.executable, '-m', 'api.course_export.child', str(self.course.pk),
+                     str(self.owner.pk), fmt, '0'],
+                    cwd=settings.BASE_DIR, env={**os.environ, 'DB_DIR': str(self.root)},
+                    stdout=target, stderr=subprocess.PIPE, timeout=90)
+                self.assertEqual(result.returncode, 0, result.stderr.decode())
+                target.seek(0)
+                if fmt == 'zip':
+                    with ZipFile(target) as archive:
+                        self.assertIsNone(archive.testzip())
+                else:
+                    self.assertEqual(BytesParser(policy=policy.default).parse(target).get_content_type(), 'multipart/related')
 
+    def test_generation_deadline_and_cancellation_reap_child(self):
+        original = subprocess.Popen
+        children = []
 
-class ExportSubprocessTests(TransactionTestCase):
-    def test_worker_builds_against_an_isolated_database_in_a_real_child(self):
-        owner = User.objects.create(username='writer', role='AUTHOR')
-        course = Course.objects.create(author=owner, title='Worker smoke test')
-        with TemporaryDirectory() as temp, closing(sqlite3.connect(str(Path(temp) / 'db.sqlite3'))) as copy:
-            root = Path(temp) / 'spool'
-            with override_settings(COURSE_EXPORT_ROOT=root, COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE=False):
-                job = jobs.enqueue(course, owner, 'zip', False)
-            connection.connection.backup(copy)
-            subprocess.run(
-                [sys.executable, str(settings.BASE_DIR / 'manage.py'), 'course_export_worker', '--once'],
-                env={**os.environ, 'DB_DIR': temp, 'COURSE_EXPORT_ROOT': str(root),
-                     'COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE': '0'},
-                timeout=60, check=True,
-            )
-            self.assertEqual(copy.execute('SELECT state FROM api_courseexportjob WHERE id=?',
-                                          (job.id.hex,)).fetchone(), ('ready',))
-            with ZipFile(root / job.id.hex) as archive:
-                self.assertEqual(json.loads(archive.read('course.json'))['id'], str(course.pk))
+        def sleeping_child(*args, **kwargs):
+            child = original([sys.executable, '-c', 'import time; time.sleep(30)'], **kwargs)
+            children.append(child)
+            return child
+
+        async def run():
+            with patch.object(downloads.subprocess, 'Popen', side_effect=sleeping_child):
+                with patch.object(downloads, 'GENERATION_SECONDS', .01):
+                    response = await self.request()
+                    self.assertEqual(response.status_code, 503)
+                task = asyncio.create_task(self.request())
+                while len(children) < 2:
+                    await asyncio.sleep(.01)
+                task.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await task
+            self.assertTrue(all(child.poll() is not None for child in children))
+            self.assertEqual(list((self.root / 'private').iterdir()), [])
+        async_to_sync(run)()
+
+    def test_another_process_cannot_acquire_active_slot(self):
+        with override_settings(DB_DIR=self.root):
+            lease = downloads.Lease(self.owner.pk)
+            try:
+                code = ('import os; os.environ["DJANGO_SETTINGS_MODULE"]="backend.settings"; '
+                        'from api.course_export.downloads import Lease; Lease(999)')
+                child = subprocess.run([sys.executable, '-c', code], cwd=settings.BASE_DIR,
+                    env={**os.environ, 'DB_DIR': str(self.root), 'COURSE_EXPORT_ROOT': str(self.root / 'private')},
+                    capture_output=True, timeout=30)
+                self.assertNotEqual(child.returncode, 0)
+                self.assertIn(b'Throttled', child.stderr)
+            finally:
+                lease.close()
+
+    def test_queue_retirement_preserves_course_and_permission_grants(self):
+        from django.db.migrations.executor import MigrationExecutor
+        executor = MigrationExecutor(connection)
+        executor.migrate([('api', '0025_course_export_job')])
+        try:
+            apps = executor.loader.project_state([('api', '0025_course_export_job')]).apps
+            content_type, _ = apps.get_model('contenttypes', 'ContentType').objects.get_or_create(
+                app_label='api', model='courseexportjob')
+            permission = Permission.objects.get(codename='export_any_course', content_type__app_label='api')
+            permission.content_type_id = content_type.pk
+            permission.save()
+            self.admin.user_permissions.add(permission)
+            executor = MigrationExecutor(connection)
+            executor.migrate([('api', '0026_retire_course_export_queue')])
+            permission.refresh_from_db()
+            self.assertEqual(permission.content_type.model, 'course')
+            self.assertTrue(self.admin.user_permissions.filter(pk=permission.pk).exists())
+            self.assertTrue(Course.objects.filter(pk=self.course.pk).exists())
+            self.assertNotIn('api_courseexportjob', connection.introspection.table_names())
+        finally:
+            MigrationExecutor(connection).migrate([('api', '0026_retire_course_export_queue')])

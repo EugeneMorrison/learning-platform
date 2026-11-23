@@ -240,14 +240,14 @@ scripts/restore.sh auto_2026-10-27_000003Z
 
 It shows the backup's `info.txt` and asks you to type the folder name. Then it:
 
-1. records the running services in a persistent marker on the DB volume, stops the worker and web,
+1. records the running services in a persistent marker on the DB volume, stops web,
    takes an exclusive lock and checks for other containers using the DB. Visitors see a 502 during recovery.
 2. saves the current DB and media to `/root/backups/pre-restore_<time>/`;
 3. replaces the database (and removes any leftover `-journal`/`-wal` file),
    empties the media volume and unpacks the backup's media;
-4. applies migrations offline, deletes transient export job records and checks SQLite integrity before
-   releasing the fence. It starts web, waits for a healthy API response, then resumes the worker if it was running.
-   Its next sweep removes orphaned export files. Authors can request fresh downloads.
+4. applies migrations offline and checks SQLite integrity before
+   releasing the fence. It starts web and waits for a healthy API response.
+   Authors can request fresh downloads after the site is healthy.
 
 **Undo a restore:** restore the safety copy the same way:
 
@@ -258,9 +258,8 @@ scripts/restore.sh pre-restore_2026-10-27_101500Z
 If an initial restore fails before replacement, the script resumes previously running services.
 A failure during replacement or offline validation leaves the persistent marker in place across reboots.
 Rerun the script with a verified backup or the printed safety snapshot. An interrupted restore keeps its
-marker on subsequent failed attempts. Both application containers check it while holding a shared lock.
-After successful offline verification, a web readiness failure leaves the worker stopped. Inspect web
-logs, verify `/api/status/`, then start the worker. `pre-restore_*` folders are never
+marker on subsequent failed attempts. The web container checks it while holding a shared lock.
+After successful offline verification, inspect web logs and verify `/api/status/` if readiness fails. `pre-restore_*` folders are never
 deleted automatically; remove them by hand once you are happy:
 
 ```bash
@@ -294,7 +293,7 @@ scripts/restore.sh /root/restore-from-laptop/auto_2026-10-27_000003Z
 
 ### On a new server
 
-Prepare and verify the dedicated export filesystem before starting Compose. [VPS release checklist](COURSE_EXPORT.md#vps-release-checklist)
+Verify RAM headroom and free space for the bounded temporary export file before starting Compose. [VPS deployment checklist](COURSE_EXPORT.md#vps-deployment-checklist)
 
 Set the server up as usual (clone the repository to `/root/learning-platform`,
 put `.env` back from your password manager, put the certificates into

@@ -19,19 +19,10 @@ def write_json(path, value):
         stream.write('\n')
 
 
-def write_folder(target, course, warn, progress, *, asset_limit=None, folder_limit=None):
-    target.mkdir(mode=0o700)
+def course_files(course, warn, progress, asset_limit=None):
+    from pathlib import PurePosixPath
+    target = PurePosixPath(".")
     assets = Assets(warn, asset_limit)
-    remaining = folder_limit
-
-    def save_json(path, data):
-        nonlocal remaining
-        write_json(path, data)
-        if remaining is not None:
-            remaining -= path.stat().st_size
-            if remaining < 0:
-                raise ExportTooLarge()
-
     manifest = {key: value for key, value in course.items() if key != 'lessons'}
     manifest.update(format='uchebus-course', schema_version=1, lessons=[])
     if course['cover']:
@@ -40,7 +31,6 @@ def write_folder(target, course, warn, progress, *, asset_limit=None, folder_lim
     for number, lesson in enumerate(course['lessons'], 1):
         name = slugify(lesson['title'], max_length=48) or 'lesson'
         directory = target / 'lessons' / f'{number:0{lesson_width}d}-{name}'
-        directory.mkdir(parents=True)
         progress(f"Lesson {number}: {lesson['title']} ({len(lesson['steps'])} steps)")
         manifest['lessons'].append((directory / 'lesson.json').relative_to(target).as_posix())
         metadata = {key: value for key, value in lesson.items() if key != 'steps'}
@@ -56,20 +46,45 @@ def write_folder(target, course, warn, progress, *, asset_limit=None, folder_lim
                                     lambda value: assets.html(value, where, offline=False))
                 except (TypeError, KeyError, AttributeError):
                     warn(f'{where}: unrecognized rich-text configuration')
-            save_json(directory / filename, step)
-        save_json(directory / 'lesson.json', metadata)
+            yield (directory / filename).as_posix(), step
+        yield (directory / "lesson.json").as_posix(), metadata
     manifest['assets'] = assets.references
     manifest['asset_types'] = {}
     for relative, (mime, data) in assets.files.items():
         manifest['asset_types'][relative] = mime
-        path = target / relative
+        yield relative, data
+    yield "course.json", manifest
+
+
+def write_folder(target, course, warn, progress, *, asset_limit=None, folder_limit=None):
+    target.mkdir(mode=0o700)
+    remaining = folder_limit
+    for name, data in course_files(course, warn, progress, asset_limit):
+        path = target / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            write_json(path, data)
         if remaining is not None:
-            remaining -= len(data)
+            remaining -= path.stat().st_size
             if remaining < 0:
                 raise ExportTooLarge()
-        path.parent.mkdir(exist_ok=True)
-        path.write_bytes(data)
-    save_json(target / 'course.json', manifest)
+
+
+def write_zip(stream, course, warn, progress, *, asset_limit=None, folder_limit=None):
+    from zipfile import ZipFile, ZIP_DEFLATED
+    remaining = folder_limit
+    with ZipFile(stream, "w", compression=ZIP_DEFLATED, compresslevel=3) as archive:
+        for name, data in course_files(course, warn, progress, asset_limit):
+            if not isinstance(data, bytes):
+                data = (json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False,
+                                   cls=DjangoJSONEncoder) + "\n").encode("utf-8")
+            if remaining is not None:
+                remaining -= len(data)
+                if remaining < 0:
+                    raise ExportTooLarge()
+            archive.writestr(name, data)
 
 
 LABELS = {'TEXT': 'Теория', 'QUIZ': 'Тест', 'CODE': 'Задача с кодом', 'FILL': 'Пропуски',
@@ -124,7 +139,8 @@ def write_mhtml(target, course, warn, progress, *, asset_limit=None):
         part.set_content(data, maintype=main, subtype=sub, cte='base64')
         part['Content-Location'] = ARCHIVE_BASE + relative
         archive.attach(part)
-    with target.open('xb') as stream:
+    from contextlib import nullcontext
+    with (target.open('xb') if hasattr(target, 'open') else nullcontext(target)) as stream:
         # Keep ASCII Content-Location URLs literal. Email-style encoded words
         # in a long URL are decoded by mail parsers but not all MHTML readers.
         BytesGenerator(stream, policy=policy.SMTP.clone(max_line_length=998)).flatten(archive)

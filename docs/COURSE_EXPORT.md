@@ -1,83 +1,110 @@
 # Export a course
 
-## Download from the author dashboard
+Authors open **Экспорт курса** on their course page and choose **Скачать MHTML** or **Скачать STEP (ZIP)**. The page shows generation status followed by download progress. The checkbox includes official solutions and hidden tests in STEP only. Both downloads contain the full course, including paid lessons. Student submissions, enrollment, progress and messages are excluded.
 
-Open a course from **Мои курсы** and find **Экспорт курса**. **Скачать MHTML** saves an offline reading copy. **Скачать STEP (ZIP)** saves the native folder with `course.json` at the archive root. Both formats include preview and paid lessons, in course order. To include official solutions, hidden tests and answer keys, select the author-materials checkbox before downloading STEP. Both formats exclude submissions, enrollments and progress.
+The authenticated endpoint is `POST /api/courses/<uuid>/exports/` with `{"format":"zip","author_materials":false}` or `{"format":"mhtml"}`. It returns the completed file. Active owners with AUTHOR/ADMIN roles, explicitly permitted staff (`api.export_any_course`), and superusers may export. Authorization is checked before admission, inside the child, and before delivery.
 
-The page shows queue, generation and transfer status. A second request for the same course and options resumes an outstanding job. Downloads are single-use. An unopened file expires after 15 minutes. A failed or interrupted download can be generated again.
+An OS file lock on `DB_DIR/.course-export.lock` admits one export across processes and containers sharing the VPS database volume, including the active download. Four requests per user per ten minutes are recorded in this small private lock file. It must remain on a local filesystem supporting locks. A busy server returns 429 with Retry-After.
 
-### Worker setup
+Each request starts a short-lived child and creates one private `TemporaryFile`. Linux unlinks the file at creation. Closing the final descriptor releases its disk space, including after crashes. The child inherits the slot lock so a web crash cannot admit a second build before the child exits. ZIP entries use the same serialization as the structured folder command, with no intermediate folder.
 
-For local development, run `python manage.py migrate` and start `python manage.py course_export_worker` alongside the web server. Docker Compose defines the same worker in the `export-worker` service. It uses the web image, shared SQLite database, read-only media, and a private shared volume. No message broker or new Python package is required. Both processes must use the same private `COURSE_EXPORT_ROOT` (local default `.course-downloads/`). Restrict the directory to their service account. The worker sweeps interrupted builds, expired files and deleted-course artifacts.
+Limits are 90 seconds wall time, 75 seconds CPU time, 512 MiB address space on Linux, 96 MiB final output, 32 MiB unique assets, 8 MiB source content, 1,000 lessons and 5,000 steps. The largest measured production course had an individual 21.84-second ZIP run. The generation deadline includes startup overhead. Downloads have a five-minute absolute deadline. Nginx allows 120 seconds between upstream reads and 60 seconds of client write inactivity. Browser requests allow 400 seconds overall. A timeout or disconnect closes the response and releases its file and slot. An interrupted transfer must be requested again.
 
-The JWT-authenticated API accepts `POST /api/courses/<course-uuid>/exports/` with `{"format":"zip","author_materials":false}` or `{"format":"mhtml"}`. Poll `GET .../exports/<job-uuid>/` and, once ready, send `POST .../exports/<job-uuid>/download/`. Every operation checks current authorization. An active course owner with the AUTHOR or ADMIN role can export their course. For cross-course exports, grant a Django staff account the explicit permission `api.export_any_course`. Django superusers also have this permission. Jobs are private to their requester. Staff status or the platform ADMIN label alone grants no cross-course export access.
+The service checks at least 1 GiB plus 96 MiB free on both the temporary-file and database filesystems. This bounds export disk consumption to one archive while preserving a reserve at admission. Other applications can consume that reserve independently. Linux enforces the file-size, memory, CPU and wall-clock limits in the child. Windows development has the parent deadline and size checks, without Linux resource limits.
 
-The worker processes one course at a time. Admission allows one pending build per user, four new jobs per user per ten minutes and twelve queued, running or ready jobs across the installation. An individual build has three minutes, 1,000 lessons, 5,000 steps, 8 MiB of stored step content and description, 32 MiB of assets and a 96 MiB output limit. The Linux build subprocess also has a 512 MiB address-space limit. A course over budget produces an error. Operators can use the existing CLI for larger courses with sufficient resources. The dashboard streams the response from disk and the browser saves a bounded Blob.
+`COURSE_EXPORT_ROOT` defaults to a private `uchebus-exports` directory under the OS temporary directory. Docker sets it to `/tmp/uchebus-exports` inside the web container. Keep it outside public media/static paths. Use the ASGI server included in the project so generation cancellation and asynchronous downloads operate correctly. There is no worker service or persistent artifact spool.
 
-## VPS release checklist
+## Linux release-candidate verification
 
-- [ ] Record the running commit, web image ID, Compose project name and version (2.24+), and applied migrations in `/root/learning-platform`. Inspect `free -h`, `docker stats --no-stream`, `lsblk -f`, available inodes, and available space on the database, backup and Docker filesystems. Budget 768 MiB and one CPU for the worker alongside web, runner, OS and backup activity. Worker swap is capped at its RAM limit, its temporary filesystem at 32 MiB and its process count at 64. Web and worker logs rotate.
-- [ ] Have the VPS administrator provision an independently backed, fixed-capacity filesystem mounted persistently at `/srv/uchebus-exports`. A 2 GiB filesystem accommodates the twelve-job queue, staging and reserve at the current limits. Confirm the backing disk or reserved LV has capacity independent of SQLite, including any underlying thin pool. Arrange mount ordering before Docker starts after reboot. A directory or sparse file on the DB filesystem does not provide this guarantee. A same-device project quota would require a separate quota-aware implementation.
-- [ ] After confirming the mount, create a root-owned mode-0700 `spool` subdirectory **on the mounted device**. Compose binds this exact existing directory into both containers with host path creation disabled. Remove any legacy Compose override that replaces this mount. The default production configuration enables separate-device enforcement. No new secrets are required.
+Use a disposable Linux Docker host with comparable RAM and CPU capacity. Keep the downloaded backup and all rehearsal output private. This procedure applies migrations only to a disposable backup copy.
+
+1. Check out the release commit and build it. Run the focused suite with isolated container storage.
+
+```bash
+docker build -t uchebus-export-review .
+docker run --rm --network none -e DB_DIR=/tmp \
+  -e SECRET_KEY=isolated-export-review-key-only-2026 -e DEBUG=False \
+  uchebus-export-review python manage.py test api.test_course_downloads api.test_course_export
+```
+
+2. Set `BACKUP_DIR` to the absolute path of the verified local backup. Create a private disposable database/media copy. The original backup remains available for comparison.
+
+```bash
+(cd "$BACKUP_DIR" && sha256sum -c SHA256SUMS)
+umask 077
+REVIEW_DIR=$(mktemp -d /tmp/uchebus-review.XXXXXX)
+mkdir "$REVIEW_DIR/db" "$REVIEW_DIR/media"
+cp "$BACKUP_DIR/db.sqlite3" "$REVIEW_DIR/db/db.sqlite3"
+tar --no-same-owner --no-same-permissions -xzf "$BACKUP_DIR/media.tar.gz" -C "$REVIEW_DIR/media"
+docker run -d --name uchebus-export-review -p 127.0.0.1:18080:8000 \
+  --mount "type=bind,src=$REVIEW_DIR/db,dst=/app/db" \
+  --mount "type=bind,src=$REVIEW_DIR/media,dst=/app/media,readonly" \
+  -e SECRET_KEY=isolated-export-review-key-only-2026 -e DEBUG=False \
+  -e ALLOWED_HOSTS=localhost,127.0.0.1,uchebus.ru,www.uchebus.ru \
+  -e COURSE_EXPORT_ROOT=/tmp/uchebus-exports \
+  uchebus-export-review
+docker exec uchebus-export-review python manage.py migrate --check
+docker exec -it uchebus-export-review python manage.py createsuperuser
+```
+
+3. Use the temporary superuser in the isolated site at `http://127.0.0.1:18080`. For a remote rehearsal host, forward port 18080 over SSH. Select the 55-lesson, 873-step course from the November 22 backup. Generate MHTML, STEP ZIP, and author STEP ZIP three times, spacing attempts to respect the four-per-ten-minute limit. Record generation and total download time, archive sizes, peak memory, free disk, and any errors. Retain only aggregate measurements in the release report.
+4. While generation is active, inspect the child's `/proc/<pid>/limits` and `/proc/<pid>/status` inside the container. Confirm 536870912-byte address space, 100663296-byte file size, 75 CPU seconds and zero core size. `VmPeak` measures virtual memory and `VmHWM` peak resident memory. Monitor `docker stats uchebus-export-review`, host `free -h`, and `df -h`. Repeat with representative runner load on this disposable host. A container-wide memory reading includes Django and the export child.
+5. Start a second export during generation and during a deliberately slow download. Expect 429. Cancel the first request in each phase and verify another export can start, subject to the per-user rate limit. Verify the child exits, temporary disk usage returns, and no OOM kill occurs. The automated suite covers deadline and disconnect handling; successful representative builds must finish within 90 seconds with RAM headroom for the live VPS workload.
+6. Open MHTML offline in Chrome and Edge and click syllabus entries. Check ZIP CRCs, 55 lesson manifests and 873 numbered steps. Confirm author materials appear only in the explicitly selected ZIP. Account for the documented external-image omissions separately from export failures.
+7. Stop and remove only the rehearsal container with `docker rm -f uchebus-export-review`. Securely remove the disposable files after verifying the exact `REVIEW_DIR` path. Preserve the original backup. Record the image/commit, Linux results and capacity measurements before approving deployment.
+
+## VPS deployment checklist
+
+Deployment remains a separately approved operation. Use the existing project directory `/root/learning-platform` and Compose project `learning-platform`. Verify these names before following the commands.
+
+1. Inspect `free -h`, `docker stats --no-stream`, `df -h`, and `df -i`. Check available RAM with the runner busy and disk space on the Docker writable-layer and DB-volume filesystems. Allow headroom for one 512 MiB child alongside Django, the 1 GiB runner, Nginx and the OS.
+2. Record the current commit and web image ID. Run `scripts/backup.sh`, then `scripts/restore.sh --check "$BACKUP_NAME"` with the exact resulting folder name. Keep a verified off-server copy.
+3. Fetch and fast-forward to the approved release commit. Keep the existing secrets, certificates and DB/media volumes. Remove any obsolete spool override and `COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE` setting. No storage provisioning or new production dependency is required.
+4. Build and validate the release before stopping the site.
 
 ```bash
 cd /root/learning-platform
-set -eu
-db_mount=$(docker volume inspect -f '{{.Mountpoint}}' learning-platform_db-data)
-mountpoint -q /srv/uchebus-exports
-findmnt --mountpoint /srv/uchebus-exports
-test -d /srv/uchebus-exports/spool
-test "$(stat -c %d /srv/uchebus-exports/spool)" != "$(stat -c %d "$db_mount")"
-stat -c '%U:%G %a %n' /srv/uchebus-exports/spool
-test "$(stat -c '%u:%g:%a' /srv/uchebus-exports/spool)" = 0:0:700
-df -h "$db_mount" /srv/uchebus-exports/spool /root/backups
-df -i "$db_mount" /srv/uchebus-exports/spool
-```
-
-- [ ] Verify the Git release contains migration 0025 and the restore-aware entrypoint. Record the prior SHA outside the checkout. Run the existing online backup and verify its name before changing the live DB. Check that the backup has a separate recoverable copy. Keep the existing `.env`, certificates, project name and DB/media volumes.
-
-```bash
-: "${RELEASE_SHA:?Set to the full approved commit}"
-git rev-parse HEAD
-docker inspect --format '{{.Image}}' "$(docker compose ps -q web)"
-scripts/backup.sh
-# Use the exact auto_... directory reported by backup.sh.
-scripts/restore.sh --check "${BACKUP_NAME:?Set to the verified backup name}"
-git fetch origin main
-git merge --ff-only "$RELEASE_SHA"
-test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
 docker compose config --quiet
-docker compose build web export-worker
+docker compose build web
 bash scripts/test_restore.sh
-docker compose run --rm --no-deps -T web python manage.py shell -c \
-  'from api.course_export.jobs import check_capacity; check_capacity()'
 docker compose run --rm --no-deps -T -e DB_DIR=/tmp web python manage.py test api.test_course_downloads api.test_course_export
 docker compose run --rm --no-deps -T web python manage.py migrate --plan
 ```
 
-- [ ] Confirm the only pending migration on an up-to-date installation is `api.0025_course_export_job`. Rehearse restore and interrupted-restore recovery with the built images on a disposable Linux Docker host. The restore script targets the fixed production volume names. Use a separate Docker daemon for this drill. Verify exported files and the database have different device IDs inside **both** containers. The service checks 448 MiB free on the spool (256 MiB reserve plus space for the folder and archive) and 1 GiB free on the DB filesystem before admission and before building. Downloads and cleanup remain available under low space. These checks supplement the hard filesystem boundary.
-- [ ] During the approved deployment window, apply migrations before starting the worker. Recheck service health and effective limits.
+5. During the approved maintenance window, stop web and remove a legacy worker container if one was previously installed. This prevents old code accessing the retired queue table.
 
 ```bash
+docker compose stop web
+legacy_worker=$(docker ps -aq --filter label=com.docker.compose.project=learning-platform --filter label=com.docker.compose.service=export-worker)
+if [ -n "$legacy_worker" ]; then
+    docker stop "$legacy_worker"
+    docker rm "$legacy_worker"
+fi
 docker compose run --rm --no-deps -T web python manage.py migrate --noinput
-docker compose up -d --no-deps web export-worker
+docker compose run --rm --no-deps -T web python manage.py shell -c 'from api.course_export.downloads import check_capacity; check_capacity()'
+docker compose up -d --no-deps web
+docker compose exec -T nginx nginx -t
 docker compose exec -T nginx nginx -s reload
 curl -fsS --retry 10 --retry-delay 2 https://uchebus.ru/api/status/
 docker compose exec -T web python manage.py migrate --check
-docker compose exec -T export-worker stat -c '%d %n' /app/db /app/course-downloads
-docker compose ps
-docker inspect --format '{{.HostConfig.RestartPolicy.Name}} {{.HostConfig.Memory}} {{.HostConfig.NanoCpus}} {{.HostConfig.PidsLimit}}' "$(docker compose ps -q export-worker)"
-docker compose logs --tail=50 export-worker
+docker compose logs --tail=50 web
 ```
 
-- [ ] Download both formats as the owner of a paid test course. Check that a student is denied, the ZIP contains its locked lesson, and the artifact disappears after transfer. Grant `api.export_any_course` only to designated staff.
-- [ ] **Rollback.** For an application rollback, stop the export worker first, check out the recorded previous SHA, rebuild/recreate the previous web image and reload nginx. Keep the DB/media volumes and the additive job table. If data recovery is necessary, keep the restore-aware release installed, verify the chosen snapshot with `scripts/restore.sh --check "$BACKUP_NAME"`, then run `scripts/restore.sh "$BACKUP_NAME"` interactively. Restore replaces DB and media, including any writes since the snapshot. Follow the printed safety-snapshot recovery instructions if validation fails. Never use `docker compose down -v` during rollback. [Backup and restore procedure](BACKUP.md)
+6. Verify a paid-course download as its owner, deny a student, check busy-export behavior and cancellation, and open MHTML offline in Chrome and Edge. Observe peak RAM while the runner is active. Linux Docker resource enforcement and restore locking should also be rehearsed on a disposable Docker host before release.
+
+Migration 0025 stays in history. Migration 0026 moves the existing export permission to Course while retaining its primary key and grants, then removes only the obsolete export-job table. Course, lesson, student and media records are unaffected. A database still at 0024 applies 0025 and 0026 in sequence. Existing queue rows are disposable and disappear.
+
+For application rollback, stop web first. If the prior application expects the queue table, use the new image to run `python manage.py migrate api 0025` while web is stopped, then restore the recorded previous code/image and its compatible configuration. Reverse migration recreates an empty queue and moves the permission back, preserving grants. A pre-export application can run against the current course schema. Retain DB/media volumes. Data recovery uses the existing verified backup and interactive restore procedure, which replaces subsequent writes. Never use `docker compose down -v` as rollback.
+
+The restore script retains its persistent maintenance marker, exclusive SQLite service lock, safety snapshot and integrity checks. It stops and resumes web. Unexpected containers mounting the DB volume cause restore to refuse replacement.
+
+## External-resource findings
+
+The November 22 production backup contains 161 distinct Stepik CDN image references (178 occurrences) and six distinct localhost image references. The inspected rich-text fields contain external images, with no external video/audio/player sources detected. Missing instructional images can prevent complete offline reading. Existing MHTML exports replace unavailable images with placeholders; structured exports retain original references and record null asset mappings.
+
+For Stepik images, implement an explicit author-reviewed import that copies permitted images into uploaded media and rewrites references. Such an importer needs an allowlist, redirect/DNS checks, type and size limits, and a record of provenance. Export-time fetching would add network variability and SSRF exposure. None of the six localhost image paths matches a file in the downloaded media archive. Ask the author to supply these originals, then upload them and replace the references with relative media URLs. These content repairs are proposed separately and have not been applied to production.
 
 ## Administrative command
-
-In the VPS containers, pass a directory under the verified spool, for example `--output-dir /app/course-downloads/manual/2026-11-23`. Copy these administrative archives to their intended destination and remove them when finished. The worker expires dashboard jobs only. The relative paths below apply to standalone development.
-
-Run these commands from the repository root with the project's Python environment and Django settings. Replace `python-basics` with a course slug or UUID. Each command prints lesson progress and the final artifact path. Asset warnings go to stderr. Errors such as a missing course, inaccessible output directory, or existing destination produce a nonzero exit code.
 
 ```sh
 python manage.py export_course python-basics --format mhtml --output-dir ./exports
@@ -85,9 +112,7 @@ python manage.py export_course python-basics --format folder --output-dir ./expo
 python manage.py export_course python-basics --format folder --author-materials --output-dir ./private-exports
 ```
 
-The operator needs read access to the configured database and course assets and write access to the output directory. Shell and filesystem permissions control access. The command can read drafts, paid courses, and all lessons of the selected course. Treat even a learner export as a copy of the entire course. Use a private destination for author exports and restrict access to the directory and any copies. The command rejects author destinations in the configured media and static directories. On Windows, use a directory with an appropriate ACL.
-
-The command reads course content without saving models or recording activity. It stages files in the destination filesystem and publishes the completed artifact. Use a new output directory for each scheduled run, for example a directory named with the job timestamp. An existing artifact is an error. MHTML publication uses a hard link and requires a filesystem that supports it. The snapshot and referenced asset bytes are held in memory for the duration of the export. For a consistent backup when editors are replacing or removing media, run against a matching database and storage snapshot.
+The operator needs filesystem and database access. The command stages files beside the destination and refuses to overwrite an existing export. Author exports require a private destination outside media/static. CLI exports retain explicit operator-controlled output and do not use the dashboard download limits. Use a consistent database/media snapshot when concurrent editing matters.
 
 ## MHTML reading copy
 

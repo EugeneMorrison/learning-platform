@@ -70,7 +70,7 @@ restore() { bash "$root/scripts/restore.sh" "$@" <<< sample; }
 reset_fixture() {
     rm -rf -- "$root/backups"/pre-restore_*
     rm -f -- "$root/db/.uchebus-restore-in-progress"
-    printf 'web\nexport-worker\n' > "$root/running"
+    printf 'web\n' > "$root/running"
     : > "$root/calls"
 }
 
@@ -83,8 +83,8 @@ if restore sample; then exit 1; fi
 echo sample > "$root/backups/sample/db.sqlite3"
 restore sample
 test -f "$root"/backups/pre-restore_*/SHA256SUMS
-test "$(tail -1 "$root/calls")" = 'compose start export-worker'
-grep -q 'CourseExportJob.objects.all().delete()' "$root/calls"
+grep -q 'compose start web' "$root/calls"
+! grep -q 'CourseExportJob' "$root/calls"
 
 reset_fixture
 if other_holder=unexpected-client restore sample; then exit 1; fi
@@ -95,7 +95,6 @@ reset_fixture
 if fail_at=':/out' restore sample; then exit 1; fi
 test ! -e "$root/db/.uchebus-restore-in-progress"
 grep -qx web "$root/running"
-grep -qx export-worker "$root/running"
 
 reset_fixture
 if fail_at='manage.py migrate' restore sample; then exit 1; fi
@@ -104,7 +103,7 @@ test ! -s "$root/running"
 test -f "$root"/backups/pre-restore_*/SHA256SUMS
 sleep 1  # Safety snapshots have second-resolution names.
 restore sample
-test "$(tail -1 "$root/calls")" = 'compose start export-worker'
+grep -q 'compose start web' "$root/calls"
 
 reset_fixture
 echo web > "$root/running"

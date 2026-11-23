@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -268,7 +269,7 @@ REST_FRAMEWORK = {
     # Counters live in the default cache (no CACHES setting → per-process LocMemCache).
     'DEFAULT_THROTTLE_RATES': {
         'code_run': '30/min',  # /api/run-code/ and /api/run-tests/ together
-        'course_export': '120/min',  # Includes status polling. Build admission is limited in SQLite as well.
+        'course_export': '10/min',  # Cross-process 4/10 min admission also applies.
     },
 }
 
@@ -354,9 +355,8 @@ if len(sys.argv) > 1 and sys.argv[1] == 'test':
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Private shared storage for short-lived dashboard exports.
-COURSE_EXPORT_ROOT = Path(os.environ.get('COURSE_EXPORT_ROOT', BASE_DIR / '.course-downloads'))
-COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE = os.environ.get('COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE') == '1'
+# Private temporary directory for request-scoped dashboard exports.
+COURSE_EXPORT_ROOT = Path(os.environ.get('COURSE_EXPORT_ROOT', Path(tempfile.gettempdir()) / 'uchebus-exports'))
 
 # Allow embedding in iframes (needed for Step 11)
 # SAMEORIGIN = only same-domain iframes; we use per-view exemption for cross-origin

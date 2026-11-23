@@ -20,7 +20,6 @@ from api.models import Block, Course, Lesson, Progress, User
 PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jN1kAAAAASUVORK5CYII=')
 
 
-@override_settings(COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE=False)
 class CourseExportTests(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -223,13 +222,19 @@ class CourseExportTests(TestCase):
             call_command('export_course', self.course.slug, '--format', 'folder', '--author-materials',
                          '--output-dir', str(self.root / 'media' / 'exports'))
 
-    @override_settings(COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE=True)
-    def test_production_command_requires_the_dedicated_output_filesystem(self):
-        spool = (self.root / 'spool').resolve()
-        spool.mkdir()
-        with patch('api.management.commands.export_course.check_capacity', return_value=spool):
-            with self.assertRaisesMessage(CommandError, 'dedicated export spool'):
-                self.export()
-            result = call_command('export_course', self.course.slug, '--format', 'folder',
-                                  '--output-dir', str(spool / 'manual'), stdout=StringIO(), stderr=self.err)
-            self.assertTrue((Path(result) / 'course.json').is_file())
+
+    def test_direct_zip_matches_folder_for_all_types_and_audiences(self):
+        from io import BytesIO
+        from zipfile import ZipFile
+        from api.course_export.snapshot import extract_course
+        from api.course_export.writers import write_folder, write_zip
+        for private in (False, True):
+            snapshot = extract_course(str(self.course.pk), private, lambda message: None)
+            folder = self.root / ('author' if private else 'learner')
+            write_folder(folder, snapshot, lambda message: None, lambda message: None)
+            stream = BytesIO()
+            write_zip(stream, snapshot, lambda message: None, lambda message: None)
+            with ZipFile(stream) as archive:
+                self.assertIsNone(archive.testzip())
+                expected = {p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob('*') if p.is_file()}
+                self.assertEqual({name: archive.read(name) for name in archive.namelist()}, expected)

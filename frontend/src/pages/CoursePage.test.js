@@ -99,11 +99,9 @@ const stepCounts = row => row.findAllByProps({ className: 'lesson-row__step-coun
 test('dashboard downloads the selected STEP archive with the supplied filename', async t => {
     const renderer = await mount(t);
     const section = renderer.root.findByProps({ 'aria-label': 'Экспорт курса' });
-    const get = fixture.get;
-    fixture.get = url => url.endsWith('/exports/job/')
-        ? { data: { state: 'ready', filename: 'paid-course-author.zip' } } : get(url);
-    fixture.post = t.mock.fn(async url => url.endsWith('/download/')
-        ? { data: new Blob(['archive']) } : { data: { id: 'job' } });
+    fixture.post = t.mock.fn(async () => ({
+        data: new Blob(['archive']), headers: { 'content-disposition': 'attachment; filename="paid-course-author.zip"' },
+    }));
     const anchor = { click: t.mock.fn(), remove() {} };
     document.createElement = () => anchor;
     document.body = { appendChild() {} };
@@ -112,7 +110,8 @@ test('dashboard downloads the selected STEP archive with the supplied filename',
     assert.deepEqual(fixture.post.mock.calls[0].arguments.slice(0, 2), [
         '/courses/course/exports/', { format: 'zip', author_materials: true },
     ]);
-    assert.equal(fixture.post.mock.calls[1].arguments[0], '/courses/course/exports/job/download/');
+    assert.equal(fixture.post.mock.calls.length, 1);
+    assert.equal(fixture.post.mock.calls[0].arguments[2].responseType, 'blob');
     assert.equal(anchor.download, 'paid-course-author.zip');
     assert.equal(anchor.click.mock.calls.length, 1);
 });
@@ -120,8 +119,9 @@ test('dashboard downloads the selected STEP archive with the supplied filename',
 test('failed export shows the server error and enables a retry', async t => {
     const renderer = await mount(t);
     const section = renderer.root.findByProps({ 'aria-label': 'Экспорт курса' });
-    fixture.post = async () => ({ data: { id: 'job' } });
-    fixture.get = async () => ({ data: { state: 'failed', error: 'Курс слишком большой.' } });
+    fixture.post = async () => {
+        throw { isAxiosError: true, response: { data: new Blob([JSON.stringify({ detail: 'Курс слишком большой.' })]) } };
+    };
     await act(async () => section.findAllByType('button')[0].props.onClick());
     assert.equal(section.findByProps({ role: 'alert' }).props.children, 'Курс слишком большой.');
     assert.equal(section.findAllByType('button')[0].props.disabled, false);

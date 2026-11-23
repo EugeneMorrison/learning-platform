@@ -59,3 +59,4 @@ frontend/dist/
 
 # Local Stepik reference exports and account configuration
 Uchebus_Stepik_Приложение/
+.course-export.lock

@@ -124,7 +124,7 @@ echo
 echo "This REPLACES the live database and ALL uploaded media with:"
 echo "  $SRC"
 if [ -f "$SRC/info.txt" ]; then sed 's/^/    /' "$SRC/info.txt"; fi
-echo "Web and export-worker will be stopped while the database and media are replaced."
+echo "Web will be stopped while the database and media are replaced."
 echo "The current data is saved first to $SAFETY_DIR"
 echo
 read -r -p "Type the backup folder name ($SRC_NAME) to restore it: " answer
@@ -134,11 +134,10 @@ read -r -p "Type the backup folder name ($SRC_NAME) to restore it: " answer
 db_mount=$(docker volume inspect --format '{{.Mountpoint}}' "$DB_VOLUME")
 [[ "$db_mount" = /* && -d "$db_mount" ]] || die "DB volume must be local to this VPS"
 marker="$db_mount/.uchebus-restore-in-progress"
-worker_id=$(docker compose ps --all --quiet export-worker)
 # Refuse to restore against older service containers that do not honor the fence.
-for id in "$web_id" $worker_id; do
+for id in "$web_id"; do
     [ "$(docker inspect --format '{{index .Config.Entrypoint 0}}' "$id")" = /usr/local/bin/uchebus-db-service ] \
-        || die "installed web/worker must use the restore-aware entrypoint"
+        || die "installed web service must use the restore-aware entrypoint"
     [ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/db"}}{{.Name}}{{end}}{{end}}' "$id")" = "$DB_VOLUME" ] \
         || die "service is not using the expected database volume"
 done
@@ -156,7 +155,7 @@ on_exit() {
             if [ "$interrupted" = no ]; then
                 rm -f -- "$marker"
                 flock -u 8
-                for service in web export-worker; do
+                for service in web; do
                     if grep -qx "$service" <<<"$was_running"; then
                         docker compose start "$service" || log "Could not restart $service"
                     fi
@@ -184,7 +183,6 @@ if [ "$interrupted" = no ]; then
 fi
 sync -f "$marker"
 log "Stopping SQLite clients"
-if [ -n "$worker_id" ]; then docker compose stop export-worker; fi
 docker compose stop web
 flock -xn 8 || die "another process holds the database service lock"
 holders=$(docker ps --quiet --filter "volume=$DB_VOLUME")
@@ -230,16 +228,13 @@ docker run --rm --network none \
     -v "$MEDIA_VOLUME:/media" -v "$SRC:/backup:ro" \
     "$HELPER_IMAGE" sh -c 'find /media -mindepth 1 -delete && tar -xzf /backup/media.tar.gz -C /media'
 
-# ---- 6. Verify while both services are fenced -------------------------------
+# ---- 6. Verify while the web service is fenced -------------------------------
 # Maintenance is the only deliberate bypass of the normal shared lock.
 log "Migrating and checking the restored DB before admitting traffic"
 docker compose run --rm --no-deps -T --entrypoint sh web -ec '
     python manage.py migrate --noinput
-    python manage.py shell -c "from api.models import CourseExportJob; CourseExportJob.objects.all().delete()"
     exec python -I -c "$1" "$2"
 ' sh "$CHECK_PY" "$DB_PATH_IN_WEB"
-resume_worker=no
-if grep -qx export-worker "$marker"; then resume_worker=yes; fi
 STAGE=verified
 rm -- "$marker"
 flock -u 8
@@ -260,7 +255,6 @@ until docker compose exec -T web python -I -c "$PING_PY" >/dev/null 2>&1; do
     fi
     sleep 3
 done
-if [ "$resume_worker" = yes ]; then docker compose start export-worker; fi
 
 STAGE=finished
 log "Restore of $SRC_NAME finished."

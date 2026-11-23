@@ -6,7 +6,6 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from slugify import slugify
 
-from api.course_export.jobs import StorageUnavailable, check_capacity
 from api.course_export.snapshot import extract_course
 from api.course_export.writers import write_folder, write_mhtml
 from api.models import Course
@@ -35,17 +34,6 @@ class Command(BaseCommand):
             public_dirs = [settings.MEDIA_ROOT, settings.STATIC_ROOT, *settings.STATICFILES_DIRS]
             if any(p and parent.is_relative_to(Path(p).resolve()) for p in public_dirs):
                 raise CommandError('Choose a private output directory outside media and static roots.')
-        if settings.COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE:
-            try:
-                spool = check_capacity()
-                # Reject outside paths and nested mounts redirecting a directory
-                # back to the database disk. Test before creating any directories.
-                existing = next(path for path in (parent, *parent.parents) if path.exists())
-                if not parent.is_relative_to(spool) or existing.stat().st_dev != spool.stat().st_dev:
-                    raise CommandError('Choose an output directory on the dedicated export spool.')
-            except (StorageUnavailable, OSError) as exc:
-                raise CommandError('The dedicated export spool is unavailable or low on space.') from exc
-
         def warn(message):
             self.stderr.write(self.style.WARNING('Warning: ' + message))
 

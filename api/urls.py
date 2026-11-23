@@ -7,7 +7,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from .edit_history import CourseHistoryView
 from .code_solutions import CodeSolutionsView
-from .course_export.views import CourseExportView, ExportStatusView, ExportDownloadView
+from .course_export.views import export_course
 
 # Router automatically creates URLs for ViewSets
 # Example: router.register('courses', CourseViewSet) creates:
@@ -24,9 +24,7 @@ router.register(r'lessons', views.LessonViewSet, basename='lesson')
 router.register(r'blocks', views.BlockViewSet, basename='block')
 
 urlpatterns = [
-    path('courses/<uuid:course_id>/exports/', CourseExportView.as_view()),
-    path('courses/<uuid:course_id>/exports/<uuid:job_id>/', ExportStatusView.as_view()),
-    path('courses/<uuid:course_id>/exports/<uuid:job_id>/download/', ExportDownloadView.as_view()),
+    path('courses/<uuid:course_id>/exports/', export_course),
     path('courses/<uuid:course_id>/history/', CourseHistoryView.as_view(), name='course-history'),
     # Simple test endpoints
     path('hello/', views.hello_view, name='hello'),

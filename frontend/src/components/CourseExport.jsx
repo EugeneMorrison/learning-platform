@@ -17,26 +17,12 @@ export default function CourseExport({ courseId }) {
         const base = '/courses/' + courseId + '/exports/';
         setBusy(true);
         setError('');
-        setStatus('Запрашиваем экспорт…');
+        setStatus('Готовим файл…');
         try {
-            const created = await api.post(base, {
+            const file = await api.post(base, {
                 format, author_materials: format === 'zip' && authorMaterials,
-            }, config);
-            const url = base + created.data.id + '/';
-            const deadline = Date.now() + 14 * 60 * 1000;
-            let job;
-            while (true) {
-                ({ data: job } = await api.get(url, config));
-                if (job.state === 'ready') break;
-                if (job.state === 'failed') throw new Error(job.error);
-                if (job.state === 'downloaded') throw new Error('Файл уже скачан.');
-                if (Date.now() >= deadline) throw new Error('Время ожидания истекло. Попробуйте ещё раз.');
-                setStatus(job.state === 'running' ? 'Готовим файл…' : 'Экспорт в очереди…');
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            setStatus('Скачиваем файл…');
-            const file = await api.post(url + 'download/', {}, {
-                ...config, responseType: 'blob',
+            }, {
+                ...config, responseType: 'blob', timeout: 400000,
                 onDownloadProgress: ({ progress }) => {
                     if (!controller.signal.aborted && progress != null) {
                         setStatus('Скачиваем файл… ' + Math.round(progress * 100) + '%');
@@ -46,7 +32,10 @@ export default function CourseExport({ courseId }) {
             const href = URL.createObjectURL(file.data);
             const link = document.createElement('a');
             link.href = href;
-            link.download = job.filename;
+            const disposition = file.headers['content-disposition'] || '';
+            const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+            const plain = disposition.match(/filename="([^"]+)"/i);
+            link.download = encoded ? decodeURIComponent(encoded[1]) : plain?.[1] || ('course-' + courseId + '.' + format);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -55,7 +44,11 @@ export default function CourseExport({ courseId }) {
         } catch (err) {
             if (controller.signal.aborted) return;
             setStatus('');
-            const detail = err.response?.data?.detail;
+            let details = err.response?.data;
+            if (details instanceof Blob) {
+                try { details = JSON.parse(await details.text()); } catch { details = null; }
+            }
+            const detail = details?.detail;
             const message = err.isAxiosError ? 'Не удалось скачать курс. Попробуйте ещё раз.' : err.message;
             setError(typeof detail === 'string' ? detail : message);
         } finally {
