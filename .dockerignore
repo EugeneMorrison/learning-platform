@@ -9,6 +9,18 @@ frontend/dist/
 
 # Database (Docker uses its own volume)
 db.sqlite3
+.course-downloads/
+.env
+.env.*
+.dev-secret-key
+*.pem
+*.key
+backups/
+db.sqlite3-*
+media/
+exports/
+private-exports/
+Uchebus_Stepik_Приложение/
 
 # Git
 .git/

@@ -268,6 +268,7 @@ REST_FRAMEWORK = {
     # Counters live in the default cache (no CACHES setting → per-process LocMemCache).
     'DEFAULT_THROTTLE_RATES': {
         'code_run': '30/min',  # /api/run-code/ and /api/run-tests/ together
+        'course_export': '120/min',  # Includes status polling. Build admission is limited in SQLite as well.
     },
 }
 
@@ -352,6 +353,10 @@ if len(sys.argv) > 1 and sys.argv[1] == 'test':
 # persistent volume so uploaded images survive container restarts.
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Private shared storage for short-lived dashboard exports.
+COURSE_EXPORT_ROOT = Path(os.environ.get('COURSE_EXPORT_ROOT', BASE_DIR / '.course-downloads'))
+COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE = os.environ.get('COURSE_EXPORT_REQUIRE_SEPARATE_DEVICE') == '1'
 
 # Allow embedding in iframes (needed for Step 11)
 # SAMEORIGIN = only same-domain iframes; we use per-view exemption for cross-origin

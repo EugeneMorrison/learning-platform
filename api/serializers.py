@@ -10,6 +10,7 @@ Serializers convert between:
 from django.utils.translation import gettext
 from rest_framework import serializers
 from .block_content import FILL_GAP_RE, TASK_TYPES, feedback, student_content
+from .course_export.access import can_export
 from .sorting import content_error as sorting_content_error
 from .matching import content_error as matching_content_error
 from .table_tasks import content_error as table_content_error
@@ -96,6 +97,7 @@ class CourseSerializer(serializers.ModelSerializer):
     # Computed fields
     author_name = serializers.CharField(source='author.username', read_only=True)
     lesson_count = serializers.SerializerMethodField()
+    can_export = serializers.SerializerMethodField()
     # Upload: multipart PATCH; remove: {"cover": null}; read: the file's URL or
     # null. Course.save() shrinks a new cover (api/covers.py) and deletes the
     # replaced or removed file. max_length=None:
@@ -116,6 +118,7 @@ class CourseSerializer(serializers.ModelSerializer):
             'level',  # BEGINNER / INTERMEDIATE / ADVANCED, or null (not specified)
             'cover',  # URL, or null
             'lesson_count',  # Extra: number of lessons
+            'can_export',
             'created_at',
             'updated_at'
         ]
@@ -144,6 +147,10 @@ class CourseSerializer(serializers.ModelSerializer):
     def get_lesson_count(self, obj):
         """Count lessons in this course"""
         return obj.lessons.count()
+
+    def get_can_export(self, obj):
+        request = self.context.get('request')
+        return can_export(getattr(request, 'user', None), obj)
 
 
 # =============================================================================

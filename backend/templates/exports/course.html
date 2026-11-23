@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ course.title }}</title>
+<style>
+body { margin: 2rem auto; max-width: 54rem; padding: 0 1rem; font: 1rem/1.6 system-ui, sans-serif; color: #20232a; }
+img { max-width: 100%; height: auto; } pre { white-space: pre-wrap; background: #f3f4f6; padding: 1rem; }
+article { border-top: 1px solid #ccc; } table { border-collapse: collapse; } td, th { border: 1px solid #aaa; padding: .35rem; }
+.preview-pairs { display: flex; gap: 2rem; }
+</style></head>
+<body><h1>{{ course.title }}</h1>
+{% if cover %}<img src="{{ cover }}" alt="Обложка курса">{% elif course.cover %}<p>Обложка недоступна.</p>{% endif %}
+{% if course.tagline %}<p>{{ course.tagline }}</p>{% endif %}
+{{ course.description|linebreaks }}
+<nav><h2>Программа курса</h2><ol>
+{% for lesson in lessons %}<li><a href="#lesson-{{ lesson.id }}">{{ lesson.title }}</a></li>{% endfor %}
+</ol></nav>
+{% for lesson in lessons %}
+<section><h2 id="lesson-{{ lesson.id }}">{{ forloop.counter }}. {{ lesson.title }}</h2>
+{% for block in lesson.blocks %}
+<article id="step-{{ block.id }}"><h3>{{ forloop.counter }}. {{ block.label }}</h3>
+{% if block.task is not None %}{% include "public/includes/readable_step.html" with task=block.task %}
+{% else %}<p>Содержимое этого шага недоступно в экспорте.</p>{% endif %}
+</article>
+{% endfor %}</section>
+{% endfor %}</body></html>

@@ -16,7 +16,8 @@ const server = await createServer({
             if (source === 'react-router-dom') return '\0course-router';
             if (source === '../lib/notifications') return '\0course-notifications';
             if (source === '../lib/chatSocket') return '\0course-socket';
-            if (source.startsWith('../components/') && !source.endsWith('/DragHandle') && !source.endsWith('/CoursePriceFields')) return '\0course-decoration';
+            if (source.startsWith('../components/') && !['DragHandle', 'CoursePriceFields', 'CourseExport']
+                .includes(source.split('/').pop())) return '\0course-decoration';
         },
         load(id) {
             if (id === '\0course-api') return `export default {
@@ -67,7 +68,8 @@ beforeEach(t => {
     enrollments = [];
     fixture.get = async url => {
         if (url === '/auth/me/') return { data: { id: fixture.userId } };
-        if (url === '/courses/course/') return { data: { id: 'course', author: 'author', title: 'Course' } };
+        if (url === '/courses/course/') return { data: { id: 'course', author: 'author', title: 'Course',
+            can_export: fixture.userId === 'author' } };
         if (url === '/lessons/?course=course') return { data: structuredClone(lessons) };
         if (url === '/lessons/outline/') return { data: structuredClone(outline) };
         if (url.endsWith('/enrollments/')) return { data: structuredClone(enrollments) };
@@ -93,6 +95,37 @@ async function mount(t) {
 const rows = renderer => renderer.root.findAll(node => node.type === 'div' && node.props.className?.split(' ').includes('lesson-row'));
 const stepCounts = row => row.findAllByProps({ className: 'lesson-row__step-count' })
     .map(node => [].concat(node.props.children).join(''));
+
+test('dashboard downloads the selected STEP archive with the supplied filename', async t => {
+    const renderer = await mount(t);
+    const section = renderer.root.findByProps({ 'aria-label': 'Экспорт курса' });
+    const get = fixture.get;
+    fixture.get = url => url.endsWith('/exports/job/')
+        ? { data: { state: 'ready', filename: 'paid-course-author.zip' } } : get(url);
+    fixture.post = t.mock.fn(async url => url.endsWith('/download/')
+        ? { data: new Blob(['archive']) } : { data: { id: 'job' } });
+    const anchor = { click: t.mock.fn(), remove() {} };
+    document.createElement = () => anchor;
+    document.body = { appendChild() {} };
+    await act(async () => section.findByType('input').props.onChange({ target: { checked: true } }));
+    await act(async () => section.findAllByType('button')[1].props.onClick());
+    assert.deepEqual(fixture.post.mock.calls[0].arguments.slice(0, 2), [
+        '/courses/course/exports/', { format: 'zip', author_materials: true },
+    ]);
+    assert.equal(fixture.post.mock.calls[1].arguments[0], '/courses/course/exports/job/download/');
+    assert.equal(anchor.download, 'paid-course-author.zip');
+    assert.equal(anchor.click.mock.calls.length, 1);
+});
+
+test('failed export shows the server error and enables a retry', async t => {
+    const renderer = await mount(t);
+    const section = renderer.root.findByProps({ 'aria-label': 'Экспорт курса' });
+    fixture.post = async () => ({ data: { id: 'job' } });
+    fixture.get = async () => ({ data: { state: 'failed', error: 'Курс слишком большой.' } });
+    await act(async () => section.findAllByType('button')[0].props.onClick());
+    assert.equal(section.findByProps({ role: 'alert' }).props.children, 'Курс слишком большой.');
+    assert.equal(section.findAllByType('button')[0].props.disabled, false);
+});
 
 test('saving a paid price enables lesson previews and saving free access hides them', async t => {
     fixture.patch = t.mock.fn(async (url, data) => ({ data }));
@@ -162,6 +195,7 @@ test('students have no drag handles or drop handlers', async t => {
     fixture.userId = 'student';
     enrollments = [{ id: 'enrollment', student: 'student', student_name: 'Alice' }];
     const renderer = await mount(t);
+    assert.equal(renderer.root.findAllByProps({ 'aria-label': 'Экспорт курса' }).length, 0);
     assert.equal(renderer.root.findAll(node => node.type === 'button' && node.props.draggable).length, 0);
     assert.ok(rows(renderer).every(row => row.props.onDrop === undefined));
     assert.ok(rows(renderer).every(row => stepCounts(row).length === 0));

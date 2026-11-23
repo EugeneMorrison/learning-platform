@@ -229,7 +229,7 @@ scripts/restore.sh --check auto_2026-10-27_000003Z
 ```
 
 It verifies the checksums and the archive, runs an integrity check on a copy
-of the database inside the `web` container, and prints the newest migration
+of the database in a disposable container from the installed web image, and prints the newest migration
 and the number of rows per table.
 
 Then restore:
@@ -240,13 +240,14 @@ scripts/restore.sh auto_2026-10-27_000003Z
 
 It shows the backup's `info.txt` and asks you to type the folder name. Then it:
 
-1. stops only `web`. nginx and the runner keep running; visitors see a 502
-   error page for the duration, usually under a minute;
+1. records the running services in a persistent marker on the DB volume, stops the worker and web,
+   takes an exclusive lock and checks for other containers using the DB. Visitors see a 502 during recovery.
 2. saves the current DB and media to `/root/backups/pre-restore_<time>/`;
 3. replaces the database (and removes any leftover `-journal`/`-wal` file),
    empties the media volume and unpacks the backup's media;
-4. starts `web` (it applies any newer migrations on startup), waits until it
-   answers, and runs the integrity check on the restored database.
+4. applies migrations offline, deletes transient export job records and checks SQLite integrity before
+   releasing the fence. It starts web, waits for a healthy API response, then resumes the worker if it was running.
+   Its next sweep removes orphaned export files. Authors can request fresh downloads.
 
 **Undo a restore:** restore the safety copy the same way:
 
@@ -254,9 +255,12 @@ It shows the backup's `info.txt` and asks you to type the folder name. Then it:
 scripts/restore.sh pre-restore_2026-10-27_101500Z
 ```
 
-If something fails before any data was changed, the script starts `web` again
-by itself. If it fails after that, it leaves `web` stopped and prints the exact
-command to put the previous data back. `pre-restore_*` folders are never
+If an initial restore fails before replacement, the script resumes previously running services.
+A failure during replacement or offline validation leaves the persistent marker in place across reboots.
+Rerun the script with a verified backup or the printed safety snapshot. An interrupted restore keeps its
+marker on subsequent failed attempts. Both application containers check it while holding a shared lock.
+After successful offline verification, a web readiness failure leaves the worker stopped. Inspect web
+logs, verify `/api/status/`, then start the worker. `pre-restore_*` folders are never
 deleted automatically; remove them by hand once you are happy:
 
 ```bash
@@ -289,6 +293,8 @@ scripts/restore.sh /root/restore-from-laptop/auto_2026-10-27_000003Z
 ```
 
 ### On a new server
+
+Prepare and verify the dedicated export filesystem before starting Compose. [VPS release checklist](COURSE_EXPORT.md#vps-release-checklist)
 
 Set the server up as usual (clone the repository to `/root/learning-platform`,
 put `.env` back from your password manager, put the certificates into

@@ -32,7 +32,16 @@ desktop.ini
 
 # Environment variables
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+/backups/
+.course-downloads/
+/exports/
+/private-exports/
+db.sqlite3-wal
+db.sqlite3-shm
 .dev-secret-key
 
 # Test files
@@ -47,3 +56,6 @@ frontend/dist/
 
 # Claude Code local settings (per-machine, not part of the project)
 .claude/
+
+# Local Stepik reference exports and account configuration
+Uchebus_Stepik_Приложение/

@@ -51,6 +51,9 @@ RUN mkdir -p /app/db
 # /app (code, database volume, media volume, static files) is
 # root-only: the server runs as root and nothing else needs it.
 RUN chmod 0700 /app
+COPY --chmod=0755 scripts/db-entrypoint.sh /usr/local/bin/uchebus-db-service
+RUN command -v flock
+ENTRYPOINT ["/usr/local/bin/uchebus-db-service"]
 
 # Port Django will listen on
 EXPOSE 8000

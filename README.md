@@ -17,6 +17,8 @@
 
 ## What it does
 
+Authors can download their complete course as offline MHTML or a STEP ZIP from the course management page. The administrative command also supports scheduled exports. [Course exports and worker setup](docs/COURSE_EXPORT.md)
+
 Authors build courses out of blocks: theory text, quizzes, and coding exercises. Students work through the lessons one block at a time. A finished lesson can be dropped into any page with an `<iframe>`.
 
 An author can:
@@ -252,7 +254,7 @@ There's an `iframe_test.html` in the repo root for trying this locally.
 
 ## Getting started
 
-You'll need [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+The VPS Compose stack requires Docker Compose 2.24+ and a private export filesystem mounted before startup. Prepare the storage using the [VPS release checklist](docs/COURSE_EXPORT.md#vps-release-checklist). Local Django development can run the worker directly.
 
 1. Clone, create `.env` from `.env.example` (set `SECRET_KEY` and `RUNNER_TOKEN`; Docker Compose refuses to start without `RUNNER_TOKEN`), and start:
 

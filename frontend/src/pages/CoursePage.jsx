@@ -5,6 +5,7 @@ import ChatPanel from '../components/ChatPanel';
 import CourseCoverEditor from '../components/CourseCoverEditor';
 import CourseDescriptionEditor from '../components/CourseDescriptionEditor';
 import CoursePriceFields from '../components/CoursePriceFields';
+import CourseExport from '../components/CourseExport';
 import DragHandle from '../components/DragHandle';
 import EditHistoryButton from '../components/EditHistory';
 import { useDragReorder } from '../lib/useDragReorder';
@@ -604,6 +605,7 @@ function CoursePage() {
                             const res = await api.patch(`/courses/${courseId}/`, { description });
                             setCourse(prev => ({ ...prev, description: res.data.description }));
                         }} />
+                    {course.can_export && <CourseExport key={course.id} courseId={course.id} />}
                 </div>
                 {/* Its own line of the header, so the bar has a width on any screen. */}
                 {!isOwner && (showStudentProgress || isEnrolled) && (

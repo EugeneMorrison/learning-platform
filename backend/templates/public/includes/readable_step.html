@@ -1,0 +1,29 @@
+{% load public_site %}
+{% if block.type == 'TEXT' %}
+  {{ task.html|preview_html }}
+{% elif block.type == 'QUIZ' %}
+  {{ task.question|preview_html }}
+  <ol>{% for option in task.options %}<li>{{ option|preview_html }}</li>{% endfor %}</ol>
+{% else %}
+  {{ task.prompt|preview_html }}
+  {% if block.type == 'CODE' %}
+    {% if task.starter_code %}<pre><code>{{ task.starter_code }}</code></pre>{% endif %}
+    {% for stdin, expected in task.examples %}
+      {% if stdin %}<p>Пример ввода</p><pre>{{ stdin }}</pre>{% endif %}
+      <p>Ожидаемый вывод</p><pre>{{ expected }}</pre>
+    {% endfor %}
+  {% elif block.type == 'FILL' %}
+    <pre>{{ task.template }}</pre>
+  {% elif block.type == 'SORT' %}
+    {% include "public/includes/preview_items.html" with items=task.items %}
+  {% elif block.type == 'MATCH' %}
+    <div class="preview-pairs">
+      {% include "public/includes/preview_items.html" with items=task.left %}
+      {% include "public/includes/preview_items.html" with items=task.right %}
+    </div>
+  {% elif block.type == 'TABLE' %}
+    <table><thead><tr><td></td>{% for col in task.columns %}<th scope="col">{{ col.text }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in task.rows %}<tr><th scope="row">{{ row.text }}</th>{% for col in task.columns %}<td><input type="{% if task.multiple_answers %}checkbox{% else %}radio{% endif %}" disabled aria-label="{{ row.text }} — {{ col.text }}"></td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
+  {% endif %}
+{% endif %}

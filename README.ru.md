@@ -200,7 +200,7 @@ Django отдаёт каждый урок по адресу `/lesson/<uuid>/`. R
 
 ## Как запустить
 
-Понадобится [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+Для запуска на VPS нужны Docker Compose 2.24+ и отдельная файловая система для экспорта. Подготовьте и проверьте её до запуска по [инструкции для VPS](docs/COURSE_EXPORT.md#vps-release-checklist). При локальной разработке Django обработчик экспорта можно запустить отдельно.
 
 1. Клонировать, создать `.env` из `.env.example` (задать `SECRET_KEY` и `RUNNER_TOKEN`; без `RUNNER_TOKEN` Docker Compose не запустится) и запустить:
 

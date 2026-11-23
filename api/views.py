@@ -61,6 +61,7 @@ from .serializers import (
     CommentSerializer,
     display_name,
 )
+from .course_export.access import can_export_any_course
 from .permissions import (
     IsAuthor,
     IsOwnerOrReadOnly,
@@ -420,6 +421,8 @@ class CourseViewSet(EditHistoryMixin, viewsets.ModelViewSet):
         """
         # list and retrieve: one rule (published for everyone, unpublished only for
         # their author; see CourseQuerySet.visible_to). Others get 404 on detail.
+        if self.action == 'retrieve' and can_export_any_course(self.request.user):
+            return Course.objects.all()
         if self.action in ('list', 'retrieve'):
             return Course.objects.visible_to(self.request.user)
 

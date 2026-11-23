@@ -431,6 +431,25 @@ class Block(models.Model):
 # ENROLLMENT MODEL (Student <-> Course Relationship)
 # =============================================================================
 
+class CourseExportJob(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE)
+    requester = models.ForeignKey(User, on_delete=models.CASCADE)
+    format = models.CharField(max_length=5, choices=[('mhtml', 'MHTML'), ('zip', 'STEP ZIP')])
+    author_materials = models.BooleanField(default=False)
+    state = models.CharField(max_length=12, default='queued', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    error = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        permissions = [('export_any_course', 'Can export any course and its author materials')]
+        constraints = [
+            models.UniqueConstraint(fields=['state'], condition=models.Q(state='running'),
+                                    name='one_running_course_export'),
+        ]
+
+
 class CourseEdit(models.Model):
     """Immutable audit snapshots. UUID references survive lesson/block deletion.
     Only the course's owner may read them, including hidden task settings.

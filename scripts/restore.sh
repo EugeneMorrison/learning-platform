@@ -7,13 +7,12 @@
 # The argument is a folder name inside /root/backups or a full path to a folder.
 #
 # A restore:
-#   1. verifies the backup's checksums and (if web is running) its database;
+#   1. verifies the backup's checksums and its database on a disposable copy;
 #   2. asks you to type the folder name to confirm;
-#   3. stops ONLY the web container (nginx and runner keep running, so the site
-#      shows a 502 error page meanwhile);
+#   3. fences database access and stops web and the export worker;
 #   4. saves the current DB and media to /root/backups/pre-restore_<time>/;
 #   5. replaces the DB and media with the backup's;
-#   6. starts web and waits until it answers (it runs migrations first).
+#   6. migrates and verifies offline, starts web, then resumes the worker.
 # To undo a restore, restore that pre-restore_* folder the same way.
 
 set -euo pipefail
@@ -56,10 +55,6 @@ exec 9>"$LOCK_FILE"
 flock -n 9 || die "a backup or restore is running (lock: $LOCK_FILE)"
 umask 077
 
-web_is_running() {
-    docker compose ps --status running --services | grep -x web >/dev/null
-}
-
 # Python program run in the web container: integrity check and a summary of
 # a database file (sys.argv[1]). Opens it read-only.
 CHECK_PY=$(cat <<'PY'
@@ -72,6 +67,8 @@ if problems != ["ok"]:
     print("  integrity_check FAILED:", *problems[:20], sep="\n    ")
     sys.exit(1)
 print("  integrity_check: ok")
+if db.execute("PRAGMA foreign_key_check").fetchone() is not None:
+    sys.exit("  foreign_key_check FAILED")
 app, name = db.execute(
     "SELECT app, name FROM django_migrations ORDER BY id DESC LIMIT 1").fetchone()
 print(f"  newest applied migration: {app}.{name}")
@@ -80,7 +77,8 @@ tables = [row[0] for row in db.execute(
     "SELECT name FROM sqlite_master WHERE type = 'table'"
     " AND name NOT LIKE 'sqlite_%' ORDER BY name")]
 for table in tables:
-    count = db.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0]
+    quoted = table.replace('"', '""')
+    count = db.execute(f'SELECT COUNT(*) FROM "{quoted}"').fetchone()[0]
     if count:
         print(f"    {table}: {count}")
 PY
@@ -103,25 +101,14 @@ log "Checksums: ok"
 MEDIA_FILES=$(tar -tzf "$SRC/media.tar.gz" | awk '!/\/$/ { n++ } END { print n + 0 }')
 log "media.tar.gz is readable: $MEDIA_FILES files"
 
-# The database check runs in the running web container on a temporary copy
-# in its /tmp, so the live site is not affected.
-if web_is_running; then
-    log "Checking the backup's database (on a copy inside the web container)"
-    tmp_dir="/tmp/restore-check-$$"
-    docker compose exec -T web mkdir -p "$tmp_dir"
-    # db.sqlite3 plus a -journal/-wal file if the backup has one.
-    for file in "$SRC"/db.sqlite3*; do
-        docker compose cp "$file" "web:$tmp_dir/"
-    done
-    check_status=0
-    docker compose exec -T web python -I -c "$CHECK_PY" "$tmp_dir/db.sqlite3" || check_status=$?
-    docker compose exec -T web rm -rf "$tmp_dir"
-    [ "$check_status" -eq 0 ] || die "the backup's database failed the check; not restoring it"
-elif [ "$CHECK_ONLY" = yes ]; then
-    die "web is not running: --check needs it to read the database"
-else
-    log "web is not running: skipping the database check (checksums are ok)"
-fi
+# Use the installed web image without mounting the live DB or loading .env.
+# This also works when recovering from an interrupted restore with web stopped.
+web_id=$(docker compose ps --all --quiet web)
+[ -n "$web_id" ] || die "web container not found"
+web_image=$(docker inspect --format '{{.Image}}' "$web_id")
+docker run --rm --network none -v "$SRC:/backup:ro" --entrypoint sh "$web_image" -ec \
+    'cp /backup/db.sqlite3* /tmp/ && exec python -I -c "$1" /tmp/db.sqlite3' sh "$CHECK_PY" \
+    || die "the backup database failed verification"
 
 if [ "$CHECK_ONLY" = yes ]; then
     log "Check finished: $SRC_NAME looks good. Nothing was changed."
@@ -132,42 +119,76 @@ fi
 [ -t 0 ] || die "restore needs an interactive terminal to confirm"
 SAFETY_NAME="pre-restore_$(date -u +%Y-%m-%d_%H%M%SZ)"
 SAFETY_DIR="$BACKUP_ROOT/$SAFETY_NAME"
+[ ! -e "$SAFETY_DIR" ] && [ ! -e "$SAFETY_DIR.partial" ] || die "safety snapshot name already exists; retry"
 echo
 echo "This REPLACES the live database and ALL uploaded media with:"
 echo "  $SRC"
 if [ -f "$SRC/info.txt" ]; then sed 's/^/    /' "$SRC/info.txt"; fi
-echo "The web container is stopped meanwhile (visitors get an error page)."
+echo "Web and export-worker will be stopped while the database and media are replaced."
 echo "The current data is saved first to $SAFETY_DIR"
 echo
 read -r -p "Type the backup folder name ($SRC_NAME) to restore it: " answer
 [ "$answer" = "$SRC_NAME" ] || die "not confirmed; nothing was changed"
 
 # What to do if something fails from here on depends on how far we got.
-STAGE=confirmed
+db_mount=$(docker volume inspect --format '{{.Mountpoint}}' "$DB_VOLUME")
+[[ "$db_mount" = /* && -d "$db_mount" ]] || die "DB volume must be local to this VPS"
+marker="$db_mount/.uchebus-restore-in-progress"
+worker_id=$(docker compose ps --all --quiet export-worker)
+# Refuse to restore against older service containers that do not honor the fence.
+for id in "$web_id" $worker_id; do
+    [ "$(docker inspect --format '{{index .Config.Entrypoint 0}}' "$id")" = /usr/local/bin/uchebus-db-service ] \
+        || die "installed web/worker must use the restore-aware entrypoint"
+    [ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/db"}}{{.Name}}{{end}}{{end}}' "$id")" = "$DB_VOLUME" ] \
+        || die "service is not using the expected database volume"
+done
+was_running=$(docker compose ps --status running --services)
+interrupted=no
+if [ -e "$marker" ]; then interrupted=yes; fi
+STAGE=stopping
 on_exit() {
     local status=$?
     if [ "$status" -eq 0 ]; then return 0; fi
     # An unfinished safety copy is useless: remove it.
     if [ -d "$SAFETY_DIR.partial" ]; then rm -rf -- "$SAFETY_DIR.partial"; fi
     case "$STAGE" in
-        stopped)
-            log "RESTORE FAILED before any data was changed. Starting web again."
-            docker compose start web \
-                || log "ERROR: could not start web; run: cd $PROJECT_DIR && docker compose start web"
+        stopping|stopped)
+            if [ "$interrupted" = no ]; then
+                rm -f -- "$marker"
+                flock -u 8
+                for service in web export-worker; do
+                    if grep -qx "$service" <<<"$was_running"; then
+                        docker compose start "$service" || log "Could not restart $service"
+                    fi
+                done
+            fi
             ;;
         changed)
-            log "RESTORE FAILED after the live data was changed; web may be stopped."
+            log "RESTORE FAILED. The persistent restore marker blocks web and worker startup."
             log "The data from before this restore is in $SAFETY_DIR"
             log "  put it back:  $0 $SAFETY_NAME"
             log "  web logs:     cd $PROJECT_DIR && docker compose logs --tail 50 web"
             ;;
+        verified)
+            log "Restored DB passed verification. Check service startup before resuming exports."
+            ;;
     esac
 }
+exec 8>>"$db_mount/.uchebus-service.lock"
 trap on_exit EXIT
+trap 'exit 1' HUP INT TERM
 
 # ---- 3. Stop web ------------------------------------------------------------
-log "Stopping web (nginx and runner keep running)"
+if [ "$interrupted" = no ]; then
+    printf '%s\n' "$was_running" > "$marker"
+fi
+sync -f "$marker"
+log "Stopping SQLite clients"
+if [ -n "$worker_id" ]; then docker compose stop export-worker; fi
 docker compose stop web
+flock -xn 8 || die "another process holds the database service lock"
+holders=$(docker ps --quiet --filter "volume=$DB_VOLUME")
+[ -z "$holders" ] || die "another running container mounts the database volume"
 STAGE=stopped
 
 # ---- 4. Safety copy of the current data -------------------------------------
@@ -193,6 +214,7 @@ docker run --rm --network none \
 (cd "$SAFETY_DIR.partial" && sha256sum db.sqlite3* media.tar.gz info.txt > SHA256SUMS)
 chmod 600 "$SAFETY_DIR.partial"/*
 mv -- "$SAFETY_DIR.partial" "$SAFETY_DIR"
+sync -f "$SAFETY_DIR"
 
 # ---- 5. Replace the data ----------------------------------------------------
 STAGE=changed
@@ -208,19 +230,27 @@ docker run --rm --network none \
     -v "$MEDIA_VOLUME:/media" -v "$SRC:/backup:ro" \
     "$HELPER_IMAGE" sh -c 'find /media -mindepth 1 -delete && tar -xzf /backup/media.tar.gz -C /media'
 
-# ---- 6. Start web and wait for it -------------------------------------------
-log "Starting web (it applies migrations first, if any)"
+# ---- 6. Verify while both services are fenced -------------------------------
+# Maintenance is the only deliberate bypass of the normal shared lock.
+log "Migrating and checking the restored DB before admitting traffic"
+docker compose run --rm --no-deps -T --entrypoint sh web -ec '
+    python manage.py migrate --noinput
+    python manage.py shell -c "from api.models import CourseExportJob; CourseExportJob.objects.all().delete()"
+    exec python -I -c "$1" "$2"
+' sh "$CHECK_PY" "$DB_PATH_IN_WEB"
+resume_worker=no
+if grep -qx export-worker "$marker"; then resume_worker=yes; fi
+STAGE=verified
+rm -- "$marker"
+flock -u 8
 docker compose start web
-# Any HTTP answer, even an error status, means Django is up; a refused
-# connection means it is still starting.
 PING_PY=$(cat <<'PY'
-import urllib.error
+import json
 import urllib.request
 
-try:
-    urllib.request.urlopen("http://127.0.0.1:8000/", timeout=3)
-except urllib.error.HTTPError:
-    pass
+req = urllib.request.Request("http://127.0.0.1:8000/api/status/", headers={"Host": "uchebus.ru"})
+with urllib.request.urlopen(req, timeout=3) as response:
+    raise SystemExit(json.load(response).get("status") != "ok")
 PY
 )
 deadline=$(( SECONDS + WAIT_SECONDS ))       # SECONDS: bash's own seconds counter
@@ -230,8 +260,7 @@ until docker compose exec -T web python -I -c "$PING_PY" >/dev/null 2>&1; do
     fi
     sleep 3
 done
-log "web is answering. Checking the restored database:"
-docker compose exec -T web python -I -c "$CHECK_PY" "$DB_PATH_IN_WEB"
+if [ "$resume_worker" = yes ]; then docker compose start export-worker; fi
 
 STAGE=finished
 log "Restore of $SRC_NAME finished."
