@@ -3,8 +3,7 @@ Discussions: public threads about one task block (Stepik-style), next to the
 private chat with the course author (api/chat.py), which they don't touch.
 
 Who reads what is one rule, Thread.objects.visible_to (api/models.py): the
-course author and its enrolled students only; on a block the viewer hasn't
-solved yet, only the pinned threads and their own. Anything outside it is a
+course author and its enrolled students can read all threads. Anything outside it is a
 404, as for lessons and blocks.
 
 Text is plain text: stored as typed (stripped), never turned into HTML; the
@@ -29,7 +28,7 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from rest_framework.exceptions import NotFound, ParseError, PermissionDenied, Throttled
 
-from .models import Block, Comment, CommentReport, DiscussionBan, Progress
+from .models import Block, Comment, CommentReport, DiscussionBan
 
 # Longest post, in characters (code points); the panel uses the same number
 # (frontend/src/components/DiscussionPanel.jsx).
@@ -42,12 +41,6 @@ POST_INTERVAL_SECONDS = 60
 
 def is_course_author(user, block):
     return block.lesson.course.author_id == user.id
-
-
-def can_see_all(user, block):
-    """Every thread on the block, not only the pinned and own ones."""
-    return block.type == 'TEXT' or is_course_author(user, block) or Progress.objects.filter(
-        student=user, block=block, is_correct=True).exists()
 
 
 def discussion_block(user, block_id):

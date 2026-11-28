@@ -684,22 +684,12 @@ class ThreadQuerySet(models.QuerySet):
         discussion endpoint goes through it):
         - only on blocks of courses the user has content access to
           (own ∪ enrolled, as BlockQuerySet.visible_to);
-        - the course author sees all of them, as do students on theory blocks;
-        - anyone else sees all of them once they have solved the block
-          (Progress.is_correct, which stays True), before that only the pinned
-          threads and the ones they started themselves.
+        - every participant sees all threads, regardless of task completion.
         """
         if not user.is_authenticated:
             return self.none()
-        solved = Progress.objects.filter(student=user, block=models.OuterRef('block'), is_correct=True)
         return self.filter(
             block__lesson__course__in=Course.objects.with_content_access(user).values('pk'),
-        ).filter(
-            models.Q(block__lesson__course__author=user)
-            | models.Q(block__type='TEXT')
-            | models.Q(is_pinned=True)
-            | models.Q(starter=user)
-            | models.Exists(solved)
         )
 
 
@@ -740,6 +730,7 @@ class Comment(models.Model):
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
+    author_read_at = models.DateTimeField(null=True, blank=True)
     deleted_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

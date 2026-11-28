@@ -53,6 +53,7 @@ urlpatterns = [
          name='comment-dismiss-reports'),
     path('discussions/counts/', views.DiscussionCountsView.as_view(), name='discussion-counts'),
     path('discussions/reports/', views.DiscussionReportsView.as_view(), name='discussion-reports'),
+    path('discussions/comments/', views.DiscussionCommentsView.as_view(), name='discussion-comments'),
     path('discussions/bans/', views.DiscussionBansView.as_view(), name='discussion-bans'),
     path('discussions/bans/<int:user_id>/', views.DiscussionBanDetailView.as_view(), name='discussion-ban-detail'),
     path('enrollments/', views.EnrollmentListCreateView.as_view(), name='enrollment-list'),
@@ -119,6 +120,7 @@ DISCUSSIONS (public threads per task block; api/discussions.py):
 - POST   /api/comments/{id}/report/           → Report a comment (students)
 - POST   /api/comments/{id}/dismiss-reports/  → Dismiss its reports (course author)
 - GET    /api/discussions/reports/            → Open reports in my courses (course author)
+- GET    /api/discussions/comments/           → Student comments and unread count in my courses
 - GET    /api/discussions/bans/               → Users I banned from posting (course author)
 - POST   /api/discussions/bans/               → Ban a student of my courses {"user_id"}
 - DELETE /api/discussions/bans/{user_id}/     → Lift a ban

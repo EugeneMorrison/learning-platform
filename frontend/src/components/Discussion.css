@@ -352,7 +352,7 @@
     }
 }
 
-/* ---- «Жалобы в обсуждениях» (author dashboard, DiscussionReports.jsx) ---- */
+/* ---- «Обсуждения» (author dashboard, DiscussionReports.jsx) ---- */
 
 .report-item {
     padding: var(--space-3) var(--space-4);

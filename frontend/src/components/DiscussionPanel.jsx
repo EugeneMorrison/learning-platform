@@ -323,7 +323,7 @@ function sortThreads(threads) {
 /**
  * The discussion of one task block: public threads, next to the private chat
  * with the teacher. GET /api/blocks/<id>/threads/ (again when `solved`
- * changes: solving shows every thread); the server decides what this user may
+ * changes to refresh comments); the server decides what this user may
  * read and do (can_* flags). A right-hand panel; a bottom sheet on phones
  * (Discussion.css). Not modal: Esc and the close button call onClose, which
  * returns focus. onThreadsChanged: a thread was started or deleted, or
@@ -456,12 +456,6 @@ function DiscussionPanel({ id, blockId, title, solved, onClose, onThreadsChanged
                         ) : (
                             <p className="notice notice-warning">
                                 Автор курса закрыл вам возможность писать в обсуждения. Читать их можно.
-                            </p>
-                        )}
-
-                        {data.hidden_count > 0 && (
-                            <p className="discussion-panel__note">
-                                Ещё обсуждений: {data.hidden_count}. Они откроются, когда вы решите задачу.
                             </p>
                         )}
 

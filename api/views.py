@@ -39,7 +39,7 @@ from .models import (Course, CourseEdit, Lesson, Block, Enrollment, Progress, Me
 from .chat import MAX_MESSAGE_LENGTH, chat_allowed, message_preview, notify_user, push_message
 from .questions import MAX_DRAFT_LENGTH, build_context
 from .edit_history import EditHistoryMixin, ordered_snapshot, record_edit, snapshot
-from .discussions import (can_see_all, check_not_banned, check_post_interval, clean_text, discussion_block,
+from .discussions import (check_not_banned, check_post_interval, clean_text, discussion_block,
                           is_banned, is_course_author, open_reports)
 from .runner import RunnerBusy, RunnerUnavailable, run_python
 from .output_comparison import outputs_match
@@ -1751,9 +1751,8 @@ class BlockThreadsView(APIView):
     POST /api/blocks/<block_id>/threads/   Body: {"text": "..."}: start one
 
     GET: {"threads": [ThreadSerializer, ...] (pinned first, then open, then
-    resolved; newest first), "can_see_all": the user sees every thread (the
-    course author, or solved the block), "hidden_count": threads not shown
-    until the block is solved, "can_post": false when the course author has
+    resolved; newest first), "can_see_all": true, "hidden_count": 0,
+    "can_post": false when the course author has
     banned the user}.
     POST 201: the new thread. 400: empty / too long text.
     403: banned by the course author. 404: no such block, or the user is
@@ -1765,13 +1764,16 @@ class BlockThreadsView(APIView):
     def get(self, request, block_id):
         block = discussion_block(request.user, block_id)
         threads = list(discussion_threads().visible_to(request.user).filter(block=block))
-        sees_all = can_see_all(request.user, block)
-        hidden = 0 if sees_all else Thread.objects.filter(block=block).count() - len(threads)
-        context = discussion_context(request, block, thread_comment_ids(*threads))
+        comment_ids = thread_comment_ids(*threads)
+        context = discussion_context(request, block, comment_ids)
+        if is_course_author(request.user, block):
+            # Mark only the comments actually loaded; concurrent replies stay new.
+            Comment.objects.filter(pk__in=comment_ids, author_read_at__isnull=True).exclude(
+                user=request.user).update(author_read_at=timezone.now())
         return Response({
             'threads': ThreadSerializer(threads, many=True, context=context).data,
-            'can_see_all': sees_all,
-            'hidden_count': hidden,
+            'can_see_all': True,
+            'hidden_count': 0,
             'can_post': not is_banned(request.user, block),
         })
 
@@ -1928,6 +1930,44 @@ class CommentDismissReportsView(APIView):
             raise PermissionDenied(gettext('Жалобы разбирает только автор курса.'))
         comment.reports.filter(is_dismissed=False).update(is_dismissed=True)
         return Response(CommentSerializer(comment, context=discussion_context(request, block, [comment.id])).data)
+
+
+class DiscussionCommentsView(APIView):
+    """All student comments in the viewer's courses, newest first, 50 per page.
+
+    Reading this feed does not clear unread comments; opening their discussion does.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            offset = int(request.query_params.get('offset', 0))
+        except (TypeError, ValueError):
+            raise ParseError('Invalid offset.')
+        if offset < 0:
+            raise ParseError('Invalid offset.')
+        comments = Comment.objects.filter(
+            thread__block__lesson__course__author=request.user, is_deleted=False,
+        ).exclude(user=request.user)
+        unread_count = comments.filter(author_read_at__isnull=True).count()
+        page = list(comments.select_related('user', 'thread__block__lesson__course')
+                    .order_by('-created_at', '-id')[offset:offset + 51])
+        entries = []
+        for comment in page[:50]:
+            block = comment.thread.block
+            entries.append({
+                'id': comment.id,
+                'text': comment.text,
+                'user_name': display_name(comment.user),
+                'created_at': comment.created_at,
+                'is_unread': comment.author_read_at is None,
+                'block_id': str(block.id),
+                'lesson_id': str(block.lesson_id),
+                'lesson_title': block.lesson.title,
+                'course_title': block.lesson.course.title,
+            })
+        return Response({'comments': entries, 'unread_count': unread_count,
+                         'next_offset': offset + 50 if len(page) > 50 else None})
 
 
 class DiscussionReportsView(APIView):

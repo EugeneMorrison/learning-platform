@@ -9,13 +9,15 @@ function errorText(err, fallback) {
 }
 
 /**
- * «Жалобы в обсуждениях» on the course author's dashboard: comments students
- * reported in her courses (GET /api/discussions/reports/, latest first), with
+ * «Обсуждения» on the course author's dashboard: all student comments and
+ * reports in their courses, latest first, with
  * what to do about each (open the task's discussion, delete, dismiss, ban the
  * writer), and the users she has banned (GET /api/discussions/bans/).
  * Comment text is plain text, rendered as a text node.
  */
 function DiscussionReports() {
+    const [feed, setFeed] = useState(null);
+    const [offset, setOffset] = useState(0);
     const [reports, setReports] = useState(null);
     const [bans, setBans] = useState([]);
     const [error, setError] = useState('');
@@ -23,20 +25,29 @@ function DiscussionReports() {
 
     const load = useCallback(async () => {
         try {
-            const [reportsRes, bansRes] = await Promise.all([
+            const [commentsRes, reportsRes, bansRes] = await Promise.all([
+                api.get('/discussions/comments/', { params: { offset } }),
                 api.get('/discussions/reports/'),
                 api.get('/discussions/bans/'),
             ]);
+            setFeed(commentsRes.data);
             setReports(reportsRes.data.reports);
             setBans(bansRes.data.bans);
+            setError('');
         } catch (err) {
             console.error('Failed to load discussion reports:', err);
-            setError('Не удалось загрузить жалобы.');
+            setError('Не удалось загрузить обсуждения.');
         }
-    }, []);
+    }, [offset]);
 
     useEffect(() => {
         load();
+        const timer = window.setInterval(load, 30000);
+        window.addEventListener('focus', load);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('focus', load);
+        };
     }, [load]);
 
     async function act(confirmText, request) {
@@ -63,11 +74,44 @@ function DiscussionReports() {
     return (
         <section className="section">
             <div className="section__header">
-                <h2 className="section__title">Жалобы в обсуждениях</h2>
+                <h2 className="section__title">Обсуждения</h2>
             </div>
             {error && <p className="notice notice-danger" role="alert">{error}</p>}
             {reports === null && !error && <p className="muted" role="status">Загружаем…</p>}
-            {reports && reports.length === 0 && <p className="muted">Жалоб нет.</p>}
+            {feed && (
+                <>
+                    <p className="muted" role="status">
+                        {feed.unread_count > 0 ? `новые комментарии (${feed.unread_count})` : 'новых комментариев нет.'}
+                    </p>
+                    <ul className="inbox-list">
+                        {feed.comments.map(comment => (
+                            <li key={comment.id} className="report-item">
+                                <p className="report-item__where">{comment.course_title} › {comment.lesson_title}</p>
+                                <p className="discussion-comment__meta">
+                                    <span className="discussion-comment__author">{comment.user_name}</span>
+                                    <time className="discussion-comment__time" dateTime={comment.created_at}>
+                                        {formatMessageTime(comment.created_at)}
+                                    </time>
+                                    {comment.is_unread && <span className="discussion-chip">Новый</span>}
+                                </p>
+                                <p className="discussion-comment__text report-item__text">{comment.text}</p>
+                                <Link className="discussion-link" to={`/lesson/${comment.lesson_id}/?discussion=${comment.block_id}#block-${comment.block_id}`}>
+                                    Открыть обсуждение
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                    {(offset > 0 || feed.next_offset !== null) && (
+                        <div className="discussion-comment__actions">
+                            <button type="button" className="discussion-link" disabled={offset === 0}
+                                onClick={() => setOffset(Math.max(0, offset - 50))}>Предыдущие</button>
+                            <button type="button" className="discussion-link" disabled={feed.next_offset === null}
+                                onClick={() => setOffset(feed.next_offset)}>Следующие</button>
+                        </div>
+                    )}
+                </>
+            )}
+            {reports && reports.length > 0 && <h3 className="report-bans__title">Жалобы на комментарии</h3>}
             {reports && reports.length > 0 && (
                 <ul className="inbox-list">
                     {reports.map(r => (

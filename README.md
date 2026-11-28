@@ -503,12 +503,15 @@ GET    /api/discussions/counts/?lesson={id}    Threads I may read, per block («
 POST   /api/comments/{id}/report/              Report a comment (students; once each)
 POST   /api/comments/{id}/dismiss-reports/     Dismiss its reports (course author)
 GET    /api/discussions/reports/               Open reports in my courses (course author's dashboard)
+GET    /api/discussions/comments/?offset=0     All student comments in my courses, with unread count (50 per page)
 GET    /api/discussions/bans/                  Users I banned from posting
 POST   /api/discussions/bans/                  Ban a student of my courses {"user_id"}
 DELETE /api/discussions/bans/{user_id}/        Lift a ban
 ```
 
-Course author and enrolled students only. Before solving a task, a student sees only the pinned threads and their own; after solving, all of them (checked on the server, `api/discussions.py`). Plain text up to 2000 characters, one post a minute (the course author is exempt). A ban covers all of the author's courses: the user can still read, but not post.
+Course author and enrolled students only. All participants can read and reply to every discussion before solving a task; access to submitted solutions still requires solving it. Plain text up to 2000 characters, one post a minute (the course author is exempt). A ban covers all of the author's courses: the user can still read, but not post.
+
+The author's **Обсуждения** dashboard lists all student comments and replies, including unreported comments, with **новые комментарии (N)** or **новых комментариев нет.** Opening a block's discussion marks its loaded comments read; the dashboard retains their history. Deleted comments and the author's own posts are excluded from the feed and unread count. The feed refreshes every 30 seconds and when the window regains focus. Reports and moderation controls remain available. Deploy with `python manage.py migrate` (migration `0029_comment_author_read_at`); existing comments initially count as new.
 
 ### WebSocket — real-time chat
 

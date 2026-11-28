@@ -1,6 +1,6 @@
 """
-Discussions (api/discussions.py): who may read which threads (the solved-block
-rule, enforced on the server), enrolment, who may resolve / pin / delete, the
+Discussions (api/discussions.py): shared comments regardless of completion,
+author inbox, enrolment, who may resolve / pin / delete, the
 one-post-a-minute limit, plain text only, and moderation (bans, reports).
 
 Run with: python manage.py test api.test_discussions
@@ -98,12 +98,13 @@ class DiscussionTestCase(APITestCase):
 
 class VisibilityTests(DiscussionTestCase):
 
-    def test_unsolved_block_shows_only_pinned_and_own_threads(self):
+    def test_unsolved_block_shows_all_threads_and_replies(self):
         response = self.threads(self.student, self.code)
-        self.assertEqual([t['id'] for t in response.data['threads']], [self.pinned.id, self.own.id])
-        self.assertFalse(response.data['can_see_all'])
-        self.assertEqual(response.data['hidden_count'], 1)
-        self.assertNotIn('print(1)', str(response.data))
+        self.assertEqual([t['id'] for t in response.data['threads']],
+                         [self.pinned.id, self.own.id, self.solvers.id])
+        self.assertTrue(response.data['can_see_all'])
+        self.assertEqual(response.data['hidden_count'], 0)
+        self.assertIn('Перечитай второй абзац', str(response.data))
 
     def test_own_thread_comes_with_its_replies(self):
         own = next(t for t in self.threads(self.student, self.code).data['threads'] if t['id'] == self.own.id)
@@ -115,10 +116,10 @@ class VisibilityTests(DiscussionTestCase):
         self.assertTrue(response.data['can_see_all'])
         self.assertEqual(response.data['hidden_count'], 0)
 
-    def test_solving_the_block_opens_the_rest(self):
+    def test_wrong_answer_does_not_hide_comments(self):
         Progress.objects.create(student=self.student, block=self.code, lesson=self.lesson,
                                 completed=True, is_correct=False)
-        self.assertNotIn(self.solvers.id, self.thread_ids(self.student, self.code))  # a wrong answer is not solving
+        self.assertIn(self.solvers.id, self.thread_ids(self.student, self.code))
         Progress.objects.filter(student=self.student, block=self.code).update(is_correct=True)
         self.assertIn(self.solvers.id, self.thread_ids(self.student, self.code))
 
@@ -128,16 +129,16 @@ class VisibilityTests(DiscussionTestCase):
         self.assertTrue(response.data['can_see_all'])
 
     def test_quiz_follows_the_same_rule(self):
-        self.assertEqual(self.thread_ids(self.student, self.quiz), [])
+        self.assertEqual(self.thread_ids(self.student, self.quiz), [self.quiz_thread.id])
         self.assertEqual(self.thread_ids(self.solver, self.quiz), [self.quiz_thread.id])
 
-    def test_hidden_thread_is_404_for_every_action(self):
-        self.assertEqual(self.reply(self.student, self.solvers).status_code, 404)
-        self.assertEqual(self.patch(self.student, self.solvers, is_resolved=True).status_code, 404)
-        self.assertEqual(self.as_user(self.student).delete(f'/api/threads/{self.solvers.id}/').status_code, 404)
+    def test_unsolved_student_can_reply_but_cannot_moderate_others_threads(self):
+        self.assertEqual(self.reply(self.student, self.solvers).status_code, 201)
+        self.assertEqual(self.patch(self.student, self.solvers, is_resolved=True).status_code, 403)
+        self.assertEqual(self.as_user(self.student).delete(f'/api/threads/{self.solvers.id}/').status_code, 403)
         comment = self.solvers.comments.first()
-        self.assertEqual(self.as_user(self.student).delete(f'/api/comments/{comment.id}/').status_code, 404)
-        self.assertEqual(self.solvers.comments.count(), 1)
+        self.assertEqual(self.as_user(self.student).delete(f'/api/comments/{comment.id}/').status_code, 403)
+        self.assertEqual(self.solvers.comments.count(), 2)
 
     def test_pinned_thread_can_be_answered_before_solving(self):
         self.assertEqual(self.reply(self.student, self.pinned).status_code, 201)
@@ -150,7 +151,7 @@ class VisibilityTests(DiscussionTestCase):
 
     def test_counts_are_what_the_viewer_may_read(self):
         code, quiz = str(self.code.id), str(self.quiz.id)
-        self.assertEqual(self.counts(self.student).data['counts'], {code: 2})
+        self.assertEqual(self.counts(self.student).data['counts'], {code: 3, quiz: 1})
         self.assertEqual(self.counts(self.solver).data['counts'], {code: 3, quiz: 1})
         self.assertEqual(self.counts(self.author).data['counts'], {code: 3, quiz: 1})
 
@@ -167,6 +168,67 @@ class VisibilityTests(DiscussionTestCase):
         for user in (self.outsider, self.other_author):
             self.assertEqual(self.threads(user, self.text).status_code, 404)
             self.assertEqual(self.start(user, self.text).status_code, 404)
+
+
+class AuthorCommentFeedTests(DiscussionTestCase):
+    def feed(self, user, **params):
+        response = self.as_user(user).get('/api/discussions/comments/', params)
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_all_comments_including_replies_without_reports(self):
+        data = self.feed(self.author)
+        self.assertEqual(data['unread_count'], 5)
+        self.assertEqual(len(data['comments']), 5)
+        self.assertIn(self.own.comments.last().id, [c['id'] for c in data['comments']])
+        self.assertTrue(all(c['is_unread'] for c in data['comments']))
+        self.assertEqual(data['comments'][0]['block_id'], str(self.quiz.id))
+        self.assertEqual(self.feed(self.author)['unread_count'], 5)
+
+    def test_only_author_opening_discussion_marks_its_comments_read(self):
+        self.threads(self.student, self.code)
+        self.assertEqual(self.feed(self.author)['unread_count'], 5)
+        self.threads(self.author, self.code)
+        data = self.feed(self.author)
+        self.assertEqual(data['unread_count'], 1)
+        self.assertEqual(len(data['comments']), 5)  # history stays available
+        self.assertEqual(sum(c['is_unread'] for c in data['comments']), 1)
+        self.reply(self.student, self.solvers, 'A new reply')
+        self.assertEqual(self.feed(self.author)['unread_count'], 2)
+
+    def test_own_and_deleted_comments_are_excluded(self):
+        self.reply(self.author, self.own, 'Author reply')
+        Comment.objects.filter(pk=self.pinned.comments.first().pk).update(is_deleted=True)
+        data = self.feed(self.author)
+        self.assertEqual(data['unread_count'], 4)
+        self.assertEqual(len(data['comments']), 4)
+
+    def test_feed_is_scoped_to_owned_courses(self):
+        other_course = Course.objects.create(title='Other', author=self.other_author)
+        lesson = Lesson.objects.create(course=other_course, title='Other', order_index=1)
+        block = Block.objects.create(lesson=lesson, type='TEXT', order_index=1, content={})
+        make_thread(block, self.student, 'Other course comment')
+        self.assertEqual(self.feed(self.author)['unread_count'], 5)
+        self.assertEqual(self.feed(self.other_author)['unread_count'], 1)
+        for user in (self.student, self.outsider):
+            self.assertEqual(self.feed(user)['comments'], [])
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.get('/api/discussions/comments/').status_code, 401)
+
+    def test_pagination_and_invalid_offsets(self):
+        Comment.objects.bulk_create([
+            Comment(thread=self.own, user=self.student, text=f'Reply {i}') for i in range(51)
+        ])
+        first = self.feed(self.author)
+        second = self.feed(self.author, offset=first['next_offset'])
+        self.assertEqual(len(first['comments']), 50)
+        self.assertEqual(len(second['comments']), 6)
+        self.assertEqual(first['unread_count'], 56)
+        self.assertIsNone(second['next_offset'])
+        self.assertFalse({c['id'] for c in first['comments']} & {c['id'] for c in second['comments']})
+        for offset in ('bad', -1):
+            self.assertEqual(self.as_user(self.author).get('/api/discussions/comments/',
+                                                         {'offset': offset}).status_code, 400)
 
 
 class EnrolmentTests(DiscussionTestCase):
@@ -412,10 +474,10 @@ class ReportTests(DiscussionTestCase):
         self.assertEqual(self.report(self.solver, spoiler).status_code, 400)  # own comment
 
     def test_cannot_report_what_one_cannot_read(self):
-        spoiler = self.solvers.comments.first()  # student hasn't solved CODE
-        self.assertEqual(self.report(self.student, spoiler).status_code, 404)
+        spoiler = self.solvers.comments.first()
         self.assertEqual(self.report(self.outsider, spoiler).status_code, 404)
         self.assertFalse(CommentReport.objects.exists())
+        self.assertEqual(self.report(self.student, spoiler).status_code, 201)
 
     def test_course_author_does_not_report_and_is_not_reported(self):
         self.assertEqual(self.report(self.author, self.solvers.comments.first()).status_code, 403)

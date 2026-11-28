@@ -143,8 +143,8 @@ function LessonViewer() {
         return () => setLessonBar(null);
     }, [loading, error, lesson, taskIds, solvedBlockIds, showLessons, openLessons, scrollToContent, setLessonBar]);
 
-    // «💬 N»: threads this user may read, per task. Again after a solve (a
-    // solved task shows every thread) and when the panel starts or deletes one.
+    // «💬 N»: all threads per task. Refresh after a solve and when the panel
+    // starts or deletes a thread.
     // No discussions in an embed.
     const discussionsOn = Boolean(user) && !isInIframe;
     const lessonId = lesson?.id;
