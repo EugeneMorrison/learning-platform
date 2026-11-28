@@ -206,3 +206,6 @@
 .course-progress__details {
     margin-top: var(--space-3);
 }
+
+.course-recommendations { margin-block: var(--space-4); }
+.course-recommendations__option { display: block; margin-block: var(--space-2); overflow-wrap: anywhere; }

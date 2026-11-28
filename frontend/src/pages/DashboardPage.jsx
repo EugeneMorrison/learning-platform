@@ -1,3 +1,4 @@
+import StudentDashboard from '../components/StudentDashboard';
 import CoursePriceFields from '../components/CoursePriceFields';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -80,72 +81,6 @@ function CoursePrice({ price }) {
     return <strong className="dash-card__price">{amount === 0 ? 'Бесплатно' : `${formatter.format(amount)} ₽`}</strong>;
 }
 
-function StudentDashboard() {
-    const [enrollments, setEnrollments] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function fetchEnrollments() {
-            try {
-                const response = await api.get('/enrollments/');
-                setEnrollments(response.data);
-            } catch (err) {
-                console.error('Failed to load enrollments:', err);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchEnrollments();
-    }, []);
-
-    if (loading) return <p className="page-status">Загрузка курсов...</p>;
-
-    return (
-        <section className="section">
-            <div className="section__header">
-                <h2 className="section__title">Мои курсы</h2>
-            </div>
-            {enrollments.length === 0 ? (
-                <p className="muted">Вы пока не записаны ни на один курс.</p>
-            ) : (
-                <div className="card-grid">
-                    {enrollments.map(enrollment => (
-                        <div key={enrollment.id} className="card card-link dash-card">
-                            <div className="dash-card__cover">
-                                <CourseCover title={enrollment.course_title} cover={enrollment.course_cover} />
-                            </div>
-                            <h3 className="dash-card__title">
-                                <Link className="card-link__target" to={`/courses/${enrollment.course}/`}>
-                                    {enrollment.course_title}
-                                </Link>
-                            </h3>
-                            <p className="dash-card__meta">
-                                Записан: {new Date(enrollment.enrolled_at).toLocaleDateString('ru-RU')}
-                            </p>
-                            {/* Course progress, as on the course page; nothing for a course without tasks. */}
-                            {enrollment.task_count > 0 && (
-                                <div className="dash-card__progress">
-                                    <TaskProgress
-                                        solved={enrollment.solved_count}
-                                        total={enrollment.task_count}
-                                        completeText="✓ Курс пройден"
-                                    />
-                                </div>
-                            )}
-                            <div className="dash-card__actions">
-                                <CoursePrice price={enrollment.course_price} />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-        </section>
-    );
-}
-
-// «Вопросы студентов»: conversations where students wrote to me (the author)
-// and I haven't read it yet. Unread questions («Задать вопрос») first, then
-// plain messages; newest first within each. Live (lib/notifications.js).
 function StudentQuestions() {
     const notifications = useNotifications();
     const conversations = (notifications?.conversations || [])

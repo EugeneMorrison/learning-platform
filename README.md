@@ -41,6 +41,14 @@ A student can:
 
 ---
 
+## Student dashboard
+
+The student dashboard shows courses in progress, completed courses, and up to six recommendations on one page. Progress counts all assignment blocks (the platform currently has no optional-assignment flag); theory blocks do not count. As in the lesson viewer, courses without assignments are complete. Completed courses remain available for review and practice.
+
+Courses in progress are ordered by the latest lesson visit or submission, falling back to enrollment time. Continue Learning opens that lesson, or the first lesson if the student has not started. Existing submission history supplies resume locations before visit tracking was introduced.
+
+Authors select follow-up courses under **Рекомендации после завершения курса** in the course editor. After completion, these courses take priority over popular courses, ranked by enrollment count. Recommendations include only published courses and exclude the student's enrolled courses and courses completed through retained progress. The dashboard API is `GET /api/dashboard/`; relationships are saved through the course API's `recommended_courses` field. Apply migration `0027_student_dashboard` with `python manage.py migrate` when deploying.
+
 ## Coding task solutions
 
 `GET /api/blocks/{id}/solutions/?offset=0` requires authentication, access to the course, and a saved successful result for that exact coding task. It returns `official_solution` (or `null`), paginated `results` (`id`, `author_name`, `code`), and `next_offset` (or `null`). Pages default to 10 entries, with an optional `limit` capped at 20. The viewer's submission, the author's test submissions, failed attempts, hidden code/tests, and private account fields are excluded. The ordinary lesson/block responses continue to omit the official solution for students, even after completion. No database migration is required.

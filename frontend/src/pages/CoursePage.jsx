@@ -1,3 +1,4 @@
+import CourseRecommendationsEditor from '../components/CourseRecommendationsEditor';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
@@ -605,6 +606,9 @@ function CoursePage() {
                             const res = await api.patch(`/courses/${courseId}/`, { description });
                             setCourse(prev => ({ ...prev, description: res.data.description }));
                         }} />
+                    {isOwner && <CourseRecommendationsEditor key={courseId} courseId={courseId}
+                        value={course.recommended_courses || []}
+                        onSaved={recommended_courses => setCourse(prev => ({ ...prev, recommended_courses }))} />}
                     {course.can_export && <CourseExport key={course.id} courseId={course.id} />}
                 </div>
                 {/* Its own line of the header, so the bar has a width on any screen. */}

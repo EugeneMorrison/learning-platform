@@ -129,6 +129,11 @@ class Course(models.Model):
         editable=False
     )
 
+    recommended_courses = models.ManyToManyField(
+        'self', symmetrical=False, blank=True, related_name='recommended_after',
+        help_text='Courses to recommend after completing this course',
+    )
+
     title = models.CharField(
         max_length=255,
         help_text="Course title (e.g., 'Python Basics')"
@@ -483,6 +488,10 @@ class Enrollment(models.Model):
         related_name='enrollments',
         help_text="Course enrolled in"
     )
+
+    last_lesson = models.ForeignKey('Lesson', null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name='+')
+    last_activity_at = models.DateTimeField(null=True, blank=True)
 
     enrolled_at = models.DateTimeField(
         auto_now_add=True,

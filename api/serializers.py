@@ -109,6 +109,7 @@ class CourseSerializer(serializers.ModelSerializer):
         model = Course
         fields = [
             'id',
+            'recommended_courses',
             'title',
             'description',
             'author',
@@ -124,6 +125,20 @@ class CourseSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'author', 'created_at', 'updated_at']
         extra_kwargs = {'title': {'error_messages': TITLE_ERRORS}}
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        fields['recommended_courses'].child_relation.queryset = (
+            Course.objects.visible_to(user) if user else Course.objects.none()
+        )
+        return fields
+
+    def validate_recommended_courses(self, value):
+        if self.instance and any(course.pk == self.instance.pk for course in value):
+            raise serializers.ValidationError('Нельзя рекомендовать этот же курс.')
+        return value
 
     def validate_price(self, value):
         if value < 0:

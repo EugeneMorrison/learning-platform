@@ -127,6 +127,8 @@ def record_answer(user, block, answer, is_correct):
     # A code run can finish after its block was moved to another lesson.
     # Share the move's block lock and read its current location before saving.
     block = Block.objects.select_for_update().get(pk=block.pk)
+    Enrollment.objects.filter(student=user, course=block.lesson.course).update(
+        last_lesson=block.lesson, last_activity_at=timezone.now())
     existing = Progress.objects.filter(student=user, block=block).first()
     if existing and existing.is_correct:
         return None
@@ -677,7 +679,11 @@ class LessonViewSet(EditHistoryMixin, ParentOwnerMixin, viewsets.ModelViewSet):
         Lessons of unpublished courses and unknown ids get a plain 404.
         """
         try:
-            return super().retrieve(request, *args, **kwargs)
+            response = super().retrieve(request, *args, **kwargs)
+            lesson = self.get_object()
+            Enrollment.objects.filter(student=request.user, course=lesson.course).update(
+                last_lesson=lesson, last_activity_at=timezone.now())
+            return response
         except Http404:
             course_slug = None
             try:

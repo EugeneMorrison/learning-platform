@@ -13,7 +13,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import ParseError
 
 from .block_content import grade_quiz
-from .models import Attempt, Block, Progress
+from .models import Attempt, Block, Enrollment, Progress
 
 
 def saved_quiz_snapshot(answer):
@@ -91,6 +91,8 @@ def submit_quiz(user, block, raw_answer):
     with transaction.atomic():
         block = Block.objects.select_for_update().get(pk=block.pk)
         answer, correct = prepare_quiz_answer(block, raw_answer)
+        Enrollment.objects.filter(student=user, course=block.lesson.course).update(
+            last_lesson=block.lesson, last_activity_at=timezone.now())
         progress, _ = Progress.objects.get_or_create(
             student=user, block=block, defaults={'lesson': block.lesson},
         )

@@ -24,7 +24,8 @@ def snapshot(obj):
     data = {'id': str(obj.pk)}
     if isinstance(obj, Course):
         data.update(title=obj.title, description=obj.description, level=obj.level,
-                    is_published=obj.is_published, price=str(obj.price), cover=obj.cover.name or '')
+                    is_published=obj.is_published, price=str(obj.price), cover=obj.cover.name or '',
+                    recommended_courses=sorted(str(pk) for pk in obj.recommended_courses.values_list('pk', flat=True)))
     elif isinstance(obj, Lesson):
         data.update(title=obj.title, course_id=str(obj.course_id), order_index=obj.order_index,
                     lesson_number=lesson_number(obj), is_preview=obj.is_preview)

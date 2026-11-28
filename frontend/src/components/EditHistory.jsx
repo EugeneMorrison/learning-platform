@@ -9,7 +9,7 @@ const ACTIONS = { created: 'Добавлено', updated: 'Изменено', de
     duplicated: 'Скопировано', restored: 'Восстановлена версия', moved: 'Перенесено в другой урок' };
 const KINDS = { course: 'Курс', lesson: 'Урок', block: 'Блок' };
 const TYPES = { TEXT: 'Теория', QUIZ: 'Тест', CODE: 'Задача с кодом', FILL: 'Пропуски', SORT: 'Сортировка', MATCH: 'Сопоставление', TABLE: 'Таблица' };
-const FIELDS = { title: 'Название', description: 'Описание', level: 'Уровень', is_published: 'Опубликован',
+const FIELDS = { recommended_courses: 'Рекомендуемые курсы', title: 'Название', description: 'Описание', level: 'Уровень', is_published: 'Опубликован',
     is_preview: 'Бесплатный просмотр', price: 'Цена', cover: 'Обложка', type: 'Тип блока', order_index: 'Порядок', content: 'Содержимое', order: 'Порядок',
     blocks: 'Блоки урока', course_id: 'Курс', lesson_id: 'Урок', lesson_number: 'Номер урока' };
 const date = value => new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));

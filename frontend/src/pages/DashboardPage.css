@@ -92,3 +92,5 @@
 .dash-notice {
     margin-bottom: var(--space-5);
 }
+
+.dash-card__progress progress { display: block; width: 100%; margin-top: var(--space-2); }
