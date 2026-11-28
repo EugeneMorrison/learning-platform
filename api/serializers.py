@@ -35,6 +35,11 @@ class UserSerializer(serializers.ModelSerializer):
     """
 
     # Add computed fields (not in database, but useful for API)
+    can_moderate_reviews = serializers.SerializerMethodField()
+
+    def get_can_moderate_reviews(self, obj):
+        return obj.is_staff and obj.has_perm('api.moderate_coursereview')
+
     course_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -47,6 +52,7 @@ class UserSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'date_joined',
+            'can_moderate_reviews',
             'course_count'  # How many courses this user authored
         ]
         # role is read-only: users never set their own role through the API
@@ -315,7 +321,8 @@ class LessonViewerSerializer(LessonSerializer):
         tasks = Block.objects.filter(lesson__course_id=obj.course_id, type__in=TASK_TYPES)
         # One Progress row per student per block (unique_together).
         solved = Progress.objects.filter(student=user, block__in=tasks, is_correct=True).count()
-        return solved == tasks.count()
+        from .completion import meets_completion
+        return meets_completion(solved, tasks.count())
 
 
 # =============================================================================

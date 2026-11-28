@@ -1,3 +1,5 @@
+import CourseReview from '../components/CourseReview';
+import PublishedReviews from '../components/PublishedReviews';
 import CourseRecommendationsEditor from '../components/CourseRecommendationsEditor';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -609,6 +611,8 @@ function CoursePage() {
                     {isOwner && <CourseRecommendationsEditor key={courseId} courseId={courseId}
                         value={course.recommended_courses || []}
                         onSaved={recommended_courses => setCourse(prev => ({ ...prev, recommended_courses }))} />}
+                    <PublishedReviews courseId={courseId} />
+                    {user?.role === 'STUDENT' && <CourseReview courseId={courseId} />}
                     {course.can_export && <CourseExport key={course.id} courseId={course.id} />}
                 </div>
                 {/* Its own line of the header, so the bar has a width on any screen. */}
@@ -616,7 +620,7 @@ function CoursePage() {
                     <div className="course-progress">
                         {showStudentProgress && (
                             <>
-                                <TaskProgress solved={solvedTasks} total={totalTasks} completeText="✓ Курс пройден" />
+                                <TaskProgress completionThreshold={89} solved={solvedTasks} total={totalTasks} completeText="✓ Курс пройден" />
                                 <p className="course-progress__lessons">
                                     Пройдено уроков: {passedLessons} из {lessonsWithTasks.length}
                                 </p>

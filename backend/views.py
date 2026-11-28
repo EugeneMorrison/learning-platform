@@ -9,7 +9,7 @@ The React app is served separately by spa_view / lesson_view in backend/urls.py.
 from datetime import timezone
 
 from django.contrib.staticfiles import finders
-from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
+from django.db.models import Avg, Count, IntegerField, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, render
@@ -158,6 +158,8 @@ def course_detail_view(request, slug):
         'course': course,
         'lessons': lessons,
         'totals': totals,
+        'student_reviews': course.student_reviews.filter(status='approved').select_related('student').order_by('-published_at'),
+        'average_rating': course.student_reviews.filter(status='approved').aggregate(value=Avg('rating'))['value'],
     })
 
 

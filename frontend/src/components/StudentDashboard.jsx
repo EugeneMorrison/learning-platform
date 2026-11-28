@@ -30,7 +30,7 @@ export default function StudentDashboard() {
     return <>
         {[
             ['in_progress', 'Курсы в процессе', 'У вас пока нет курсов в процессе обучения.'],
-            ['completed', 'Завершённые курсы', 'Здесь появятся курсы, в которых вы решили все задания.'],
+            ['completed', 'Завершённые курсы', 'Здесь появятся курсы, в которых вы решили не менее 89% заданий.'],
             ['recommended', 'Рекомендуемые курсы', 'Пока нет подходящих рекомендаций. Загляните позже.'],
         ].map(([key, title, empty]) => <section className="section" key={key} aria-labelledby={`dash-${key}`}>
             <div className="section__header"><h2 className="section__title" id={`dash-${key}`}>{title}</h2></div>

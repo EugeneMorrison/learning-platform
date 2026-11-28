@@ -43,7 +43,9 @@ A student can:
 
 ## Student dashboard
 
-The student dashboard shows courses in progress, completed courses, and up to six recommendations on one page. Progress counts all assignment blocks (the platform currently has no optional-assignment flag); theory blocks do not count. As in the lesson viewer, courses without assignments are complete. Completed courses remain available for review and practice.
+The student dashboard shows courses in progress, completed courses, and up to six recommendations on one page. Completion requires at least 89% of assignment blocks solved, without rounding up. The platform currently has no optional-assignment flag or theory-read tracking; theory blocks do not count. As in the lesson viewer, courses without assignments are complete. Completed courses remain available for review and practice.
+
+After completing the final lesson, eligible students see congratulations and a review form. A 1–5 rating is required; review text is optional (up to 5,000 characters). Students can also submit or edit their one review from the course page. Every submission or edit returns to moderation and is excluded from public reviews and averages until approved. Course authors moderate their own reviews from the dashboard. To assign an administrator, give a staff user the **Can moderate course reviews** permission (`api.moderate_coursereview`) through Django admin. This grants moderation access across courses; ordinary staff status alone does not. The header's pending-review notification refreshes every 30 seconds and survives logout. Published reviews show the username, rating, text and publication date on the public and student course pages. Existing imported landing-page testimonials remain separate. Deploy with `python manage.py migrate` (migration `0028_course_reviews`).
 
 Courses in progress are ordered by the latest lesson visit or submission, falling back to enrollment time. Continue Learning opens that lesson, or the first lesson if the student has not started. Existing submission history supplies resume locations before visit tracking was introduced.
 

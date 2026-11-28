@@ -1,3 +1,4 @@
+import ReviewModeration from '../components/ReviewModeration';
 import StudentDashboard from '../components/StudentDashboard';
 import CoursePriceFields from '../components/CoursePriceFields';
 import { useState, useEffect } from 'react';
@@ -60,6 +61,7 @@ function DashboardPage() {
             </div>
             {user.role === 'AUTHOR' && <StudentQuestions />}
             {user.role === 'AUTHOR' && <DiscussionReports />}
+            {(user.role === 'AUTHOR' || user.can_moderate_reviews) && <ReviewModeration />}
             {user.role === 'AUTHOR' ? <AuthorDashboard /> : <StudentDashboard />}
         </div>
     );

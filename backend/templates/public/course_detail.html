@@ -89,4 +89,17 @@
       {% endif %}
     </div>
   </section>
+  <section class="course-section" aria-labelledby="reviews-title">
+    <div class="container course-section__inner">
+      <h2 id="reviews-title">Отзывы о курсе</h2>
+      {% if average_rating %}<p>Средняя оценка: {{ average_rating|floatformat:2 }} / 5 ★</p>{% endif %}
+      {% for review in student_reviews %}
+        <article>
+          <h3>{{ review.student.username }} · {{ review.rating }} / 5 ★</h3>
+          <time datetime="{{ review.published_at|date:'c' }}">{{ review.published_at|date:'d.m.Y' }}</time>
+          <div style="overflow-wrap:anywhere">{{ review.text|linebreaks }}</div>
+        </article>
+      {% empty %}<p>Опубликованных отзывов пока нет.</p>{% endfor %}
+    </div>
+  </section>
 {% endblock %}

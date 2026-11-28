@@ -835,6 +835,24 @@ class AuthorProfile(models.Model):
         return _localized(self.bio_ru, self.bio_en, lang)
 
 
+class CourseReview(models.Model):
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='student_reviews')
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='course_reviews')
+    rating = models.PositiveSmallIntegerField()
+    text = models.TextField(blank=True, max_length=5000)
+    status = models.CharField(max_length=10, default='pending', choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')])
+    revision = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['student', 'course'], name='one_student_course_review'),
+            models.CheckConstraint(condition=models.Q(rating__gte=1, rating__lte=5), name='course_rating_1_to_5'),
+        ]
+        permissions = [('moderate_coursereview', 'Can moderate course reviews')]
+
+
 class Review(models.Model):
     """A student review for the landing page's "Отзывы" section (published ones only)."""
     student_name = models.CharField(max_length=200)

@@ -1,3 +1,4 @@
+import ReviewModeration from './ReviewModeration';
 import { useEffect, useRef } from 'react';
 import { Link, useLocation, useMatch } from 'react-router-dom';
 import UserBadge from './UserBadge';
@@ -158,6 +159,7 @@ function AppHeader() {
                 {token && (
                     <div className="app-header__end">
                         {isThemedPath(pathname) && <ThemeToggle />}
+                        <ReviewModeration key={token} notification />
                         <NotificationsBell />
                         <UserBadge key={token} />
                     </div>

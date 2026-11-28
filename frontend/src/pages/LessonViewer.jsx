@@ -1,3 +1,4 @@
+import CourseReview from '../components/CourseReview';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { getLesson, getBlocks } from '../api';
@@ -513,6 +514,8 @@ function LessonViewer() {
                 {/* Render all blocks */}
                 {blocks.map(renderBlock)}
 
+                {!isInIframe && user?.role === 'STUDENT' && !lesson.next_lesson_id && (lessonComplete || taskIds.length === 0) &&
+                    <CourseReview courseId={lesson.course} refreshKey={solvedBlockIds.size} congratulations />}
                 {/* After the last block: the next lesson in the course; on the last
                     lesson, back to the course ("Курс пройден" only once every task in
                     the course is solved). Always shown (no lesson locking); hidden

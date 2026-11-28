@@ -21,11 +21,11 @@ function LessonProgress({ taskIds, solvedIds, completeAction }) {
  * then summed over students, so the bar reports a percentage, labelled ariaLabel).
  */
 export function TaskProgress({
-    solved, total, completeAction, completeText = '✓ Урок пройден', label, ariaLabel = 'Решено задач',
+    solved, total, completionThreshold = 100, completeAction, completeText = '✓ Урок пройден', label, ariaLabel = 'Решено задач',
 }) {
     if (total === 0) return null;
     const percent = Math.round((solved / total) * 100);
-    const complete = solved === total;
+    const complete = solved * 100 >= total * completionThreshold;
 
     return (
         <div className={complete ? 'lesson-progress lesson-progress--complete' : 'lesson-progress'}>

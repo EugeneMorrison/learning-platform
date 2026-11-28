@@ -5,6 +5,7 @@ URL routing for API endpoints
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .course_reviews import CourseReviewsView, MyCourseReviewView, ReviewModerationView
 from .student_dashboard import StudentDashboardView
 from .edit_history import CourseHistoryView
 from .code_solutions import CodeSolutionsView
@@ -25,6 +26,9 @@ router.register(r'lessons', views.LessonViewSet, basename='lesson')
 router.register(r'blocks', views.BlockViewSet, basename='block')
 
 urlpatterns = [
+    path('courses/<uuid:course_id>/reviews/', CourseReviewsView.as_view()),
+    path('courses/<uuid:course_id>/my-review/', MyCourseReviewView.as_view()),
+    path('reviews/moderation/', ReviewModerationView.as_view()),
     path('dashboard/', StudentDashboardView.as_view(), name='student-dashboard'),
     path('courses/<uuid:course_id>/exports/', export_course),
     path('courses/<uuid:course_id>/history/', CourseHistoryView.as_view(), name='course-history'),

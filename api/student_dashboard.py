@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .block_content import TASK_TYPES
+from .completion import meets_completion
 from .models import Attempt, Course, Enrollment, Lesson, Progress
 
 
@@ -54,7 +55,7 @@ class StudentDashboardView(APIView):
                     activity.append((date, lesson or enrollment.first_lesson))
             last_at, last_lesson = max(activity, key=lambda item: item[0])
             # Matches LessonViewerSerializer: no required tasks means complete.
-            is_complete = course.solved_count == course.task_count
+            is_complete = meets_completion(course.solved_count, course.task_count)
             item = metadata(course) | dict(
                 completion_percentage=(int(100 * course.solved_count / course.task_count)
                                        if course.task_count else 100),
@@ -68,7 +69,7 @@ class StudentDashboardView(APIView):
         # courses must not reappear as recommendations or lose their follow-ups.
         completed_ids = list(course_totals(request.user).filter(
             lessons__blocks__progress__student=request.user,
-        ).filter(solved_count=F('task_count')).values_list('pk', flat=True))
+        ).filter(solved_count__gte=F('task_count') * 0.89).values_list('pk', flat=True))
         completed_ids += [item['id'] for item in completed]
         followups = Course.objects.filter(recommended_after__pk__in=completed_ids).values('pk')
         candidates = Course.objects.filter(is_published=True).exclude(
